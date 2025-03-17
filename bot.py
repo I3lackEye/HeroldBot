@@ -5,7 +5,7 @@ import os
 import random
 
 # Setze hier deinen Bot-Token ein
-TOKEN = "MTM1MTIxNzc3NTYzNjM4NTk3Mw.GBPxil.J1UjXL2FSDqZH3fqWhWuNZKvuoCyak-BAnQFkc"
+TOKEN = "Token"
 
 # Datei für die Speicherung der Anmeldungen
 FILE_PATH = "anmeldungen.json"
