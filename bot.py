@@ -101,50 +101,49 @@ async def anmelden_solo(interaction: discord.Interaction):
         ephemeral=False
     )
 
-# **Abmelden aus der Team-Liste**
-@tree.command(name="abmelden", description="Entfernt dein Team aus der Turnierliste.")
+@tree.command(name="abmelden", description="Entfernt dich aus dem Turnier (egal ob Team oder Einzelanmeldung).")
 async def abmelden(interaction: discord.Interaction):
     spieler_name = interaction.user.name
     found_team = None
 
+    # Prüfen, ob der Spieler in einem Team ist
     for team in anmeldungen["teams"]:
         if spieler_name in (team["spieler1"], team["spieler2"]):
             found_team = team
             break
 
     if found_team:
+        # Team löschen
         spieler1_mention = get_mention(interaction.guild, found_team['spieler1'])
         spieler2_mention = get_mention(interaction.guild, found_team['spieler2'])
         teamname = found_team["teamname"]
-        
+
         anmeldungen["teams"].remove(found_team)
         save_anmeldungen()
-        
+
         await interaction.response.send_message(
             f"❌ **Team entfernt:** `{teamname}`\n"
             f"👤 **{spieler1_mention} & {spieler2_mention}** sind nun nicht mehr angemeldet.",
             ephemeral=False
         )
-    else:
-        await interaction.response.send_message("⚠ Du bist in keinem Team angemeldet!", ephemeral=True)
+        return
 
-# **Abmelden aus der Einzelspieler-Liste**
-@tree.command(name="abmelden_solo", description="Entfernt dich aus der Einzelspieler-Liste.")
-async def abmelden_solo(interaction: discord.Interaction):
-    spieler_name = interaction.user.name
-
+    # Falls kein Team gefunden wurde, prüfen, ob der Spieler in der Solo-Liste ist
     if spieler_name in anmeldungen["solo"]:
         anmeldungen["solo"].remove(spieler_name)
         save_anmeldungen()
-        
+
         spieler_mention = get_mention(interaction.guild, spieler_name)
-        
+
         await interaction.response.send_message(
             f"✅ **{spieler_mention}** wurde aus der Einzelspieler-Liste entfernt.",
             ephemeral=False
         )
-    else:
-        await interaction.response.send_message("⚠ Du bist nicht in der Einzelspieler-Liste!", ephemeral=True)
+        return
+
+    # Falls der Spieler weder in einem Team noch in der Solo-Liste ist
+    await interaction.response.send_message("⚠ Du bist weder in einem Team noch als Einzelspieler angemeldet!", ephemeral=True)
+
 
 
 # **Teilnehmerliste anzeigen**
