@@ -4,18 +4,6 @@ if ! [ -x "$(command -v git)" ]; then
   echo 'Error: git is not installed.' >&2
   exit 1
 fi
-if ! [ -x "$(command -v docker)" ]; then
-  echo 'Error: docker is not installed.' >&2
-  exit 1
-fi
-if ! [ -x "$(command -v mvn)" ]; then
-  echo 'Error: maven is not installed.' >&2
-  exit 1
-fi
-if ! [ -x "$(command -v java)" ]; then
-  echo 'Error: java is not installed.' >&2
-  exit 1
-fi
 # defaults
 REGISTRY="local.host/i3lackeye"
 # get current tag information
