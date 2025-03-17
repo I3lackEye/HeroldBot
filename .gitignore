@@ -17,3 +17,4 @@
 !bot.py
 !requirements.txt
 !Dockerfile
+!buildDocker.sh
