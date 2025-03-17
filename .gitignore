@@ -1,0 +1,14 @@
+# Created by venv; see https://docs.python.org/3/library/venv.html
+
+# Ignore everything
+*
+
+# But not these files...
+!.gitignore
+!script.pl
+!template.latex
+!bot.py
+# etc...
+
+# ...even if they are in subdirectories
+!*/
