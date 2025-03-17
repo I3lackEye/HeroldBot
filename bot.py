@@ -61,6 +61,7 @@ async def anmelden(interaction: discord.Interaction, spieler: discord.Member, te
             await interaction.response.send_message("❌ Du bist bereits in einem Team angemeldet!", ephemeral=True)
             return
 
+    # Prüfen, ob der Spieler bereits in Solo eingetragen ist
     if spieler_name in anmeldungen["solo"]:
         await interaction.response.send_message("❌ Du bist bereits in der Einzelspieler-Liste!", ephemeral=True)
         return
