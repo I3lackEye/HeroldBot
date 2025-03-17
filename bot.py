@@ -4,11 +4,8 @@ import json
 import os
 import random
 
-# Setze hier deinen Bot-Token ein
-TOKEN = "Token"
-
 # Datei für die Speicherung der Anmeldungen
-FILE_PATH = "anmeldungen.json"
+FILE_PATH = os.environ["DATABASE_PATH"]
 
 # Erstelle eine Instanz des Bots mit allen Intents
 intents = discord.Intents.default()
@@ -23,11 +20,11 @@ def load_anmeldungen():
             with open(FILE_PATH, "r", encoding="utf-8") as file:
                 data = json.load(file)
                 if not isinstance(data, dict):
-                    print("⚠ Fehler: `anmeldungen.json` hatte ein falsches Format! Erstelle neue Datei.")
+                    print("⚠ Fehler: {FILE_PATH} hatte ein falsches Format! Erstelle neue Datei.")
                     return {"teams": [], "solo": []}
                 return data
         except json.JSONDecodeError:
-            print("⚠ Fehler: `anmeldungen.json` ist beschädigt! Leere Datei wird erstellt.")
+            print("⚠ Fehler: {FILE_PATH} ist beschädigt! Leere Datei wird erstellt.")
             return {"teams": [], "solo": []}
     return {"teams": [], "solo": []}  # Falls Datei nicht existiert
 
@@ -223,4 +220,4 @@ async def team_umbenennen(interaction: discord.Interaction, neuer_name: str):
         await interaction.response.send_message("⚠ Du bist in keinem Team angemeldet!", ephemeral=True)
 
 # Startet den Bot
-bot.run(TOKEN)
+bot.run(os.environ["TOKEN"])

@@ -13,3 +13,9 @@
 
 # ...even if they are in subdirectories
 !*/
+
+# allow files
+!bot.py
+!requirements.txt
+!Dockerfile
+!buildDocker.sh
