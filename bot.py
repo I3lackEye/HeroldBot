@@ -5,7 +5,7 @@ import os
 import random
 
 # Datei für die Speicherung der Anmeldungen
-FILE_PATH = os.environ.get["DATABASE_PATH","anmeldung.json"]
+FILE_PATH = os.environ["DATABASE_PATH"]
 
 # Erstelle eine Instanz des Bots mit allen Intents
 intents = discord.Intents.default()
