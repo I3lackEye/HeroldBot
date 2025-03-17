@@ -8,6 +8,7 @@
 !script.pl
 !template.latex
 !bot.py
+!requirements.txt
 # etc...
 
 # ...even if they are in subdirectories
