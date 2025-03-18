@@ -314,8 +314,8 @@ async def punkte_reset(interaction: discord.Interaction):
 
     await interaction.response.send_message("🔄 Alle Punkte wurden zurückgesetzt!", ephemeral=False)
 
-@tree.command(name="punkteboard", description="Zeigt die Punkteliste aller Teams und Spieler.")
-async def punkteboard(interaction: discord.Interaction):
+@tree.command(name="Leaderboard", description="Zeigt die Punkteliste aller Teams und Spieler.")
+async def Leaderboard(interaction: discord.Interaction):
     if not anmeldungen["punkte"]:
         await interaction.response.send_message("❌ Es gibt noch keine vergebenen Punkte!", ephemeral=True)
         return
