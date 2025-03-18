@@ -1,21 +1,10 @@
 # Created by venv; see https://docs.python.org/3/library/venv.html
 
-# Ignore everything
-*
-
-# But not these files...
-!.gitignore
-!script.pl
-!template.latex
-!bot.py
-!requirements.txt
-# etc...
-
-# ...even if they are in subdirectories
-!*/
+# Ignore Python dirs
+/.venv
+/bin
+/include
+/lib
+/lib64
 
 # allow files
-!bot.py
-!requirements.txt
-!Dockerfile
-!buildDocker.sh
