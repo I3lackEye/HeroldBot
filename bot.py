@@ -314,6 +314,25 @@ async def punkte_reset(interaction: discord.Interaction):
 
     await interaction.response.send_message("🔄 Alle Punkte wurden zurückgesetzt!", ephemeral=False)
 
+@tree.command(name="punkteboard", description="Zeigt die Punkteliste aller Teams und Spieler.")
+async def punkteboard(interaction: discord.Interaction):
+    if not anmeldungen["punkte"]:
+        await interaction.response.send_message("❌ Es gibt noch keine vergebenen Punkte!", ephemeral=True)
+        return
+
+    # Sortiere nach Punkten (höchste zuerst)
+    sorted_punkte = sorted(anmeldungen["punkte"].items(), key=lambda x: x[1], reverse=True)
+
+    # Leaderboard-Nachricht formatieren
+    msg = "🏆 **Punkte-Rangliste:**\n"
+    for rank, (name, punkte) in enumerate(sorted_punkte, start=1):
+        msg += f"🔹 **Platz {rank}:** `{name}` - `{punkte} Punkte`\n"
+
+    # Logge, wer das Leaderboard aufgerufen hat
+    bot_logger.info(f"📢 {interaction.user} hat das Leaderboard abgerufen.")
+
+    await interaction.response.send_message(msg, ephemeral=False)
+
 # **Teilnehmerliste zurücksetzen (nur für Admins)**
 @tree.command(name="teilnehmer_reset", description="Löscht alle angemeldeten Teams und Einzelspieler.")
 async def teilnehmer_reset(interaction: discord.Interaction):
