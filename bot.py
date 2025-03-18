@@ -73,12 +73,12 @@ async def on_ready():
 # **Logger für Fehlermeldungen**
 @bot.event
 async def on_error(event, *args, **kwargs):
-    logger.error(f"⚠ Fehler im Event `{event}`: {args}, {kwargs}")
+    bot_logger.error(f"⚠ Fehler im Event `{event}`: {args}, {kwargs}")
 
 # **Logger für Befehle**
 @tree.command(name="test_log", description="Testet den Logger.")
 async def test_log(interaction: discord.Interaction):
-    logger.info(f"📢 {interaction.user} hat /test_log benutzt.")
+    bot_logger.info(f"📢 {interaction.user} hat /test_log benutzt.")
     await interaction.response.send_message("✅ Logger funktioniert!", ephemeral=True)
 
 
