@@ -66,6 +66,18 @@ async def on_ready():
     print(f'✅ {bot.user} ist online und bereit!')
     print(f'📌 Registrierte Slash-Commands: {[cmd.name for cmd in tree.get_commands()]}')
 
+# **Logger für Fehlermeldungen**
+@bot.event
+async def on_error(event, *args, **kwargs):
+    logger.error(f"⚠ Fehler im Event `{event}`: {args}, {kwargs}")
+
+# **Logger für Befehle**
+@tree.command(name="test_log", description="Testet den Logger.")
+async def test_log(interaction: discord.Interaction):
+    logger.info(f"📢 {interaction.user} hat /test_log benutzt.")
+    await interaction.response.send_message("✅ Logger funktioniert!", ephemeral=True)
+
+
 # **Anmelden als Team**
 @tree.command(name="anmelden", description="Melde dich mit einem festen Team für das Turnier an.")
 async def anmelden(interaction: discord.Interaction, spieler: discord.Member, teamname: str):
