@@ -41,6 +41,11 @@ def get_mention(guild, username):
     member = discord.utils.get(guild.members, name=username)
     return member.mention if member else username
 
+# **Hilfsfunktion: Prüft, ob der Nutzer eine bestimmte Rolle hat**
+def has_permission(interaction: discord.Interaction, role_name="Moderator"):
+    return any(role.name == role_name for role in interaction.user.roles)
+
+
 @bot.event
 async def on_ready():
     await tree.sync()  # Slash-Commands synchronisieren
@@ -180,6 +185,10 @@ async def team_shuffle(interaction: discord.Interaction):
         await interaction.response.send_message("❌ Nicht genug Einzelspieler für eine zufällige Teameinteilung!", ephemeral=True)
         return
 
+    if not has_permission(interaction):
+        await interaction.response.send_message("⛔ Du hast keine Berechtigung, diesen Befehl auszuführen!", ephemeral=True)
+        return
+
     random.shuffle(anmeldungen["solo"])
     neue_teams = []
 
@@ -228,6 +237,63 @@ async def team_umbenennen(interaction: discord.Interaction, neuer_name: str):
         )
     else:
         await interaction.response.send_message("⚠ Du bist in keinem Team angemeldet!", ephemeral=True)
+
+# **Punkte vergeben (nur für Admins)**
+@tree.command(name="punkte", description="Vergibt Punkte an ein Team oder einen Spieler.")
+async def punkte(interaction: discord.Interaction, name: str, punkte: int):
+    if not has_permission(interaction):
+        await interaction.response.send_message("⛔ Du hast keine Berechtigung, diesen Befehl auszuführen!", ephemeral=True)
+        return
+
+    if name not in anmeldungen["punkte"]:
+        anmeldungen["punkte"][name] = 0
+
+    anmeldungen["punkte"][name] += punkte
+    save_anmeldungen()
+
+    await interaction.response.send_message(f"✅ `{punkte}` Punkte wurden an **{name}** vergeben! (Gesamt: `{anmeldungen['punkte'][name]}`)", ephemeral=False)
+
+# **Punkte entfernen (nur für Admins)**
+@tree.command(name="punkte_entfernen", description="Entfernt Punkte von einem Team oder Spieler.")
+async def punkte_entfernen(interaction: discord.Interaction, name: str, punkte: int):
+    if not has_permission(interaction):
+        await interaction.response.send_message("⛔ Du hast keine Berechtigung, diesen Befehl auszuführen!", ephemeral=True)
+        return
+
+    if name not in anmeldungen["punkte"]:
+        await interaction.response.send_message(f"⚠ **{name}** hat noch keine Punkte.", ephemeral=True)
+        return
+
+    anmeldungen["punkte"][name] = max(0, anmeldungen["punkte"][name] - punkte)
+    save_anmeldungen()
+
+    await interaction.response.send_message(f"❌ `{punkte}` Punkte wurden von **{name}** entfernt! (Gesamt: `{anmeldungen['punkte'][name]}`)", ephemeral=False)
+
+# **Punkte zurücksetzen (nur für Admins)**
+@tree.command(name="punkte_reset", description="Setzt alle Punkte auf 0 zurück.")
+async def punkte_reset(interaction: discord.Interaction):
+    if not has_permission(interaction):
+        await interaction.response.send_message("⛔ Du hast keine Berechtigung, diesen Befehl auszuführen!", ephemeral=True)
+        return
+
+    anmeldungen["punkte"] = {}
+    save_anmeldungen()
+
+    await interaction.response.send_message("🔄 Alle Punkte wurden zurückgesetzt!", ephemeral=False)
+
+# **Teilnehmerliste zurücksetzen (nur für Admins)**
+@tree.command(name="teilnehmer_reset", description="Löscht alle angemeldeten Teams und Einzelspieler.")
+async def teilnehmer_reset(interaction: discord.Interaction):
+    if not has_permission(interaction):
+        await interaction.response.send_message("⛔ Du hast keine Berechtigung, diesen Befehl auszuführen!", ephemeral=True)
+        return
+
+    anmeldungen["teams"] = []  # Alle Teams löschen
+    anmeldungen["solo"] = []  # Alle Einzelanmeldungen löschen
+    save_anmeldungen()
+
+    await interaction.response.send_message("🔄 **Alle Teams und Einzelspieler wurden entfernt!**", ephemeral=False)
+
 
 # Startet den Bot
 bot.run(os.environ["TOKEN"])
