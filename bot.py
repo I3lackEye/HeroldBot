@@ -39,12 +39,12 @@ def load_anmeldungen():
                 data = json.load(file)
                 if not isinstance(data, dict):
                     print("⚠ Fehler: {FILE_PATH} hatte ein falsches Format! Erstelle neue Datei.")
-                    return {"teams": [], "solo": []}
+                    return {"teams": [], "solo": [], "punkte": []}
                 return data
         except json.JSONDecodeError:
             print("⚠ Fehler: {FILE_PATH} ist beschädigt! Leere Datei wird erstellt.")
-            return {"teams": [], "solo": []}
-    return {"teams": [], "solo": []}  # Falls Datei nicht existiert
+            return {"teams": [], "solo": [], "punkte": []}
+    return {"teams": [], "solo": [], "punkte": []}  # Falls Datei nicht existiert
 
 # Funktion zum Speichern der Anmeldungen
 def save_anmeldungen():
@@ -88,21 +88,28 @@ async def test_log(interaction: discord.Interaction):
 # **Anmelden als Team**
 @tree.command(name="anmelden", description="Melde dich mit einem festen Team für das Turnier an.")
 async def anmelden(interaction: discord.Interaction, spieler: discord.Member, teamname: str):
+    spieler1_name = interaction.user.name  # Name des ersten Spielers
+    spieler2_name = spieler.name  # Name des zweiten Spielers
+
     team = {
         "teamname": teamname,
-        "spieler1": interaction.user.name,
-        "spieler2": spieler.name
+        "spieler1": spieler1_name,
+        "spieler2": spieler2_name
     }
-    # Prüfen, ob der Spieler bereits in einem Team ist
-    for team in anmeldungen["teams"]:
-        if spieler_name in (team["spieler1"], team["spieler2"]):
-            await interaction.response.send_message("❌ Du bist bereits in einem Team angemeldet!", ephemeral=True)
+
+    # Prüfen, ob einer der Spieler bereits in einem Team ist
+    for t in anmeldungen["teams"]:
+        if spieler1_name in (t["spieler1"], t["spieler2"]) or spieler2_name in (t["spieler1"], t["spieler2"]):
+            await interaction.response.send_message("❌ Einer der Spieler ist bereits in einem Team angemeldet!", ephemeral=True)
             return
 
-    # Prüfen, ob der Spieler bereits in Solo eingetragen ist
-    if spieler_name in anmeldungen["solo"]:
-        await interaction.response.send_message("❌ Du bist bereits in der Einzelspieler-Liste!", ephemeral=True)
-        return
+    # Prüfen, ob einer der Spieler in der Solo-Liste ist (und entfernen, falls ja)
+    if spieler1_name in anmeldungen["solo"]:
+        anmeldungen["solo"].remove(spieler1_name)
+
+    if spieler2_name in anmeldungen["solo"]:
+        anmeldungen["solo"].remove(spieler2_name)
+
 
     anmeldungen["teams"].append(team)
     save_anmeldungen()
