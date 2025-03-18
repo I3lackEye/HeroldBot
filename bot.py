@@ -3,6 +3,20 @@ from discord import app_commands
 import json
 import os
 import random
+import logging
+
+
+# Logging aktivieren
+logging.basicConfig(
+    level=logging.INFO,  # Standard-Logging auf INFO-Level
+    format="%(asctime)s [%(levelname)s] %(message)s", 
+    handlers=[
+        logging.FileHandler("debug.log"),  # Speichert Logs in bot.log
+        #logging.StreamHandler()  # Zeigt Logs in der Konsole optional
+    ]
+)
+
+logger = logging.getLogger("discord")  # Erstelle einen Logger für discord.py
 
 # Datei für die Speicherung der Anmeldungen
 FILE_PATH = os.environ["DATABASE_PATH"]
