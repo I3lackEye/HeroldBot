@@ -78,6 +78,9 @@ async def on_error(event, *args, **kwargs):
 # **Logger für Befehle**
 @tree.command(name="test_log", description="Testet den Logger.")
 async def test_log(interaction: discord.Interaction):
+    if not has_permission(interaction):
+        await interaction.response.send_message("⛔ Du hast keine Berechtigung, diesen Befehl auszuführen!", ephemeral=True)
+        return
     bot_logger.info(f"📢 {interaction.user} hat /test_log benutzt.")
     await interaction.response.send_message("✅ Logger funktioniert!", ephemeral=True)
 
