@@ -67,8 +67,8 @@ def has_permission(interaction: discord.Interaction, role_name="Moderator"):
 @bot.event
 async def on_ready():
     await tree.sync()  # Slash-Commands synchronisieren
-    print(f'✅ {bot.user} ist online und bereit!')
-    print(f'📌 Registrierte Slash-Commands: {[cmd.name for cmd in tree.get_commands()]}')
+    bot_logger.info(f'✅ {bot.user} ist online und bereit!')
+    bot_logger.info(f'📌 Registrierte Slash-Commands: {[cmd.name for cmd in tree.get_commands()]}')
 
 # **Logger für Fehlermeldungen**
 @bot.event
