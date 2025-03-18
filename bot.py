@@ -6,17 +6,21 @@ import random
 import logging
 
 
-# Logging aktivieren
-logging.basicConfig(
-    level=logging.INFO,  # Standard-Logging auf INFO-Level
-    format="%(asctime)s [%(levelname)s] %(message)s", 
-    handlers=[
-        logging.FileHandler("debug.log"),  # Speichert Logs in debug.log
-        logging.StreamHandler()  # Zeigt Logs in der Konsole optional
-    ]
-)
+# **Logging für Discord-Events aktivieren**
+logger = logging.getLogger("discord")  # Nutzt das interne Discord-Logging
+logger.setLevel(logging.INFO)  # Setzt das Log-Level (ändern auf DEBUG für mehr Details)
 
-logger = logging.getLogger("discord")  # Erstelle einen Logger für discord.py
+# **FileHandler für Logging in `discord.log`**
+handler = logging.FileHandler(filename="debug.log", encoding="utf-8", mode="w")
+formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(message)s")
+handler.setFormatter(formatter)
+
+logger.addHandler(handler)  # Logger mit dem FileHandler verknüpfen
+
+# **Zusätzliches Logging für eigene Events**
+bot_logger = logging.getLogger("HeroldBot")
+bot_logger.setLevel(logging.INFO)
+bot_logger.addHandler(handler)
 
 # Datei für die Speicherung der Anmeldungen
 FILE_PATH = os.environ["DATABASE_PATH"]
