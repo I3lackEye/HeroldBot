@@ -11,8 +11,8 @@ logging.basicConfig(
     level=logging.INFO,  # Standard-Logging auf INFO-Level
     format="%(asctime)s [%(levelname)s] %(message)s", 
     handlers=[
-        logging.FileHandler("debug.log"),  # Speichert Logs in bot.log
-        #logging.StreamHandler()  # Zeigt Logs in der Konsole optional
+        logging.FileHandler("debug.log"),  # Speichert Logs in debug.log
+        logging.StreamHandler()  # Zeigt Logs in der Konsole optional
     ]
 )
 
