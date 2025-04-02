@@ -67,7 +67,7 @@ match_plan = []
 
 # Erzeugt aus den registrierten Teams zufällige Paarungen.
 # Hinweis: Bei ungerader Anzahl wird das letzte Team in diesem Beispiel nicht berücksichtigt.
-def generate_matches_from_teams(teams: dict):
+def generate_matches(teams: dict):
     team_names = list(teams.keys())
     random.shuffle(team_names)
     matches = []
