@@ -27,12 +27,6 @@ bot_logger.addHandler(handler)
 # Datei für die Speicherung der Anmeldungen
 FILE_PATH = os.environ["DATABASE_PATH"]
 
-# Erstelle eine Instanz des Bots mit allen Intents
-intents = discord.Intents.default()
-intents.members = True  # Notwendig, um Mitglieder zu erkennen
-bot = discord.Client(intents=intents)
-tree = app_commands.CommandTree(bot)
-
 # Funktion zum Laden der Anmeldungen aus der Datei
 def load_anmeldungen():
     if os.path.exists(FILE_PATH):
@@ -64,6 +58,81 @@ def get_mention(guild, username):
 # **Hilfsfunktion: Prüft, ob der Nutzer eine bestimmte Rolle hat**
 def has_permission(interaction: discord.Interaction, allowed_roles=["Moderator", "Lappen des Vertrauens"]):
     return any(role.name in allowed_roles for role in interaction.user.roles)
+
+# Globaler Speicher für den aktuellen Matchplan (Liste von Dicts)
+# Jeder Eintrag: { "date": "YYYY-MM-DD", "match": (TeamA, TeamB), "time": "HH:MM" oder None }
+match_plan = []
+
+# --- Funktionen zum Erzeugen des Matchplans ---
+
+# Erzeugt aus den registrierten Teams zufällige Paarungen.
+# Hinweis: Bei ungerader Anzahl wird das letzte Team in diesem Beispiel nicht berücksichtigt.
+def generate_matches_from_teams(teams: dict):
+    team_names = list(teams.keys())
+    random.shuffle(team_names)
+    matches = []
+    for i in range(0, len(team_names) - 1, 2):
+        matches.append((team_names[i], team_names[i+1]))
+    return matches
+
+# Gibt für einen gegebenen Index (0,1,2,...) ein Datum zurück:
+# Index 0 -> nächster Samstag, 1 -> nächster Sonntag, 2 -> übernächster Samstag, 3 -> übernächster Sonntag, usw.
+def get_dates(i: int) -> datetime.date:
+    today = datetime.date.today()
+    # Berechne den nächsten Samstag:
+    days_ahead = (5 - today.weekday()) % 7  # Samstag hat weekday 5
+    next_saturday = today + datetime.timedelta(days=days_ahead)
+    if i % 2 == 0:
+        # Samstag eines bestimmten Wochenendes
+        return next_saturday + datetime.timedelta(days=(i // 2) * 7)
+    else:
+        # Sonntag desselben Wochenendes
+        return next_saturday + datetime.timedelta(days=1 + (i // 2) * 7)
+
+# Erzeugt einen Matchplan (nur Datum und Platzhalter für die Uhrzeit)
+# Es werden pro Tag maximal zwei Matches eingeplant.
+def generate_plan(matches):
+    scheduled_days = {}  # Mapping: Datum (als String) -> Liste von Matches (Tupel)
+    day_index = 0
+    plan = []
+
+    for match in matches:
+        assigned = False
+        # Suche das früheste Datum, an dem weder eines der Teams bereits spielt noch bereits 2 Matches geplant sind.
+        while not assigned:
+            current_date = get_dates(day_index)
+            date_str = current_date.isoformat()
+            matches_today = scheduled_days.get(date_str, [])
+            # Prüfe, ob eines der Teams in diesem Tag schon eingeplant ist
+            conflict = False
+            for m in matches_today:
+                if match[0] in m or match[1] in m:
+                    conflict = True
+                    break
+            if not conflict and len(matches_today) < 2:
+                # Match an diesem Datum einplanen
+                matches_today.append(match)
+                scheduled_days[date_str] = matches_today
+                plan.append({
+                    "date": date_str,
+                    "match": match,
+                    "time": None  # Zeit wird später von den Spielern gesetzt
+                })
+                assigned = True
+            else:
+                # Entweder Konflikt oder bereits zwei Matches an diesem Tag – probiere den nächsten Tag
+                day_index += 1
+    # Sortiere den Plan nach Datum
+    plan.sort(key=lambda x: x["date"])
+    return plan
+
+# --- Slash-Commands ---
+
+# Erstelle eine Instanz des Bots mit allen Intents
+intents = discord.Intents.default()
+intents.members = True  # Notwendig, um Mitglieder zu erkennen
+bot = discord.Client(intents=intents)
+tree = app_commands.CommandTree(bot)
 
 @bot.event
 async def on_ready():
