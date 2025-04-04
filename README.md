@@ -1,4 +1,4 @@
-Funktionen
+# Funktionen
 1. Registrierung & Teilnehmerverwaltung
 
     Team Registration (/anmelden):
@@ -65,7 +65,7 @@ Funktionen
     Logging:
     Der Bot nutzt das interne Discord-Logging sowie ein zusätzliches Logging für eigene Events. Alle Logs werden in der Datei debug.log abgelegt. Mit dem Befehl /test_log kann geprüft werden, ob das Logging funktioniert.
 
-Setup und Konfiguration
+# Setup und Konfiguration
 
     Umgebungsvariablen:
 
