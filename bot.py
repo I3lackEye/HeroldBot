@@ -59,6 +59,40 @@ def get_mention(guild, username):
 def has_permission(interaction: discord.Interaction, allowed_roles=["Moderator", "Lappen des Vertrauens"]):
     return any(role.name in allowed_roles for role in interaction.user.roles)
 
+def round_robin_schedule(teams: list) -> list:
+    """
+    Generiert einen Round-Robin-Plan für die übergebene Liste von Teams.
+    Jedes Team spielt genau einmal gegen jedes andere Team.
+    
+    :param teams: Liste von Teamnamen (Strings)
+    :return: Liste von Runden, wobei jede Runde eine Liste von Matches (Tupel) ist.
+    """
+    # Wenn die Anzahl der Teams ungerade ist, füge einen Platzhalter hinzu.
+    if len(teams) % 2 == 1:
+        teams.append("BYE")
+    
+    n = len(teams)
+    schedule = []
+    fixed = teams[0]  # Das erste Team bleibt fixiert.
+    rest = teams[1:]  # Die übrigen Teams werden rotiert.
+    
+    for round_index in range(n - 1):
+        round_matches = []
+        # Erstelle eine Liste, die den aktuellen Spielplan der Runde repräsentiert.
+        teams_order = [fixed] + rest
+        # Erzeuge die Paarungen
+        for i in range(n // 2):
+            team1 = teams_order[i]
+            team2 = teams_order[n - 1 - i]
+            # Falls ein Team "BYE" ist, wird das Match übersprungen.
+            if team1 != "BYE" and team2 != "BYE":
+                round_matches.append((team1, team2))
+        schedule.append(round_matches)
+        # Rotationsschritt: Das letzte Team aus 'rest' wird an den Anfang verschoben.
+        rest = [rest[-1]] + rest[:-1]
+    
+    return schedule
+
 # --- Slash-Commands ---
 
 # Erstelle eine Instanz des Bots mit allen Intents
