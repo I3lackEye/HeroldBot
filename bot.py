@@ -599,5 +599,47 @@ async def set_availability(interaction: discord.Interaction, time_slots: str):
 
     await interaction.response.send_message(f"✅ Availability for team **{team_name}** has been updated: {', '.join(intervals)}", ephemeral=False)
 
+@tree.command(name="propose_match", description="Propose a match time based on common availability between two teams.")
+async def propose_match(interaction: discord.Interaction, team1: str, team2: str):
+    # Check if both teams are registered
+    if team1 not in anmeldungen["teams"] or team2 not in anmeldungen["teams"]:
+        await interaction.response.send_message("One or both teams are not registered.", ephemeral=True)
+        return
+
+    # Check if availability is set for both teams
+    if "availability" not in anmeldungen or team1 not in anmeldungen["availability"] or team2 not in anmeldungen["availability"]:
+        await interaction.response.send_message("Availability is not set for one or both teams.", ephemeral=True)
+        return
+
+    # Retrieve availability lists (each as a list of strings, e.g., ["16:00-18:00", "20:00-22:00"])
+    avail_team1 = anmeldungen["availability"][team1]
+    avail_team2 = anmeldungen["availability"][team2]
+
+    # Compute common time slots using the helper function
+    common_slots = common_availability(avail_team1, avail_team2)
+
+    if not common_slots:
+        await interaction.response.send_message("No common availability found between the two teams.", ephemeral=True)
+        return
+
+    # For simplicity, select the first common slot as the proposed match time
+    slot = common_slots[0]
+    proposed_time_str = f"{slot[0].strftime('%H:%M')} - {slot[1].strftime('%H:%M')}"
+
+    # Generate mentions for all players from both teams using the get_mention helper function
+    team1_players = anmeldungen["teams"][team1]
+    team2_players = anmeldungen["teams"][team2]
+    # Remove duplicate players if any
+    all_players = list(set(team1_players + team2_players))
+    mentions = " ".join(get_mention(interaction.guild, player) for player in all_players)
+
+    # Create the proposal message
+    message = (
+        f"Proposed match time for **{team1}** vs **{team2}**: **{proposed_time_str}**\n"
+        f"{mentions}\nPlease react with 👍 to confirm the proposed time."
+    )
+    
+    await interaction.response.send_message(message, ephemeral=False)
+
 # --- Starting the Bot ---
 bot.run(os.environ["TOKEN"])
