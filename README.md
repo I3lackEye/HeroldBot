@@ -1,22 +1,22 @@
 # Funktionen
 1. Registrierung & Teilnehmerverwaltung
 
-    Team Registration (/anmelden):
+    Team Registration (**/anmelden**):
     Ermöglicht es zwei Spielern, sich gemeinsam als Team mit einem Teamnamen anzumelden. Dabei wird überprüft, dass kein Spieler mehrfach in einem Team oder in der Einzelspieler-Liste registriert ist.
 
-    Solo Registration (/anmelden_solo):
+    Solo Registration (**/anmelden_solo**):
     Einzelspieler können sich registrieren, um später einem Team zugeordnet zu werden.
 
-    Deregistration (/abmelden):
+    Deregistration (**/abmelden**):
     Ein Spieler kann sich abmelden. Falls er in einem Team registriert ist, wird das Team aufgelöst und der andere Spieler wird zur Einzelspieler-Liste hinzugefügt.
 
-    Teilnehmerliste anzeigen (/teilnehmer):
+    Teilnehmerliste anzeigen (**/teilnehmer**):
     Zeigt die aktuelle Liste der angemeldeten Teams und Einzelspieler sowie die Gesamtzahl der Teilnehmer an.
 
-    Team Shuffle (/team_shuffle):
+    Team Shuffle (**/team_shuffle**):
     Teilt alle registrierten Einzelspieler zufällig in 2er-Teams ein. (Nur für berechtigte Nutzer)
 
-    Team umbenennen (/team_umbenennen):
+    Team umbenennen (**/team_umbenennen**):
     Ermöglicht es Teammitgliedern, den Namen ihres Teams zu ändern.
 
 2. Matchplanung & Turnierstruktur
@@ -29,7 +29,7 @@
 
 3. Verfügbarkeitsmanagement & Terminvorschläge
 
-    Set Availability (/set_availability):
+    Set Availability (**/set_availability**):
     Teams können ihre Verfügbarkeiten als durch Komma getrennte Zeitintervalle (z. B. "16:00-18:00,20:00-22:00") eingeben. Die Eingabe wird geparst und validiert.
 
     Availability Helper Functions:
@@ -40,21 +40,21 @@
 
         common_availability: Ermittelt die gemeinsamen Zeitfenster zwischen zwei Teams.
 
-    Match Proposal (/propose_match):
+    Match Proposal (**/propose_match**):
     Basierend auf den Verfügbarkeiten von zwei Teams wird ein gemeinsamer Termin vorgeschlagen. Dabei werden alle Spieler der beteiligten Teams in einer Nachricht erwähnt, um die Bestätigung (via Emoji-Reaktion) anzufordern.
 
 4. Punkte- und Leaderboardverwaltung
 
-    Punkte vergeben (/punkte):
+    Punkte vergeben (**/punkte**):
     Admins können einem Team Punkte gutschreiben.
 
-    Punkte entfernen (/punkte_entfernen):
+    Punkte entfernen (**/punkte_entfernen**):
     Ermöglicht Admins, Punkte von einem Team oder Spieler zu entfernen.
 
-    Punkte zurücksetzen (/punkte_reset):
+    Punkte zurücksetzen (**/punkte_reset**):
     Setzt alle vergebenen Punkte auf 0 zurück.
 
-    Leaderboard (/leaderboard):
+    Leaderboard (**/leaderboard**):
     Zeigt eine Rangliste der Teams basierend auf den vergebenen Punkten. (Befehl ist auf einen bestimmten Kanal begrenzt.)
 
 5. Datenpersistenz und Logging
@@ -87,7 +87,7 @@ Starten des Bots
 
 Stelle sicher, dass alle erforderlichen Umgebungsvariablen gesetzt sind und alle Abhängigkeiten (wie discord.py) installiert sind. Starte den Bot dann mit:
 
-python bot.py
+`python bot.py`
 
 Erweiterungsmöglichkeiten
 
