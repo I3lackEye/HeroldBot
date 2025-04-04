@@ -4,6 +4,8 @@ import json
 import os
 import random
 import logging
+import datetime
+import calendar
 
 LIMITED_CHANNEL_ID_1 = 1351213319104761937 #Limited to channel "wettkampf"
 LIMITED_CHANNEL_ID_2 = 1351583903348953109 #Limited to channel "leaderboard"
@@ -27,8 +29,10 @@ bot_logger.addHandler(handler)
 # Datei für die Speicherung der Anmeldungen
 FILE_PATH = os.environ["DATABASE_PATH"]
 
-# Funktion zum Laden der Anmeldungen aus der Datei
 def load_anmeldungen():
+    """
+    loads data from file (player, team etc)
+    """
     if os.path.exists(FILE_PATH):
         try:
             with open(FILE_PATH, "r", encoding="utf-8") as file:
@@ -42,56 +46,176 @@ def load_anmeldungen():
             return {"teams": {}, "solo": [], "punkte": {}}
     return {"teams": {}, "solo": [], "punkte": {}}  # Falls Datei nicht existiert
 
-# Funktion zum Speichern der Anmeldungen
 def save_anmeldungen():
+    """
+    saves registered players
+    """
     with open(FILE_PATH, "w", encoding="utf-8") as file:
         json.dump(anmeldungen, file, indent=4, ensure_ascii=False)
 
 # Lade bestehende Anmeldungen beim Start
 anmeldungen = load_anmeldungen()
 
-# **Hilfsfunktion, um einen Spieler in @mention umzuwandeln**
+# --- Matchplan Helper Functions--- 
 def get_mention(guild, username):
+    """
+    changes playername_string into discords own @mention
+    """
     member = discord.utils.get(guild.members, name=username)
     return member.mention if member else username
 
-# **Hilfsfunktion: Prüft, ob der Nutzer eine bestimmte Rolle hat**
 def has_permission(interaction: discord.Interaction, allowed_roles=["Moderator", "Lappen des Vertrauens"]):
+    """
+    checks if user has certain permission 
+    """
     return any(role.name in allowed_roles for role in interaction.user.roles)
 
 def round_robin_schedule(teams: list) -> list:
     """
-    Generiert einen Round-Robin-Plan für die übergebene Liste von Teams.
-    Jedes Team spielt genau einmal gegen jedes andere Team.
+    generates a round-robin-plan vor all listed teams
+    each teams plays each team once
     
-    :param teams: Liste von Teamnamen (Strings)
-    :return: Liste von Runden, wobei jede Runde eine Liste von Matches (Tupel) ist.
+    :param teams: list of teamnames (Strings)
+    :return: list of rounds, where each round is a list of matches (tuple)
     """
-    # Wenn die Anzahl der Teams ungerade ist, füge einen Platzhalter hinzu.
+    # insert placeholder incase of uneven team amount
     if len(teams) % 2 == 1:
         teams.append("BYE")
     
     n = len(teams)
     schedule = []
-    fixed = teams[0]  # Das erste Team bleibt fixiert.
-    rest = teams[1:]  # Die übrigen Teams werden rotiert.
+    fixed = teams[0]  # first team stays fixed
+    rest = teams[1:]  # rotate all other teams
     
     for round_index in range(n - 1):
         round_matches = []
-        # Erstelle eine Liste, die den aktuellen Spielplan der Runde repräsentiert.
+        # generate list with current plan
         teams_order = [fixed] + rest
-        # Erzeuge die Paarungen
+        # generate pairings
         for i in range(n // 2):
             team1 = teams_order[i]
             team2 = teams_order[n - 1 - i]
-            # Falls ein Team "BYE" ist, wird das Match übersprungen.
+            # if team is "bye" -> skip
             if team1 != "BYE" and team2 != "BYE":
                 round_matches.append((team1, team2))
         schedule.append(round_matches)
-        # Rotationsschritt: Das letzte Team aus 'rest' wird an den Anfang verschoben.
+        #rotation step: Last team from 'rest' will be moved to beginning
         rest = [rest[-1]] + rest[:-1]
     
     return schedule
+
+def get_weekend_dates(year: int, month: int) -> list:
+    """
+    gives weekend data (saturday and sunday) from a giving month
+    """
+    weekend_dates = []
+    cal = calendar.monthcalendar(year, month)
+    # pythons week starts with monday (index 0) and ends with sunday (index 6)
+    for week in cal:
+        saturday = week[calendar.SATURDAY]  # saturday (Index 5)
+        sunday = week[calendar.SUNDAY]      # sunday (Index 6)
+        if saturday != 0:
+            weekend_dates.append(datetime.date(year, month, saturday))
+        if sunday != 0:
+            weekend_dates.append(datetime.date(year, month, sunday))
+    weekend_dates.sort()
+    return weekend_dates
+
+def reorder_matches(matches: list) -> list:
+    """
+    Versucht, die Liste von Matches so zu ordnen, dass nie ein Team in zwei
+    aufeinanderfolgenden Matches erscheint.
+    
+    :param matches: Liste von Tupeln (Team1, Team2)
+    :return: Neu geordnete Liste von Matches
+    """
+    if not matches:
+        return matches
+
+    # Beginne mit dem ersten Match und entferne es aus der Liste.
+    ordered = [matches.pop(0)]
+    while matches:
+        last_match = ordered[-1]
+        found_index = None
+        # Suche ein Match, das kein Team aus last_match enthält.
+        for i, match in enumerate(matches):
+            if last_match[0] not in match and last_match[1] not in match:
+                found_index = i
+                break
+        if found_index is not None:
+            ordered.append(matches.pop(found_index))
+        else:
+            # Wenn kein passendes Match gefunden wurde, füge einfach das erste hinzu.
+            ordered.append(matches.pop(0))
+    return ordered
+
+def distribute_matches_over_weekends(matches: list, year: int, month: int) -> dict:
+    """
+    Distributes the given matches (list of tuples) across all weekend days of a specified month. 
+    Matches are assigned cyclically, and an attempt is made for each day to arrange the order so that the same team never appears in two consecutive matches.
+
+    :param matches: list of matches (Tupel), for example [("Team A", "Team B"), ...]
+    :param year: year as in (e.g. 2025)
+    :param month: month as int (1 to 12)
+    :return: Dictionary with date as key and list of matches a value
+    """
+    weekend_dates = get_weekend_dates(year, month)
+    schedule = {date: [] for date in weekend_dates}
+    num_days = len(weekend_dates)
+    
+    # spread matches cyclical among weekend days 
+    for i, match in enumerate(matches):
+        date = weekend_dates[i % num_days]
+        schedule[date].append(match)
+    
+    # order matches so no team plays twice in succession 
+    for date in schedule:
+        day_matches = schedule[date]
+        schedule[date] = reorder_matches(day_matches.copy())
+    
+    return schedule
+
+# --- Availability Helper Functions ---
+def parse_time_interval(interval_str: str) -> tuple:
+    """
+    Converts a time interval string (e.g., "16:00-18:00") into a tuple (start, end)
+    where start and end are datetime.time objects.
+    """
+    start_str, end_str = interval_str.split("-")
+    start = datetime.datetime.strptime(start_str.strip(), "%H:%M").time()
+    end = datetime.datetime.strptime(end_str.strip(), "%H:%M").time()
+    return start, end
+
+def get_overlap(interval1: tuple, interval2: tuple) -> tuple:
+    """
+    Calculates the overlapping time interval between two time intervals.
+    Returns a tuple (start, end) if an overlap exists, otherwise returns None.
+    """
+    start = max(interval1[0], interval2[0])
+    end = min(interval1[1], interval2[1])
+    if start < end:
+        return start, end
+    return None
+
+def common_availability(team1_intervals: list, team2_intervals: list) -> list:
+    """
+    Determines the common time slots between two teams.
+    
+    :param team1_intervals: A list of time interval strings (e.g., ["16:00-18:00", "20:00-22:00"]) for team 1.
+    :param team2_intervals: A list of time interval strings for team 2.
+    :return: A list of tuples (start, end) representing the common availability.
+    """
+    parsed_team1 = [parse_time_interval(interval) for interval in team1_intervals]
+    parsed_team2 = [parse_time_interval(interval) for interval in team2_intervals]
+    
+    overlaps = []
+    for interval1 in parsed_team1:
+        for interval2 in parsed_team2:
+            overlap = get_overlap(interval1, interval2)
+            if overlap:
+                overlaps.append(overlap)
+    return overlaps
+
 
 # --- Slash-Commands ---
 
@@ -434,6 +558,46 @@ async def teilnehmer_reset(interaction: discord.Interaction):
     bot_logger.info(f"{interaction.user} Hat die Teilnehmer zurückgesetzt.")
     await interaction.response.send_message("🔄 **Alle Teams und Einzelspieler wurden entfernt!**", ephemeral=False)
 
+@tree.command(name="set_availability", description="Set your team's availability as comma-separated time intervals (e.g., '16:00-18:00,20:00-22:00').")
+async def set_availability(interaction: discord.Interaction, time_slots: str):
+    # Check if the command is used in the correct channel (if needed)
+    if interaction.channel_id != LIMITED_CHANNEL_ID_1:
+        await interaction.response.send_message("🚫 This command can only be used in a specific channel!", ephemeral=True)
+        return
 
-# Startet den Bot
+    user_name = interaction.user.name
+    team_name = None
+    
+    # Identify the team that the user is registered in.
+    for team, members in anmeldungen["teams"].items():
+        if user_name in members:
+            team_name = team
+            break
+
+    if not team_name:
+        await interaction.response.send_message("❌ You are not registered in any team!", ephemeral=True)
+        return
+
+    # Split the input string into individual time intervals.
+    intervals = [slot.strip() for slot in time_slots.split(",")]
+    
+    # Validate each time interval using the parse_time_interval function.
+    try:
+        # If any interval is invalid, an exception will be raised.
+        parsed_intervals = [parse_time_interval(slot) for slot in intervals]
+    except Exception as e:
+        await interaction.response.send_message("❌ Error parsing your time slots. Please use the format HH:MM-HH:MM.", ephemeral=True)
+        return
+
+    # Save the availability in the JSON database.
+    # Extend the 'anmeldungen' structure if necessary.
+    if "availability" not in anmeldungen:
+        anmeldungen["availability"] = {}
+    anmeldungen["availability"][team_name] = intervals  # storing as a list of strings
+    
+    save_anmeldungen()
+
+    await interaction.response.send_message(f"✅ Availability for team **{team_name}** has been updated: {', '.join(intervals)}", ephemeral=False)
+
+# --- Starting the Bot ---
 bot.run(os.environ["TOKEN"])
