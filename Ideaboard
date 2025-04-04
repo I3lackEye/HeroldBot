@@ -1,5 +1,9 @@
 Verbesserungen
 
--Give Teams possiblity of  'accepting' a date match -> if not move it to another day (possiblity for more than two matches per day?)
--Send out private messages to affected players in case of changes linked to their matchup
--Fancy formatting for match_plan
+- Matche Teams gegeneinander (jedes Team kämpft einmal gegen jedes andere)
+- Verteile die Matches auf Wochenende (nur 2 Matches am Tag *evtl dynamisch?*, niemals das gleiche Team 2 mal hintereinander)
+- Lasse die Teams ihre Verfügbarkeit angeben (z.B. 16:00-18:00)
+- Überprüfe ob es Überschneidungen in der Verfügbarkeit der Teams gibt
+- Schlage Termin vor (Sende Nachricht in Text channel in dem alle beteiligten Spieler markiert werden)
+- Spieler stimmen mit Emoji ab um Termin zu bestätigen (*Was ist wenn diese nicht zustimmen?*)
+- Wenn Termin bestätigt dann trage ihn in Matchplan ein (*Am Ende als Tabelle ausgeben? oder nice formatiert*)
