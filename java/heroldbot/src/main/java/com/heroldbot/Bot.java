@@ -25,3 +25,4 @@ public class Bot extends ListenerAdapter {
         }
         // Weitere Slash-Commands hier hinzufügen
     }
+}
