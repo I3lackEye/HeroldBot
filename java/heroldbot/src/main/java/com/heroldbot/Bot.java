@@ -9,7 +9,7 @@ import javax.security.auth.login.LoginException;
 public class Bot extends ListenerAdapter {
 
     public static void main(String[] args) throws LoginException {
-        // Token aus der Umgebungsvariable holen
+        // Get token form env variable
         String token = System.getenv("TOKEN");
         
         JDABuilder builder = JDABuilder.createDefault(token);
@@ -23,6 +23,6 @@ public class Bot extends ListenerAdapter {
         if (event.getName().equals("test_log")) {
             event.reply("✅ Logger works!").queue();
         }
-        // Weitere Slash-Commands hier hinzufügen
+        // place more slash commands here
     }
 }
