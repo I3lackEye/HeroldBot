@@ -1,0 +1,9 @@
+{
+    "TOKEN": "TOKEN",
+    "DATABASE_PATH": "path/to/data.json",
+    "STATS_DATABASE_PATH": "path/to/stats.json",
+    "ROLE_PERMISSIONS": {
+      "Moderator": ["Moderator", "Lappen des Vertrauens"],
+      "Admin": ["Administrator"]
+    }
+  }
