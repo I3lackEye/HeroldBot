@@ -9,3 +9,6 @@
 debug.log
 anmeldungen.json
 pyvenv.cfg
+/logs
+/scripts/__pycache__
+Ideaboard

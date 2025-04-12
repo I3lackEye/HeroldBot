@@ -1,9 +1,14 @@
 {
     "TOKEN": "TOKEN",
-    "DATABASE_PATH": "path/to/data.json",
-    "STATS_DATABASE_PATH": "path/to/stats.json",
+    "DATA_PATH": "data.json",
+    "TOURNAMENT_PATH": "tournament.json",
     "ROLE_PERMISSIONS": {
       "Moderator": ["Moderator", "Lappen des Vertrauens"],
       "Admin": ["Administrator"]
-    }
+    },
+    "CHANNEL_LIMIT": {
+      "ID": ["1359882955564253324", "1351213319104761937"]
+    },
+    "DEBUG": 1,
+    "STR_MAX_LENGTH": 50
   }

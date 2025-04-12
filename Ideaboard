@@ -9,9 +9,18 @@ Verbesserungen
 - Wenn Termin bestätigt dann trage ihn in Matchplan ein (*Am Ende als Tabelle ausgeben? oder nice formatiert*)
 - Ewige Topliste (Topliste der Tunier Gewinner)
 - Liste an Spielen
-    - Voting für neue Spiele in der Liste  
     - Voting für welches Spiel als nächstes dran ist
     - Champion Rolle als Platz 1. der Liste
 - Automove Spieler in ihre channel
 - Automatisiere die Umfrage von Zusatzpunkten
     - hinzufügen der Punkte zum Team
+
+
+python -m scripts.bot
+source .venv/bin/activate    
+
+
+!Nicht Category moderator laden sonder  Moderator:Moderator oder Moder
+Poll Message aufhübschen
+Jedes Turnier bekommt eine Unique ID, damit man später nachvollziehen kann wie das Turnier strukuriert war und wer gewonnen hat!
+    -Wir dann in der data.json gespeichert
