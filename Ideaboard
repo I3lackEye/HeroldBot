@@ -24,3 +24,9 @@ source .venv/bin/activate
 Poll Message aufhübschen
 Jedes Turnier bekommt eine Unique ID, damit man später nachvollziehen kann wie das Turnier strukuriert war und wer gewonnen hat!
     -Wir dann in der data.json gespeichert
+
+/end_tournament
+    -speichert Gewinner in data.json
+    -evtl welches Spiel gespielt wurde
+
+Evtl Blackliste für Spieler
