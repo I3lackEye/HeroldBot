@@ -52,16 +52,14 @@ coverage.xml
 .env
 .env.*
 
-# Docker related
-Dockerfile
-buildDocker.sh
-
 # Project-specific ignore rules
 debug.log
 anmeldungen.json
 logs/
 data.json
 tournament.json
+Rules.txt
+pyvenv.cfg
 
 # Node (falls du Webanbindung oder Frontend später baust)
 node_modules/
