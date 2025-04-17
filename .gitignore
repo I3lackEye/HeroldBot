@@ -1,10 +1,78 @@
-# Created by venv; see https://docs.python.org/3/library/venv.html
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
 
-# Ignore Python dirs
-/.venv
-/bin
-/include
-/lib
-/lib64
+# Virtual environments
+.venv/
+env/
+ENV/
+venv/
+pip-wheel-metadata/
+
+# VSCode project settings
+.vscode/
+
+# macOS system files
+.DS_Store
+
+# Python distribution / packaging
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+.pytest_cache/
+
+# Django stuff (if needed later)
+*.log
+
+# Environment variable files
+.env
+.env.*
+
+# Docker related
+Dockerfile
+buildDocker.sh
+
+# Project-specific ignore rules
 debug.log
 anmeldungen.json
+logs/
+data.json
+tournament.json
+
+# Node (falls du Webanbindung oder Frontend später baust)
+node_modules/
+
+# IDE settings
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Git
+.git/
+
+# README backup files (nur wenn du manchmal .bak anlegst)
+*.bak

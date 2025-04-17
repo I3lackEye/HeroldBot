@@ -16,8 +16,7 @@ from .tournament import (
     list_matches,
     match_history,
     team_stats,
-    set_winner_command,
-    close_registration
+    set_winner_command
 )
 from .admin_tools import (
     admin_abmelden,

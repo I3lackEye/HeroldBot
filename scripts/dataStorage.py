@@ -27,7 +27,6 @@ def load_config(config_path="../config.json"):
 # Konfiguration laden
 config = load_config()
 
-
 # Hole Pfade aus Umgebungsvariablen (mit Fallback auf Standardwerte)
 data_path_env = os.getenv("DATA_PATH", "data.json")
 tournament_path_env = os.getenv("TOURNAMENT_PATH", "tournament.json")

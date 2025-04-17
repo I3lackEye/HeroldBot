@@ -167,45 +167,88 @@ class PollView(View):
                 logger.error(f"Fehler beim Löschen der Poll-Nachricht: {e}")
 
 # Funktion zum Starten eines Turniers inkl. Poll
-async def start_tournament(interaction: discord.Interaction, registration_period: int = 604800):
-    # Überprüfe auf Korrekten Channel
-    if interaction.channel_id != CHANNEL_LIMIT_1:
-        await interaction.response.send_message("🚫 Dieser Befehl kann nur in einem bestimmten Kanal verwendet werden!", ephemeral=True)
-        logger.info(f"User {interaction.user} hat falschen Channel für Command verwendet")
-        return
-    
-    # Überprüfe, ob der Nutzer Administratorrechte hat.
+@app_commands.command(name="start_tournament", description="Startet ein neues Turnier (Admin).")
+@app_commands.describe(
+    registration_hours="Wie viele Stunden soll die Anmeldung offen bleiben?",
+    tournament_hours="Wie viele Stunden soll das Turnier laufen?"
+)
+async def start_tournament(
+    interaction: Interaction, 
+    registration_hours: int = 48,  # Standard: 48 Stunden Anmeldung
+    tournament_hours: int = 168    # Standard: 1 Woche Turnierzeit
+):
     if not has_permission(interaction.user, "Moderator", "Admin"):
-        logger.info(f"{interaction.user} hatte keine Berechtigung")
-        await interaction.response.send_message("Du hast keine ausreichenden Rechte, um diesen Befehl auszuführen.", ephemeral=True)
+        await interaction.response.send_message("🚫 Du hast keine Berechtigung für diesen Befehl.", ephemeral=True)
         return
 
-    tournament = load_tournament_data()
-    if tournament.get("running", False):
-        await interaction.response.send_message("Ein Turnier läuft bereits!", ephemeral=True)
-        return
-
-    # Setze das Turnier zurück und markiere es als laufend
-    tournament = reset_tournament_data()
-    tournament["running"] = True
+    # Turnier-Daten vorbereiten
+    tournament = {
+        "registration_open": True,
+        "running": True,
+        "teams": {},
+        "solo": [],
+        "registration_end": (datetime.now() + timedelta(hours=registration_hours)).isoformat(),
+        "tournament_end": (datetime.now() + timedelta(hours=registration_hours + tournament_hours)).isoformat()
+    }
     save_tournament_data(tournament)
 
-    # Lade die globalen Spieldaten
-    global_data = load_global_data()
-    games = global_data.get("games", [])
-    if not games:
-        await interaction.response.send_message("Es sind keine Spiele in den globalen Daten hinterlegt.", ephemeral=True)
-        return
+    logger.info(f"[TOURNAMENT] Neues Turnier gestartet – Anmeldung bis {tournament['registration_end']}")
 
-    # Erstelle die PollView mit der angegebenen Registrierungsdauer (in Sekunden)
-    view = PollView(games, registration_period=registration_period)
-    poll_msg = await interaction.channel.send("Bitte stimme ab, welches Spiel im Turnier gespielt werden soll:", view=view)
-    view.message = poll_msg
+    # Starte die Spiel-Umfrage (Poll)
+    from .dataStorage import load_global_data
+    games = load_global_data().get("games", [])
+    view = PollView(options=games)
+    poll_message = await interaction.channel.send("🎮 Bitte stimmt ab, welches Spiel gespielt werden soll:", view=view)
+    view.message = poll_message
 
-    # Sende eine Bestätigung (optional auch mit Anzeige des Endzeitpunkts)
-    end_time = datetime.now() + timedelta(seconds=registration_period)
-    formatted_end = end_time.strftime("%d.%m.%Y %H:%M")
-    await interaction.response.send_message(f"Neues Turnier gestartet. Die Anmeldung ist bis {formatted_end} freigegeben.", ephemeral=True)
+    # Schöne Ankündigung per Embed
+    embed = Embed(
+        title="🏆 Turnier gestartet!",
+        description="Die Anmeldung ist jetzt offen!\n\nBitte stimmt über das Spiel ab und meldet euch an!",
+        color=0x3498db
+    )
+    registration_end_formatted = (datetime.now() + timedelta(hours=registration_hours)).strftime("%d.%m.%Y %H:%M")
+    tournament_end_formatted = (datetime.now() + timedelta(hours=registration_hours + tournament_hours)).strftime("%d.%m.%Y %H:%M")
+    embed.add_field(name="📅 Anmeldeschluss", value=f"**{registration_end_formatted}**", inline=False)
+    embed.add_field(name="🏁 Voraussichtliches Turnierende", value=f"**{tournament_end_formatted}**", inline=False)
+    embed.set_footer(text="Viel Erfolg allen Teilnehmern!")
+
+    await interaction.channel.send(embed=embed)
+
+    # Hintergrundaufgabe: Anmeldung automatisch schließen
+    async def close_registration_task():
+        await asyncio.sleep(registration_hours * 3600)
+        tournament = load_tournament_data()
+        tournament["registration_open"] = False
+        save_tournament_data(tournament)
+        await interaction.channel.send("🚫 Die Anmeldephase ist nun geschlossen.")
+        logger.info("[TOURNAMENT] Anmeldung wurde automatisch geschlossen.")
+
+        # Auto-Matchmaking nach Ende der Anmeldefrist
+        new_teams = auto_match_solo()
+        if new_teams:
+            team_texts = [f"**{team}**: {', '.join(members)}" for team, members in new_teams.items()]
+            teams_message = "\n".join(team_texts)
+            await interaction.channel.send(f"🤝 Neue Teams aus der Solo-Liste:\n{teams_message}")
+            logger.info(f"[TOURNAMENT] Neue Teams automatisch erstellt: {list(new_teams.keys())}")
+        else:
+            await interaction.channel.send("⚠️ Es konnten keine neuen Teams gebildet werden.")
+
+    asyncio.create_task(close_registration_task())
+
+    # Hintergrundaufgabe: Turnierende (Optional)
+    async def close_tournament_task():
+        await asyncio.sleep((registration_hours + tournament_hours) * 3600)
+        tournament = load_tournament_data()
+        tournament["running"] = False
+        save_tournament_data(tournament)
+        await interaction.channel.send("🏁 Das Turnier ist nun offiziell beendet!")
+        logger.info("[TOURNAMENT] Turnier automatisch beendet.")
+
+    asyncio.create_task(close_tournament_task())
+
+    # Erfolgsmeldung
+    await interaction.response.send_message("✅ Turnier erfolgreich gestartet!", ephemeral=True)
 
 async def finalize_and_schedule_matches(interaction: discord.Interaction, registration_period: int):
     # Warte, bis die Anmeldefrist abgelaufen ist
