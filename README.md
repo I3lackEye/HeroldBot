@@ -22,17 +22,17 @@ Mit Features wie automatischem Matchmaking, Solo-/Team-Anmeldung, Umfragen, Lead
 
 1. **Projekt klonen:**
 
-bash
-git clone https://github.com/dein-benutzername/HeroldBotV2.git
-cd HeroldBot
+- bash
+- git clone https://github.com/dein-benutzername/HeroldBotV2.git
+- cd HeroldBot
 
 ---
 
 ## Virtuelle Umgebung erstellen (optional, empfohlen):
 
-python -m venv .venv
-source .venv/bin/activate   # (Linux/macOS)
-.venv\Scripts\activate      # (Windows)
+- python -m venv .venv
+- source .venv/bin/activate   # (Linux/macOS)
+- .venv\Scripts\activate      # (Windows)
 
 ---
 
