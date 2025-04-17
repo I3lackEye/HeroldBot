@@ -1,5 +1,4 @@
 {
-    "TOKEN": "TOKEN",
     "DATA_PATH": "data.json",
     "TOURNAMENT_PATH": "tournament.json",
     "ROLE_PERMISSIONS": {
