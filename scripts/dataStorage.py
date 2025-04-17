@@ -26,7 +26,8 @@ config = load_config()
 # Standardinhalte für persistente Daten
 DEFAULT_GLOBAL_DATA = {
     "games": [],
-    "players": {}
+    "last_tournament_winner": {},
+    "player_stats": {}
 }
 
 # Standardinhalte für die turnierspezifischen Daten (tournament.json)
@@ -36,7 +37,8 @@ DEFAULT_TOURNAMENT_DATA = {
     "punkte": {},
     "running": False,
     "registration_open": False,
-    "poll_results": None
+    "poll_results": None,
+    "schedule": []
 }
 
 # Berechne absolute Pfade anhand der neuen Schlüssel in der config
