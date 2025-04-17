@@ -12,3 +12,4 @@ pyvenv.cfg
 /logs
 /scripts/__pycache__
 Ideaboard
+.gitignore
