@@ -52,4 +52,11 @@
 
 ---
 
+## 💡 Zukünftige Features
+- **Automatische Rollenvergabe**
+- **Gamekeys** werden in separater Datei (verschlüsselt gespeichert)
+- **Tournament History**
+- **Automove** spieler werden automatisch in ihre Teamchannel gemoved
+- **Event management** Bot startet automatische Events basierend auf scheduel
+
 > Diese Doku wurde zuletzt aktualisiert am **17.04.2025**
