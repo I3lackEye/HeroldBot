@@ -7,7 +7,7 @@ import os
 import re
 from discord.ui import View, Button
 from discord.utils import get
-from discord import Embed
+from discord import Embed, app_commands, Interaction
 from datetime import datetime, timedelta
 from .logger import setup_logger
 from .matchmaker import auto_match_solo
@@ -229,7 +229,7 @@ async def finalize_and_schedule_matches(interaction: discord.Interaction, regist
     
     await interaction.channel.send(message)
 
-async def set_winner(interaction: discord.Interaction, team: str):
+async def set_winner_command(interaction: discord.Interaction, team: str):
     # Funktionalität, z. B.:
     if not has_permission(interaction.user, "Moderator", "Admin"):
         await interaction.response.send_message("Du hast keine Berechtigung, diesen Befehl auszuführen.", ephemeral=True)
@@ -499,3 +499,155 @@ async def send_registration_open_embed(interaction, end_time: datetime):
     embed.timestamp = datetime.utcnow()
 
     await interaction.channel.send(embed=embed)
+
+
+# Hilfsfunktion: Lade aktuelle Teamnamen
+def get_team_names() -> list[str]:
+    tournament = load_tournament_data()
+    return list(tournament.get("teams", {}).keys())
+
+# Autocomplete-Funktion für Teams
+async def autocomplete_team_name(interaction: Interaction, current: str):
+    tournament = load_tournament_data()
+    teams = get_team_names()
+    return [
+        app_commands.Choice(name=team, value=team)
+        for team in teams if current.lower() in team.lower()
+    ][:25]
+
+# Slash-Command
+@app_commands.command(name="report_match", description="Trage das Ergebnis eines Matches ein.")
+@app_commands.describe(
+    team_a="Erstes Team",
+    team_b="Zweites Team",
+    winner="Gewinnerteam"
+)
+@app_commands.autocomplete(
+    team_a=autocomplete_team_name,
+    team_b=autocomplete_team_name,
+    winner=autocomplete_team_name
+)
+async def report_match(interaction: Interaction, team_a: str, team_b: str, winner: str):
+    if not has_permission(interaction.user, "Moderator", "Admin"):
+        await interaction.response.send_message("🚫 Du hast keine Berechtigung dafür.", ephemeral=True)
+        return
+
+    if winner not in (team_a, team_b):
+        await interaction.response.send_message("⚠ Gewinner muss entweder Team A oder Team B sein.", ephemeral=True)
+        return
+
+    tournament = load_tournament_data()
+    matches = tournament.setdefault("matches", [])
+    matches.append({
+        "team_a": team_a,
+        "team_b": team_b,
+        "winner": winner,
+        "played_at": datetime.now().isoformat()
+    })
+    save_tournament_data(tournament)
+
+    logger.info(f"[MATCH] {team_a} vs {team_b} – Gewinner: {winner}")
+
+    await interaction.response.send_message(
+        f"✅ Match gespeichert!\n\n"
+        f"🏹 {team_a} vs {team_b}\n"
+        f"🏆 Gewinner: **{winner}**",
+        ephemeral=False
+    )
+
+@app_commands.command(name="list_matches", description="Zeigt alle bisher gemeldeten Matches an.")
+async def list_matches(interaction: Interaction):
+    if not has_permission(interaction.user, "Moderator", "Admin"):
+        await interaction.response.send_message("🚫 Du hast keine Berechtigung dafür.", ephemeral=True)
+        return
+
+    tournament = load_tournament_data()
+    matches = tournament.get("matches", [])
+
+    if not matches:
+        await interaction.response.send_message("📭 Es wurden noch keine Matches eingetragen.", ephemeral=True)
+        return
+
+    embed = Embed(
+        title="📜 Gespielte Matches",
+        description="Hier sind alle bisherigen Match-Ergebnisse:",
+        color=0x7289DA  # Discord-Blau
+    )
+
+    for idx, match in enumerate(matches, start=1):
+        played_at = match.get("played_at", "Unbekannt")
+        date_str = played_at.split("T")[0]  # Nur Datum anzeigen
+        embed.add_field(
+            name=f"Match {idx}: {match['team_a']} vs {match['team_b']}",
+            value=f"🏆 Gewinner: **{match['winner']}**\n📅 Gespielt am: {date_str}",
+            inline=False
+        )
+
+    await interaction.response.send_message(embed=embed)
+
+@app_commands.command(name="match_history", description="Zeigt die Match-Historie eines Teams an.")
+@app_commands.describe(team="Das Team, dessen Matches du sehen möchtest.")
+@app_commands.autocomplete(team=autocomplete_team_name)
+async def match_history(interaction: Interaction, team: str):
+    if not has_permission(interaction.user, "Moderator", "Admin"):
+        await interaction.response.send_message("🚫 Du hast keine Berechtigung dafür.", ephemeral=True)
+        return
+
+    tournament = load_tournament_data()
+    matches = tournament.get("matches", [])
+
+    team_matches = [match for match in matches if match['team_a'] == team or match['team_b'] == team]
+
+    if not team_matches:
+        await interaction.response.send_message(f"📭 Keine Matches für Team **{team}** gefunden.", ephemeral=True)
+        return
+
+    embed = Embed(
+        title=f"📜 Match-Historie: {team}",
+        color=0xE67E22  # ein schönes Orange
+    )
+
+    for idx, match in enumerate(team_matches, start=1):
+        opponent = match['team_b'] if match['team_a'] == team else match['team_a']
+        result = "🏆 Sieg" if match['winner'] == team else "❌ Niederlage"
+        played_at = match.get("played_at", "Unbekannt").split("T")[0]
+        embed.add_field(
+            name=f"Match {idx}",
+            value=f"🆚 Gegner: **{opponent}**\n📅 Datum: {played_at}\n{result}",
+            inline=False
+        )
+
+    await interaction.response.send_message(embed=embed)
+
+@app_commands.command(name="team_stats", description="Zeigt die Statistiken eines Teams.")
+@app_commands.describe(team="Das Team, dessen Statistik angezeigt werden soll.")
+@app_commands.autocomplete(team=autocomplete_team_name)
+async def team_stats(interaction: Interaction, team: str):
+    if not has_permission(interaction.user, "Moderator", "Admin"):
+        await interaction.response.send_message("🚫 Du hast keine Berechtigung dafür.", ephemeral=True)
+        return
+
+    tournament = load_tournament_data()
+    matches = tournament.get("matches", [])
+
+    team_matches = [match for match in matches if match['team_a'] == team or match['team_b'] == team]
+
+    if not team_matches:
+        await interaction.response.send_message(f"📭 Keine Matches für Team **{team}** gefunden.", ephemeral=True)
+        return
+
+    wins = sum(1 for match in team_matches if match['winner'] == team)
+    losses = len(team_matches) - wins
+    winrate = (wins / len(team_matches)) * 100 if team_matches else 0
+
+    embed = Embed(
+        title=f"📈 Team-Statistiken: {team}",
+        color=0x2ECC71  # schönes Grün für Erfolg
+    )
+    embed.add_field(name="📊 Gespielte Matches", value=str(len(team_matches)), inline=True)
+    embed.add_field(name="🏆 Siege", value=str(wins), inline=True)
+    embed.add_field(name="❌ Niederlagen", value=str(losses), inline=True)
+    embed.add_field(name="📈 Winrate", value=f"{winrate:.1f} %", inline=False)
+
+    await interaction.response.send_message(embed=embed)
+

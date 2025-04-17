@@ -2,9 +2,13 @@ import os
 import json
 import logging
 from .logger import setup_logger
+from dotenv import load_dotenv
 
 # Logger Setup
 logger = setup_logger("logs", level=logging.INFO)
+
+# Lade .env files
+load_dotenv()
 
 def load_config(config_path="../config.json"):
     try:
@@ -23,6 +27,17 @@ def load_config(config_path="../config.json"):
 # Konfiguration laden
 config = load_config()
 
+
+# Hole Pfade aus Umgebungsvariablen (mit Fallback auf Standardwerte)
+data_path_env = os.getenv("DATA_PATH", "data.json")
+tournament_path_env = os.getenv("TOURNAMENT_PATH", "tournament.json")
+
+# Berechne die vollständigen Pfade
+BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+
+DATA_FILE_PATH = os.path.join(BASE_DIR, data_path_env)
+TOURNAMENT_FILE_PATH = os.path.join(BASE_DIR, tournament_path_env)
+
 # Standardinhalte für persistente Daten
 DEFAULT_GLOBAL_DATA = {
     "games": [],
@@ -40,10 +55,6 @@ DEFAULT_TOURNAMENT_DATA = {
     "poll_results": None,
     "schedule": []
 }
-
-# Berechne absolute Pfade anhand der neuen Schlüssel in der config
-DATA_FILE_PATH = os.path.join(os.path.dirname(__file__), "../", config.get("DATA_PATH"))
-TOURNAMENT_FILE_PATH = os.path.join(os.path.dirname(__file__), "../", config.get("TOURNAMENT_PATH"))
 
 # Handling der Channel Limits
 channel_limit = config.get("CHANNEL_LIMIT", {})
