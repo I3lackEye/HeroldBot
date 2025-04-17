@@ -60,6 +60,7 @@ data.json
 tournament.json
 Rules.txt
 pyvenv.cfg
+Ideaboard
 
 # Node (falls du Webanbindung oder Frontend später baust)
 node_modules/
