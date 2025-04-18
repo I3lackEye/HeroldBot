@@ -99,14 +99,94 @@ python -m scripts.bot
 
 ---
 
-## 🏗️ ToDo / Ideen für die Zukunft
+## 🧠 Geplante Erweiterungen
 
-- Dynamische Teamgrößen (1vs1, 2vs2, 3vs3)
-- Mehrstufige Match-Verwaltung (Best-of-3, Finals, etc.)
-- Web-Dashboard (Statusanzeige, Matches, Leaderboards)
-- Bessere Autocomplete-Features
-- Serverübergreifende Statistiken
-- Turnierhistorie mit Archivfunktion
+### 📦 Version 2 – Fokus: Stabilität & Kernfeatures
+
+- [ ] **1h vor Match Benachrichtigung**  
+  Spieler erhalten automatisch eine Erinnerung an ihr anstehendes Match.
+
+- [ ] **/request_reschedule – Matches verschieben**  
+  Spieler können eine einmalige Anfrage zum Matchverschieben stellen, die vom Gegner bestätigt werden muss.
+
+- [ ] **/update_availability – Verfügbarkeit ändern**  
+  Teilnehmer können ihre Spielzeiten nachträglich anpassen. Der Matchplan wird intelligent aktualisiert.
+
+- [ ] **Reminder mit @Mention**  
+  Erinnerungen mentionen die betroffenen Spieler direkt im Chat.
+
+- [ ] **Handling bei No-Shows**  
+  Moderatoren können Matches als "Nicht angetreten" markieren.
+
+- [ ] **Maximale Reschedules**  
+  Schutz vor Missbrauch – nur 1 erlaubte Verschiebung pro Match.
+
+- [ ] **/next_matches Command**  
+  Zeigt Spielern ihre nächsten geplanten Matches kompakt an.
+
+---
+
+### 🚀 Version 3 – Fokus: Komfort & Flexibilität
+
+- [ ] **Dynamische Teamgrößen (1vs1, 2vs2, 3vs3)**  
+  Unterschiedliche Teamgrößen je Turnier möglich.
+
+- [ ] **Mehrstufige Match-Verwaltung (Best-of-3, Finale, etc.)**  
+  Unterstützung für Best-of-Formate und spezielle Finalrunden.
+
+- [ ] **Live-Scoreboard während des Turniers**  
+  Turnierergebnisse in Echtzeit sichtbar.
+
+- [ ] **Fortgeschrittene Rescheduling-Logik**  
+  Bei Terminänderungen automatische neue Vorschläge.
+
+- [ ] **Smartes Balancing bei Ausfällen**  
+  Dynamisches Anpassen des Spielplans, wenn ein Spieler ausfällt.
+
+---
+
+### 🌟 Version 4 – Fokus: Community & Luxus
+
+- [ ] **Web-Dashboard für Matches und Leaderboards**  
+  Schicke Browser-Oberfläche für Spieler, Zuschauer und Admins.
+
+- [ ] **Serverübergreifende Statistiken**  
+  Turniererfolge getrennt nach Discord-Server verwalten.
+
+- [ ] **Turnierhistorie mit Archivfunktion**  
+  Überblick über vergangene Turniere, Sieger und Statistiken.
+
+- [ ] **Trophäensystem und Belohnungen**  
+  Spieler erhalten Awards für Meilensteine (z.B. 3 Turniersiege).
+
+- [ ] **Automatisierte Siegerehrung**  
+  Nach Turnierende werden Rollen oder Titel automatisch verteilt.
+
+---
+
+## ✅ Bonusideen
+
+- [ ] **Playoff- oder K.O.-System nach Gruppenphase**  
+- [ ] **Integration von Preisgeldern oder Spiele-Keys**  
+- [ ] **Internationale Zeitzonenunterstützung**  
+- [ ] **Custom Matchregeln pro Turnier (z.B. Map-Pools, Sonderregeln)**
+
+---
+
+# 📋 Zusammenfassung
+
+| Phase  | Ziel                  | Geplante Features                             |
+|:-------|:----------------------|:----------------------------------------------|
+| **V2** | Stabiler Turnierablauf | Erinnerungen, Reschedules, Verfügbarkeiten    |
+| **V3** | Komfort & Erweiterungen | Dynamische Teams, Bo3, Live-Scoreboard       |
+| **V4** | Community Features     | Web-Dashboard, Archiv, Preise & Awards        |
+
+---
+
+# 🤝 Contributing
+
+Du hast eine coole Idee für **HeroldBot** oder möchtest helfen?  
+> **Melde dich gerne oder öffne ein Issue! 🚀**
 
 ---
 
