@@ -9,24 +9,34 @@ from dotenv import load_dotenv
 # Lokale Module
 from .dataStorage import load_global_data, load_tournament_data
 from .logger import setup_logger
-from .players import anmelden, update_availability, sign_out_command, participants
-from .stats import leaderboard, stats, tournament_stats
+from .players import anmelden, update_availability, sign_out, participants, help_command
 from .tournament import (
-    report_match,
+    start_tournament,
+    close_registration_after_delay,
+    close_tournament_after_delay,
+    end_tournament,
     list_matches,
-    match_history,
-    team_stats,
-    set_winner_command,
-    close_registration
+    match_schedule
 )
 from .admin_tools import (
+    report_match,
+    force_sign_out,
     admin_abmelden,
     admin_add_win,
-    start_tournament,
-    end_tournament,
     add_game,
     remove_game,
-    award_overall_winner
+    award_overall_winner,
+    reload_commands,
+    close_registration,
+    generate_dummy_teams
+)
+from .stats import (
+    team_stats,
+    leaderboard,
+    stats,
+    tournament_stats,
+    match_history,
+    status
 )
 
 # Setup Logger
@@ -83,11 +93,11 @@ tree = bot.tree
 
 @bot.event
 async def on_ready():
-    print(f"✅ Bot ist eingeloggt als {bot.user}")
+    logger.info(f"✅ Bot ist eingeloggt als {bot.user}")
     try:
         synced = await tree.sync()
         debug_dump_configs()
-        print(f"🔄 {len(synced)} Slash-Commands synchronisiert.")
+        logger.info(f"🔄 {len(synced)} Slash-Commands synchronisiert.")
     except Exception as e:
         print(f"❌ Fehler beim Synchronisieren der Commands: {e}")
 
@@ -98,19 +108,22 @@ async def on_ready():
 # Spielerbefehle
 tree.add_command(anmelden)
 tree.add_command(update_availability)
-tree.add_command(sign_out_command)
+tree.add_command(sign_out)
 tree.add_command(participants)
+tree.add_command(help_command)
+tree.add_command(list_matches)
 
 # Statistikbefehle
 tree.add_command(leaderboard)
 tree.add_command(stats)
 tree.add_command(tournament_stats)
+tree.add_command(status)
 
 # Turnierbefehle
 tree.add_command(report_match)
-tree.add_command(list_matches)
 tree.add_command(match_history)
 tree.add_command(team_stats)
+tree.add_command(match_schedule)
 
 # Adminbefehle
 tree.add_command(admin_abmelden)
@@ -120,6 +133,9 @@ tree.add_command(end_tournament)
 tree.add_command(add_game)
 tree.add_command(remove_game)
 tree.add_command(award_overall_winner)
+tree.add_command(reload_commands)
+tree.add_command(close_registration)
+tree.add_command(generate_dummy_teams)
 
 # --------------------------------
 # Bot starten

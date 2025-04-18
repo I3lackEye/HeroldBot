@@ -1,10 +1,10 @@
 import discord
 from discord import app_commands, Interaction, Member
 from typing import Optional
-from .dataStorage import load_tournament_data, save_tournament_data
-from .utils import has_permission, validate_availability
+from .dataStorage import load_tournament_data, save_tournament_data, config
+from .utils import has_permission, parse_availability, validate_string
 from .logger import setup_logger
-from .matchmaker import run_matchmaker
+from .embeds import send_help_embed
 
 logger = setup_logger("logs")
 
@@ -53,7 +53,6 @@ async def sign_in_solo(interaction: Interaction, anmeldungen: dict, verfugbarkei
         "verfügbarkeit": verfugbarkeit
     })
     save_tournament_data(anmeldungen)
-    logger.info(f"User {user.display_name} hat sich erfolgreich als Solo-Spieler angemeldet.")
 
     await interaction.response.send_message(f"✅ {spieler_mention}, du bist erfolgreich als Einzelspieler angemeldet.", ephemeral=True)
 
@@ -67,13 +66,13 @@ async def sign_in_team(interaction: Interaction, mitspieler: Member, teamname: s
         members = team_entry.get("members", [])
         if user_mention in members or mitspieler_mention in members:
             await interaction.response.send_message("❌ Einer von euch ist bereits in einem Team angemeldet!", ephemeral=True)
-            logger.info(f"Anmeldung fehlgeschlagen: {user.display_name} oder {mitspieler.display_name} ist bereits in einem Team.")
+            logger.info(f"[Anmeldung] fehlgeschlagen: {user.display_name} oder {mitspieler.display_name} ist bereits in einem Team.")
             return
 
     for solo_entry in anmeldungen.get("solo", []):
         if solo_entry.get("player") in (user_mention, mitspieler_mention):
             await interaction.response.send_message("❌ Einer von euch ist bereits als Einzelspieler angemeldet!", ephemeral=True)
-            logger.info(f"Anmeldung fehlgeschlagen: {user.display_name} oder {mitspieler.display_name} ist bereits als Einzelspieler angemeldet.")
+            logger.info(f"[Anmeldung] fehlgeschlagen: {user.display_name} oder {mitspieler.display_name} ist bereits als Einzelspieler angemeldet.")
             return
 
     # Anmeldung speichern
@@ -82,8 +81,8 @@ async def sign_in_team(interaction: Interaction, mitspieler: Member, teamname: s
         "verfügbarkeit": verfugbarkeit
     }
     save_tournament_data(anmeldungen)
-    logger.info(f"Team {teamname} ({user.display_name} und {mitspieler.display_name}) wurde erfolgreich angemeldet.")
-
+    
+    logger.info(f"[Anmeldung] Team {teamname} ({user.display_name} und {mitspieler.display_name}) wurde erfolgreich angemeldet.")
     await interaction.response.send_message(f"✅ Team **{teamname}** ({user_mention} und {mitspieler_mention}) wurde erfolgreich angemeldet!", ephemeral=True)
 
 # ----------------------------------------
@@ -97,6 +96,23 @@ async def sign_in_team(interaction: Interaction, mitspieler: Member, teamname: s
     teamname="Optional: Teamname angeben"
 )
 async def anmelden(interaction: Interaction, verfugbarkeit: str, mitspieler: Optional[Member] = None, teamname: Optional[str] = None):
+    is_valid, error_message = validate_availability(verfugbarkeit)
+    user = interaction.user
+    # Verfügbarkeit prüfen
+    if not is_valid:
+        logger.warning(f"[Anmeldung] {user.display_name} hat ungültige Verfügbarkeit angegeben: {verfugbarkeit}")
+        await interaction.response.send_message(error_message, ephemeral=True)
+        return
+
+    # Teamname prüfen, falls angegeben
+    if teamname:
+        is_valid, error_message = validate_string(teamname)
+        if not is_valid:
+            logger.warning(f"[Anmeldung] {user.display_name} hat ungültigen Teamnamen angegeben: {teamname}")
+            await interaction.response.send_message(error_message, ephemeral=True)
+            return
+
+    logger.info(f"[Anmeldung] {user.display_name} meldet sich an. Verfügbarkeit: {verfugbarkeit}, Teamname: {teamname if teamname else 'Solo'}")
     await handle_sign_in(interaction, verfugbarkeit, mitspieler, teamname)
 
 @app_commands.command(name="update_availability", description="Aktualisiere deinen Verfügbarkeitszeitraum.")
@@ -151,13 +167,12 @@ async def update_availability(interaction: Interaction, verfugbarkeit: str):
             await interaction.channel.send("⚠ Kein neuer Spielplan verfügbar.")
 
 @app_commands.command(name="sign_out", description="Melde dich vom Turnier ab.")
-async def sign_out_command(interaction: Interaction):
+async def sign_out(interaction: Interaction):
     """
     Meldet den User vom Turnier ab.
     """
-    from ..config import CHANNEL_LIMIT_1
-
-    if interaction.channel_id != CHANNEL_LIMIT_1:
+    channel_limit_ids = config.get("CHANNEL_LIMIT", {}).get("ID", [])
+    if str(interaction.channel_id) not in channel_limit_ids:
         await interaction.response.send_message("🚫 Dieser Befehl kann nur in einem bestimmten Kanal verwendet werden!", ephemeral=True)
         return
 
@@ -168,6 +183,7 @@ async def sign_out_command(interaction: Interaction):
         return
 
     user_mention = interaction.user.mention
+    user_name = interaction.user.display_name
     found_team = None
     found_team_entry = None
 
@@ -184,15 +200,21 @@ async def sign_out_command(interaction: Interaction):
             if other_members:
                 verfugbarkeit = found_team_entry.get("verfügbarkeit", "")
                 tournament.setdefault("solo", []).append({"player": other_members[0], "verfügbarkeit": verfugbarkeit})
-                logger.info(f"[SIGN OUT] {other_members[0]} wurde aus Team {found_team} in die Solo-Liste übernommen.")
+
+                 # Namen auflösen
+                other_id = int(other_members[0].strip("<@>"))
+                other_member = interaction.guild.get_member(other_id)
+                other_name = other_member.display_name if other_member else other_members[0]
+                
+                logger.info(f"[SIGN OUT] {other_name[0]} wurde aus Team {found_team} in die Solo-Liste übernommen.")
             save_tournament_data(tournament)
-            logger.info(f"[SIGN OUT] {user_mention} hat Team {found_team} verlassen. Team wurde aufgelöst.")
+            logger.info(f"[SIGN OUT] {user_name} hat Team {found_team} verlassen. Team wurde aufgelöst.")
             await interaction.response.send_message(f"✅ Du wurdest erfolgreich von Team {found_team} abgemeldet.", ephemeral=True)
             return
         else:
             del tournament["teams"][found_team]
             save_tournament_data(tournament)
-            logger.info(f"[SIGN OUT] {user_mention} hat Team {found_team} verlassen. Turnier war bereits geschlossen.")
+            logger.info(f"[SIGN OUT] {user_name} hat Team {found_team} verlassen. Turnier war bereits geschlossen.")
             await interaction.response.send_message(f"✅ Dein Team {found_team} wurde entfernt.", ephemeral=True)
             return
 
@@ -200,11 +222,11 @@ async def sign_out_command(interaction: Interaction):
         if entry.get("player") == user_mention:
             tournament["solo"].remove(entry)
             save_tournament_data(tournament)
-            logger.info(f"[SIGN OUT] Solo-Spieler {user_mention} wurde erfolgreich abgemeldet.")
+            logger.info(f"[SIGN OUT] Solo-Spieler {user_name} wurde erfolgreich abgemeldet.")
             await interaction.response.send_message("✅ Du wurdest erfolgreich aus der Solo-Liste entfernt.", ephemeral=True)
             return
 
-    logger.warning(f"[SIGN OUT] {user_mention} wollte sich abmelden, wurde aber nicht gefunden.")
+    logger.warning(f"[SIGN OUT] {user_name} wollte sich abmelden, wurde aber nicht gefunden.")
     await interaction.response.send_message("⚠ Du bist weder in einem Team noch in der Solo-Liste angemeldet.", ephemeral=True)
 
 @app_commands.command(name="participants", description="Liste aller Teilnehmer anzeigen.")
@@ -233,3 +255,10 @@ async def participants(interaction: Interaction):
         await interaction.response.send_message("Es sind noch keine Teilnehmer angemeldet.", ephemeral=True)
     else:
         await interaction.response.send_message("\n".join(lines), ephemeral=False)
+
+@app_commands.command(name="help", description="Zeigt alle wichtigen Infos und Befehle zum HeroldBot an.")
+async def help_command(interaction: Interaction):
+    """
+    Zeigt das Hilfe-Embed an.
+    """
+    await send_help_embed(interaction)

@@ -11,58 +11,156 @@
     },
     "DEBUG": 1,
     "STR_MAX_LENGTH": 50,
-    "TOURNAMENT_ANNOUNCEMENT": {
-      "title": "🎮 Willkommen zum Turnier!",
-      "description": "Es ist soweit – das nächste große Community-Turnier startet **jetzt!**\n\n📋 Stimmt ab, welches Spiel gespielt werden soll und meldet euch direkt an!",
-      "fields": [
-      {
-      "name": "🗳️ Spielwahl",
-      "value": "Nutze die Buttons unter dieser Nachricht, um **für dein Lieblingsspiel abzustimmen**."
+    "EMBEDS": {
+      "TOURNAMENT_ANNOUNCEMENT": {
+        "title": "🎮 Turnier gestartet!",
+        "description": "Die Anmeldung ist jetzt **offen!**\n\nBitte stimmt für das Spiel ab und meldet euch an!",
+        "fields": [
+          {
+            "name": "📅 Anmeldeschluss",
+            "value": "PLACEHOLDER_ENDTIME"
+          },
+          {
+            "name": "🛡️ Voraussichtliches Turnierende",
+            "value": "PLACEHOLDER_TOURNAMENT_ENDTIME"
+          }
+        ],
+        "footer": "HeroldBot Turniersystem • Viel Erfolg!"
       },
-      {
-      "name": "📥 Anmeldung geöffnet bis",
-      "value": "PLACEHOLDER_ENDTIME"
+
+      "TOURNAMENT_ENDED_ANNOUNCEMENT": {
+        "title": "🏁 Turnier beendet!",
+        "description": "Das Turnier ist abgeschlossen – vielen Dank an alle Teilnehmer!",
+        "fields": [
+          {
+            "name": "🥇 Gewinnerteam",
+            "value": "PLACEHOLDER_WINNERTEAM"
+          },
+          {
+            "name": "🏆 Punkte erreicht",
+            "value": "PLACEHOLDER_POINTS"
+          },
+          {
+            "name": "🎮 Gespieltes Spiel",
+            "value": "PLACEHOLDER_GAME"
+          }
+        ],
+        "footer": "Bis zum nächsten Mal – bleibt fair!"
       },
-      {
-      "name": "👥 Teams & Einzelspieler",
-      "value": "Melde dich alleine oder im 2er-Team an. Falls du solo spielst, wirst du automatisch zugewiesen."
+
+      "POLL_RESULT_EMBED": {
+        "title": "📊 Umfrage abgeschlossen",
+        "description": "Hier sind die Ergebnisse der Spielabstimmung:",
+        "footer": "Danke für eure Teilnahme!"
+      },
+
+      "REGISTRATION_OPEN_ANNOUNCEMENT": {
+        "title": "📥 Anmeldung geöffnet!",
+        "description": "Die Anmeldung für das Turnier läuft jetzt! Sichere dir deinen Platz und mach mit!",
+        "fields": [
+          {
+            "name": "🛠 Wie melde ich mich an?",
+            "value": "Benutze den Befehl **/anmelden** und gib deine Verfügbarkeit an."
+          },
+          {
+            "name": "👥 Teams bilden",
+            "value": "Optional kannst du dich gemeinsam mit einem Freund anmelden."
+          },
+          {
+            "name": "⏳ Anmeldefrist",
+            "value": "**PLACEHOLDER_ENDTIME** Uhr – Danach ist keine Anmeldung mehr möglich!"
+          }
+        ],
+        "footer": "Viel Erfolg – möge das beste Team gewinnen!"
+      },
+      "GLOBAL_STATS_EMBED": {
+        "title": "📊 Turnier-Übersicht",
+        "description": "Globale Statistiken über alle bisherigen Turniere.",
+        "footer": "Statistiken werden automatisch aktualisiert."
+      },
+      "REGISTRATION_CLOSED_ANNOUNCEMENT": {
+      "title": "🚫 Anmeldung geschlossen!",
+      "description": "Die Anmeldephase ist beendet.\n\nDie Teams werden jetzt gebildet und die Matches vorbereitet.",
+      "footer": "Danke für eure Teilnahme!"
+      },
+      "TOURNAMENT_STATS_EMBED": {
+        "title": "📋 Turnierstatistiken",
+        "description": "Hier findest du eine Übersicht über die bisherigen Turnierdaten.",
+        "fields": [
+          {
+            "name": "🧾 Zusammenfassung",
+            "value": "📈 Turnier-Übersicht"
+          },
+          {
+            "name": "👥 Spieler insgesamt",
+            "value": "PLACEHOLDER_TOTAL_PLAYERS"
+          },
+          {
+            "name": "🏆 Vergebene Siege",
+            "value": "PLACEHOLDER_TOTAL_WINS"
+          },
+          {
+            "name": "🥇 Bester Spieler",
+            "value": "PLACEHOLDER_BEST_PLAYER"
+          },
+          {
+            "name": "🔥 Beliebtestes Spiel",
+            "value": "PLACEHOLDER_FAVORITE_GAME"
+          }
+        ],
+        "footer": "Statistiken basierend auf allen vergangenen Turnieren."
+      },
+      "HELP_EMBED": {
+        "title": "🆘 HeroldBot Hilfe",
+        "description": "Hier findest du alle wichtigen Informationen zum Ablauf und den verfügbaren Befehlen.",
+        "fields": [
+          {
+            "name": "🚀 Turnierablauf",
+            "value": "1️⃣ Spiel wählen (Voting)\n2️⃣ Anmeldung öffnen\n3️⃣ Teams erstellen\n4️⃣ Matches spielen\n5️⃣ Sieger küren!"
+          },
+          {
+            "name": "📜 Wichtige Befehle",
+            "value": "`/anmelden` – Anmeldung fürs Turnier\n`/sign_out` – Vom Turnier abmelden\n`/stats` – Eigene Statistiken ansehen\n`/report_match` – Spielergebnis melden\n`/participants` – Aktuelle Teilnehmerliste"
+          },
+          {
+            "name": "📢 Hinweise",
+            "value": "⚠ Achte auf die Anmeldefrist!\n⚡ Sei pünktlich bei deinen Matches!\n💬 Fragen? ➔ Mods anschreiben!"
+          }
+        ],
+        "footer": "Viel Erfolg und viel Spaß – dein HeroldBot-Team!"
+      },
+      "STATUS_EMBED": {
+        "title": "🎮 Turnierstatus",
+        "description": "Hier findest du alle wichtigen Infos zum aktuellen Turnier:",
+        "fields": [
+          {
+            "name": "📥 Anmeldung",
+            "value": "PLACEHOLDER_REGISTRATION"
+          },
+          {
+            "name": "🕹️ Turnierstatus",
+            "value": "PLACEHOLDER_TOURNAMENT"
+          },
+          {
+            "name": "🎯 Gespieltes Spiel",
+            "value": "PLACEHOLDER_GAME"
+          },
+          {
+            "name": "📝 Anstehende Matches",
+            "value": "PLACEHOLDER_MATCHES"
+          }
+        ],
+        "footer": "Nutze /anmelden um dich anzumelden oder /stats für deine Statistik."
+      },
+      "LIST_MATCHES_EMBED": {
+        "title": "📋 Geplante Matches",
+        "description": "Hier siehst du alle angesetzten Begegnungen.",
+        "footer": "Stand: Zeitpunkt der Abfrage"
+      },
+      "MATCH_SCHEDULE_EMBED": {
+      "title": "📋 Spielplan Übersicht",
+      "description": "Hier siehst du alle geplanten Matches!",
+      "footer": "Spielplan wird automatisch aktualisiert."
       }
-    ],
-    "footer": "Viel Spaß & viel Erfolg – möge das beste Team gewinnen!"
-    },
-    "TOURNAMENT_ENDED_ANNOUNCEMENT": {
-      "title": "🏁 Turnier beendet!",
-      "description": "Das Turnier ist abgeschlossen – vielen Dank an alle Teilnehmer für euren Einsatz und euren Sportsgeist!",
-      "fields": [
-      {
-        "name": "🥇 Gewinnerteam",
-        "value": "PLACEHOLDER_WINNERTEAM"
-      },
-      {
-        "name": "🎯 Punkte erreicht",
-        "value": "PLACEHOLDER_POINTS"
-      },
-      {
-        "name": "🕹️ Gespieltes Spiel",
-        "value": "PLACEHOLDER_GAME"
-      }
-    ],
-    "footer": "Bis zum nächsten Mal – bleibt fair und zockt weiter!"
-    },
-    "POLL_RESULT_EMBED": {
-      "title": "📊 Abstimmung beendet!",
-      "description": "Hier sind die Ergebnisse der Spielwahl:",
-      "footer": "Danke für deine Stimme!",
-      "highlight_winner": true
-    },
-    "REGISTRATION_OPEN_ANNOUNCEMENT": {
-      "title": "📥 Anmeldung gestartet!",
-      "description": "Die Anmeldung ist bis **PLACEHOLDER_ENDTIME Uhr** geöffnet.",
-      "footer": "Reagiere schnell – begrenzte Zeit!"
-    },
-    "GLOBAL_STATS_EMBED": {
-      "title": "📊 Turnier-Übersicht",
-      "description": "Globale Statistiken über alle Turniere hinweg",
-      "footer": "Statistik über alle bisherigen Turniere"
-    }    
+    }
 }

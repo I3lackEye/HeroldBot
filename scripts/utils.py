@@ -2,9 +2,11 @@
 import discord
 import re
 import logging
+import random
+import time
 from collections import Counter
-from discord import app_commands
-from datetime import datetime
+from discord import app_commands, Interaction, Embed
+from datetime import datetime, timedelta
 from typing import List
 from .logger import setup_logger
 from .dataStorage import load_config, load_global_data, save_global_data, load_tournament_data
@@ -12,6 +14,20 @@ from .dataStorage import load_config, load_global_data, save_global_data, load_t
 # Konfiguration laden (falls nicht schon global geladen)
 config = load_config()
 logger = setup_logger("logs", level=logging.INFO)
+
+
+# Listen für zufällige Namen
+ADJEKTIVE = [
+    "Mutige", "Wilde", "Eiserne", "Schnelle", "Stille", "Kühne", "Tapfere", "Listige",
+    "Freche", "Donnernde", "Flinke", "Mächtige", "Verwegene", "Legendäre", "Lustige", 
+    "Athletische", "Beglückende", "Elegante", "Fabelhafte", "Feurige", "Grandiose",
+    "Mysteriöse"
+]
+
+SUBSTANTIVE = [
+    "Wölfe", "Drachen", "Falken", "Titanen", "Krieger", "Panther", "Schlangen", "Ninjas",
+    "Löwen", "Bären", "Adler", "Haie", "Berserker", "Wächter"
+]
 
 def has_permission(member: discord.Member, *required_permissions: str) -> bool:
     """
@@ -34,20 +50,6 @@ def has_permission(member: discord.Member, *required_permissions: str) -> bool:
     
     # Prüfe, ob eine der erlaubten Rollen in den Member-Rollen enthalten ist:
     return any(role in member_role_names for role in allowed_roles)
-
-def validate_availability(zeitraum: str) -> (bool, str):
-    """
-    Prüft, ob der übergebene Verfügbarkeitszeitraum dem Format HH:MM-HH:MM entspricht.
-    Erlaubt Zeiten von 00:00 bis 23:59.
-    
-    :param availability: Der Zeitbereich als String, z.B. "12:00-18:00".
-    :return: (True, "") wenn valid, sonst (False, Fehlermeldung).
-    """
-    pattern = r"^(?:[01]?\d|2[0-3]):[0-5]\d-(?:[01]?\d|2[0-3]):[0-5]\d$"
-    if not re.match(pattern, zeitraum):
-        logger.info(f"Fehlerhafte Uhrzeit angegeben: {zeitraum}")
-        return False, "Bitte gib die Verfügbarkeitszeit im Format HH:MM-HH:MM an (z.B. 12:00-18:00)."
-    return True, ""
 
 def validate_string(input_str: str, max_length: int = None) -> (bool, str):
     """
@@ -285,3 +287,64 @@ def finalize_tournament(winning_team: str, winners: list[int], game: str, points
 
     save_global_data(data)
     logger.info(f"[TOURNAMENT] Abschluss gespeichert für Team '{winning_team}' mit Spiel: {game}")
+
+def generate_team_name() -> str:
+    """
+    Erzeugt einen zufälligen Teamnamen aus einer Adjektiv- und einer Substantivliste.
+
+    :return: Der generierte Teamname als String.
+    """
+    adjektiv = random.choice(ADJEKTIVE)
+    substantiv = random.choice(SUBSTANTIVE)
+    return f"{adjektiv} {substantiv}"
+
+async def smart_send(interaction: Interaction, *, content: str = None, embed: Embed = None, ephemeral: bool = False):
+    """
+    Sendet eine Nachricht über interaction.response.send_message,
+    oder über interaction.followup.send, falls bereits geantwortet wurde.
+    """
+    try:
+        await interaction.response.send_message(content=content, embed=embed, ephemeral=ephemeral)
+    except discord.InteractionResponded:
+        await interaction.followup.send(content=content, embed=embed, ephemeral=ephemeral)
+
+    # Hilfsfunktion für zufällige Verfügbarkeiten
+
+def generate_random_availability():
+    start_hour = random.randint(8, 16)  # 8-16 Uhr
+    duration = random.randint(2, 6)     # 2-6 Stunden Spielzeit
+    end_hour = start_hour + duration
+    if end_hour > 23:
+        end_hour = 23
+
+    return f"{start_hour:02d}:00-{end_hour:02d}:00"
+
+def parse_availability(avail_str: str) -> tuple[time, time]:
+    """
+    Wandelt einen String wie '12:00-18:00' in zwei datetime.time Objekte um.
+    """
+    try:
+        start_str, end_str = avail_str.split("-")
+        start_time = datetime.strptime(start_str.strip(), "%H:%M").time()
+        end_time = datetime.strptime(end_str.strip(), "%H:%M").time()
+        return start_time, end_time
+    except Exception as e:
+        logger.warning(f"[MATCHMAKER] Fehler beim Parsen der Verfügbarkeit '{avail_str}': {e}")
+        return None, None
+
+def generate_weekend_slots(start_date: datetime, end_date: datetime) -> list[str]:
+    """
+    Erzeugt alle 30-Minuten Slots zwischen start_date und end_date,
+    aber nur an Samstagen und Sonntagen.
+    Gibt sie im ISO-Format zurück (z.B. '2025-04-20T14:30').
+    """
+    slots = []
+    current = start_date.replace(minute=0, second=0, microsecond=0)
+
+    while current <= end_date:
+        if current.weekday() in (5, 6):  # Samstag oder Sonntag
+            slot = current.isoformat()
+            slots.append(slot)
+        current += timedelta(minutes=30)
+
+    return slots
