@@ -93,8 +93,8 @@ def create_round_robin_schedule():
 
 async def assign_matches_to_slots():
     """
-    Ordnet Matches passenden Slots zu mit "Soft-Cooldown" zwischen Matches.
-    (Vermeidet direktes Hintereinander-Spielen wenn möglich.)
+    Ordnet Matches passenden Slots zu – fair verteilt über die verfügbaren Wochenenden.
+    Achtet darauf, dass Teams nicht direkt nacheinander spielen müssen.
     """
     tournament = load_tournament_data()
     matches = tournament.get("matches", [])
@@ -106,64 +106,67 @@ async def assign_matches_to_slots():
 
     registration_end = datetime.fromisoformat(tournament.get("registration_end"))
     tournament_end = datetime.fromisoformat(tournament.get("tournament_end"))
-    available_slots = generate_weekend_slots(registration_end, tournament_end)
+    slots = generate_weekend_slots(registration_end, tournament_end)
 
-    if not available_slots:
-        logger.warning("[MATCHMAKER] Keine verfügbaren Wochenendslots gefunden.")
+    if not slots:
+        logger.warning("[MATCHMAKER] Keine verfügbaren Slots gefunden.")
         return
 
-    # Vorbereiten
-    scheduled_matches = {}
-    for match in matches:
-        match["scheduled_time"] = None
+    team_slots = {team_name: calculate_team_slots(team_entry, slots) for team_name, team_entry in teams.items()}
 
-    team_slots = {team_name: calculate_team_slots(team_entry, available_slots) for team_name, team_entry in teams.items()}
+    # Matches besser verteilen
+    scheduled_slots = []
+    team_last_played = {}
+    day_match_counter = {}
 
-    def has_recent_match(team_name, slot_time):
-        """Prüfe, ob Team kurz vor oder nach dem Slot spielt."""
-        for scheduled_time, teams_in_match in scheduled_matches.items():
-            if team_name in teams_in_match:
-                diff = abs((slot_time - scheduled_time).total_seconds()) / 60  # Minuten
-                if diff <= 30:  # innerhalb einer halben Stunde
-                    return True
-        return False
-
-    # Matches verteilen
     for match in matches:
         team1 = match["team1"]
         team2 = match["team2"]
 
-        slots_team1 = set(team_slots.get(team1, []))
-        slots_team2 = set(team_slots.get(team2, []))
+        available_for_team1 = set(team_slots.get(team1, []))
+        available_for_team2 = set(team_slots.get(team2, []))
 
-        common_slots = sorted(slots_team1 & slots_team2)
+        common_slots = sorted(available_for_team1 & available_for_team2)
 
         if not common_slots:
             logger.warning(f"[MATCHMAKER] Kein gemeinsamer Slot für {team1} vs {team2} gefunden!")
             continue
 
         best_slot = None
+        lowest_penalty = float('inf')
 
         for slot in common_slots:
-            slot_time = datetime.strptime(slot, "%Y-%m-%dT%H:%M:%S")
-            if not (has_recent_match(team1, slot_time) or has_recent_match(team2, slot_time)):
+            dt = datetime.strptime(slot, "%Y-%m-%dT%H:%M:%S")
+            date_key = dt.strftime("%Y-%m-%d")
+
+            penalty = day_match_counter.get(date_key, 0)
+
+            if team_last_played.get(team1) == date_key:
+                penalty += 5
+            if team_last_played.get(team2) == date_key:
+                penalty += 5
+
+            if penalty < lowest_penalty:
                 best_slot = slot
-                break
+                lowest_penalty = penalty
 
-        # Wenn kein "perfekter" Slot, dann einfach den ersten nehmen
-        if not best_slot:
-            best_slot = common_slots[0]
+        if best_slot:
+            match["scheduled_time"] = best_slot
+            scheduled_slots.append(best_slot)
 
-        # Slot zuweisen
-        match["scheduled_time"] = best_slot
-        scheduled_matches[datetime.strptime(best_slot, "%Y-%m-%dT%H:%M:%S")] = {team1, team2}
+            # Aktualisiere Zähler
+            dt = datetime.strptime(best_slot, "%Y-%m-%dT%H:%M:%S")
+            date_key = dt.strftime("%Y-%m-%d")
+            day_match_counter[date_key] = day_match_counter.get(date_key, 0) + 1
+            team_last_played[team1] = date_key
+            team_last_played[team2] = date_key
 
-        # Slot für beide Teams blockieren
-        team_slots[team1].remove(best_slot)
-        team_slots[team2].remove(best_slot)
+            team_slots[team1].remove(best_slot)
+            team_slots[team2].remove(best_slot)
 
     save_tournament_data(tournament)
-    logger.info("[MATCHMAKER] Alle Matches verteilt unter Berücksichtigung von Pausen.")
+    logger.info(f"[MATCHMAKER] {len(matches)} Matches erfolgreich verteilt.")
+
 
 def calculate_overlap(zeitraum1: str, zeitraum2: str) -> str:
     """
