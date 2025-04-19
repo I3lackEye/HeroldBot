@@ -102,3 +102,10 @@ pip install -r requirements.txt
 ## ✨ Credits
 
 - **BlackEye**
+
+---
+
+## 🔗 Weitere Ressourcen
+
+- [discord.py auf GitHub](https://github.com/Rapptz/discord.py) – Offizielle Python-Bibliothek für Discord-Bots
+- [discord.py Dokumentation](https://discordpy.readthedocs.io/en/stable/) – Ausführliche API-Dokumentation
