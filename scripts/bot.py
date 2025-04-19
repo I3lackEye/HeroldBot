@@ -3,12 +3,15 @@ import json
 import os
 from discord import app_commands
 from discord.ext import commands
+from discord.ext import tasks
 from dotenv import load_dotenv
 
 
 # Lokale Module
-from .dataStorage import load_global_data, load_tournament_data
+from .dataStorage import load_global_data, load_tournament_data, load_config
 from .logger import setup_logger
+from .reminder import match_reminder_loop
+from .reschedule import request_reschedule
 from .players import anmelden, update_availability, sign_out, participants, help_command
 from .tournament import (
     start_tournament,
@@ -28,7 +31,8 @@ from .admin_tools import (
     award_overall_winner,
     reload_commands,
     close_registration,
-    generate_dummy_teams
+    generate_dummy_teams,
+    test_reminder
 )
 from .stats import (
     team_stats,
@@ -41,6 +45,9 @@ from .stats import (
 
 # Setup Logger
 logger = setup_logger("logs")
+
+# Globale Variable für Task-Handling
+reminder_task = None  
 
 # Lade Umgebungsvariablen
 load_dotenv()
@@ -93,6 +100,8 @@ tree = bot.tree
 
 @bot.event
 async def on_ready():
+    global reminder_task
+
     logger.info(f"✅ Bot ist eingeloggt als {bot.user}")
     try:
         synced = await tree.sync()
@@ -100,6 +109,20 @@ async def on_ready():
         logger.info(f"🔄 {len(synced)} Slash-Commands synchronisiert.")
     except Exception as e:
         print(f"❌ Fehler beim Synchronisieren der Commands: {e}")
+
+    # Reminder-Task starten
+    if reminder_task is None or reminder_task.done():
+        config = load_config()
+        reminder_channel_id = int(config.get("CHANNELS", {}).get("REMINDER", 0))
+        channel = bot.get_channel(reminder_channel_id)
+        
+        if channel:
+            reminder_task = bot.loop.create_task(match_reminder_loop(channel))
+            logger.info(f"🔔 Match-Reminder gestartet im Channel {channel.name}.")
+        else:
+            logger.error("❌ Reminder-Channel nicht gefunden oder ungültige ID!")
+    else:
+        logger.info("ℹ️ Reminder-Task läuft bereits.")
 
 # --------------------------------
 # Slash-Commands Registrieren
@@ -112,6 +135,8 @@ tree.add_command(sign_out)
 tree.add_command(participants)
 tree.add_command(help_command)
 tree.add_command(list_matches)
+tree.add_command(request_reschedule)
+tree.add_command(test_reminder)
 
 # Statistikbefehle
 tree.add_command(leaderboard)

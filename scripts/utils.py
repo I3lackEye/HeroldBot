@@ -370,6 +370,37 @@ def intersect_availability(avail1: str, avail2: str) -> Optional[str]:
     except Exception:
         return None
 
+def get_player_team(user_mention_or_id: str) -> Optional[str]:
+    """
+    Findet das Team eines Spielers anhand seiner ID oder Mention.
+    
+    :param user_mention_or_id: String (Mention z.B. "<@123456789>" oder ID "123456789")
+    :return: Teamname oder None
+    """
+    tournament = load_tournament_data()
+
+    for team_name, team_data in tournament.get("teams", {}).items():
+        for member in team_data.get("members", []):
+            if user_mention_or_id in member:
+                return team_name
+    return None
+
+def get_team_open_matches(team_name: str) -> list:
+    """
+    Gibt alle offenen Matches eines Teams zurück.
+    
+    :param team_name: Der Name des Teams
+    :return: Liste von Match-Objekten
+    """
+    tournament = load_tournament_data()
+    open_matches = []
+
+    for match in tournament.get("matches", []):
+        if match.get("status") != "erledigt" and (match.get("team1") == team_name or match.get("team2") == team_name):
+            open_matches.append(match)
+
+    return open_matches
+    
 # Hilfsfunktion für den dummy gen
 def generate_random_availability() -> tuple[str, dict[str, str]]:
     """

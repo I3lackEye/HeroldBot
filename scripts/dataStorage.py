@@ -3,6 +3,7 @@ import json
 import logging
 from .logger import setup_logger
 from dotenv import load_dotenv
+from typing import Optional
 
 # Logger Setup
 logger = setup_logger("logs", level=logging.INFO)
@@ -171,3 +172,4 @@ def remove_game_from_data(game_title: str):
     # Speichere die aktualisierten Daten wieder ab
     save_global_data(data)
     logger.info(f"Spiel '{game_title}' wurde aus den globalen Daten entfernt.")
+

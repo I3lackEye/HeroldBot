@@ -28,7 +28,7 @@ async def anmelden(
     team_name: Optional[str] = None,
     samstag: Optional[str] = None,
     sonntag: Optional[str] = None
-):
+ ):
     """
     Meldet einen Spieler für das Turnier an. Entweder Solo oder Team.
     """

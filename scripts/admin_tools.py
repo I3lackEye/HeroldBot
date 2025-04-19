@@ -7,12 +7,12 @@ from random import randint, choice
 
 
 # Lokale Module
-from .dataStorage import load_global_data, save_global_data, load_tournament_data, save_tournament_data
+from .dataStorage import load_global_data, save_global_data, load_tournament_data, save_tournament_data, load_config
 from .utils import has_permission, generate_team_name, smart_send, generate_random_availability, parse_availability
 from .logger import setup_logger
 from .stats import autocomplete_players, autocomplete_teams
 from .matchmaker import auto_match_solo, create_round_robin_schedule, assign_matches_to_slots, generate_schedule_overview, cleanup_orphan_teams
-from .embeds import send_match_schedule_embed
+from .embeds import send_match_schedule_embed, create_embed_from_config
 
 logger = setup_logger("logs")
 
@@ -264,7 +264,6 @@ async def close_registration(interaction: Interaction):
     description_text = generate_schedule_overview()
     await send_match_schedule_embed(interaction, description_text)
 
-
 @app_commands.command(name="generate_dummy", description="(Admin) Erzeugt Dummy-Solos und Dummy-Teams zum Testen.")
 @app_commands.describe(num_solo="Anzahl Solo-Spieler", num_teams="Anzahl Teams")
 async def generate_dummy_teams(interaction: Interaction, num_solo: int = 4, num_teams: int = 2):
@@ -313,6 +312,52 @@ async def generate_dummy_teams(interaction: Interaction, num_solo: int = 4, num_
     logger.info(f"[DUMMY] {num_solo} Solo-Spieler und {num_teams} Teams erstellt.")
     await interaction.response.send_message(f"✅ {num_solo} Solo-Spieler und {num_teams} Teams wurden erfolgreich erzeugt!", ephemeral=True)
 
+import random
+from discord import app_commands, Interaction
+
+@app_commands.command(name="test_reminder", description="Testet ein Reminder-Embed mit einem zufälligen Match.")
+async def test_reminder(interaction: Interaction):
+    config = load_config()
+    reminder_channel_id = int(config.get("CHANNELS", {}).get("REMINDER", 0))
+
+    guild = interaction.guild
+    if not guild:
+        await smart_send(interaction, content="🚫 Dieser Befehl kann nur auf einem Server genutzt werden.", ephemeral=True)
+        return
+
+    channel = guild.get_channel(reminder_channel_id)
+    if not channel:
+        await smart_send(interaction, content="🚫 Reminder-Channel nicht gefunden! Bitte überprüfe die Config.", ephemeral=True)
+        return
+
+    tournament = load_tournament_data()
+    matches = tournament.get("matches", [])
+
+    if not matches:
+        await smart_send(interaction, content="🚫 Keine Matches vorhanden. Reminder-Test nicht möglich.", ephemeral=True)
+        return
+
+    # Zufälliges Match wählen
+    match = random.choice(matches)
+
+    team1 = match.get("team1", "Team 1")
+    team2 = match.get("team2", "Team 2")
+    match_id = match.get("match_id", "???")
+    scheduled_time = match.get("scheduled_time", "Kein Termin")
+
+    embed = create_embed_from_config("reminder_embed")
+    embed.title = f"📢 Match-Reminder (Test)"
+    embed.description = (
+        f"**Match ID:** {match_id}\n"
+        f"**Teams:** {team1} vs {team2}\n"
+        f"**Geplanter Termin:** {scheduled_time}\n\n"
+        f"Dies ist ein **Test-Reminder** für ein zufällig gewähltes Match."
+    )
+
+    await channel.send(embed=embed)
+    await smart_send(interaction, content=f"✅ Reminder-Test mit Match-ID {match_id} erfolgreich gesendet.", ephemeral=True)
+
+    logger.info(f"[TEST] Reminder-Embed für Match {match_id} ({team1} vs {team2}) erfolgreich im Channel #{channel.name} gesendet.")
 
 
 

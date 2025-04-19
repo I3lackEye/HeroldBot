@@ -1,9 +1,12 @@
 # scripts/embeds.py
 
 import discord
+import configparser
+import json
+import re
 from discord import Embed, Interaction, TextChannel
 
-
+# Lokale Module
 from .utils import load_config, smart_send
 
 def create_embed_from_config(key: str, placeholders: dict = None) -> Embed:
@@ -158,3 +161,44 @@ async def send_cleanup_summary(channel: discord.TextChannel, teams_deleted: list
 
     embed.description = desc
     await channel.send(embed=embed)
+
+async def send_match_reminder(channel: TextChannel, match: dict):
+    """
+    Schickt eine Erinnerung für ein geplantes Match, inklusive Spieler-Pings.
+    """
+    placeholders = {
+        "team1": match.get("team1", "Team A"),
+        "team2": match.get("team2", "Team B"),
+        "time": match.get("scheduled_time", "").replace("T", " ")[:16]
+    }
+
+    embed = create_embed_from_config("reminder_embed", placeholders)
+
+    # Spieler-Mentions erzeugen
+    tournament = load_tournament_data()
+    team1_members = tournament.get("teams", {}).get(match.get("team1"), {}).get("members", [])
+    team2_members = tournament.get("teams", {}).get(match.get("team2"), {}).get("members", [])
+
+    mentions = []
+    for member in team1_members + team2_members:
+        match_id = re.search(r"\d+", member)
+        if match_id:
+            mentions.append(f"<@{match_id.group(0)}>")
+
+    mention_text = " ".join(mentions) if mentions else None
+
+    # Nachricht senden
+    await channel.send(content=mention_text, embed=embed)
+
+    # 📢 Neuen Log-Eintrag bauen
+    try:
+        scheduled_time = datetime.strptime(match.get("scheduled_time"), "%Y-%m-%dT%H:%M:%S")
+        now = datetime.utcnow()
+        minutes_until_start = int((scheduled_time - now).total_seconds() // 60)
+    except Exception as e:
+        minutes_until_start = "?"
+
+    logger.info(
+        f"[REMINDER] Reminder für Match {match.get('match_id')} ({placeholders['team1']} vs {placeholders['team2']}) "
+        f"erfolgreich gesendet. Start in {minutes_until_start} Minuten."
+    )

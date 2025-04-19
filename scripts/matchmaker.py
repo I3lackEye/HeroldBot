@@ -167,7 +167,6 @@ async def assign_matches_to_slots():
     save_tournament_data(tournament)
     logger.info(f"[MATCHMAKER] {len(matches)} Matches erfolgreich verteilt.")
 
-
 def calculate_overlap(zeitraum1: str, zeitraum2: str) -> str:
     """
     Berechnet die Überschneidung von zwei Zeiträumen im Format 'HH:MM-HH:MM'.
