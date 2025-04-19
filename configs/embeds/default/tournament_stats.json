@@ -1,0 +1,29 @@
+{
+    "TOURNAMENT_STATS": {
+        "title": "📋 Turnierstatistiken",
+        "description": "Hier findest du eine Übersicht über die bisherigen Turnierdaten.",
+        "fields": [
+          {
+            "name": "🧾 Zusammenfassung",
+            "value": "📈 Turnier-Übersicht"
+          },
+          {
+            "name": "👥 Spieler insgesamt",
+            "value": "PLACEHOLDER_TOTAL_PLAYERS"
+          },
+          {
+            "name": "🏆 Vergebene Siege",
+            "value": "PLACEHOLDER_TOTAL_WINS"
+          },
+          {
+            "name": "🥇 Bester Spieler",
+            "value": "PLACEHOLDER_BEST_PLAYER"
+          },
+          {
+            "name": "🔥 Beliebtestes Spiel",
+            "value": "PLACEHOLDER_FAVORITE_GAME"
+          }
+        ],
+        "footer": "Statistiken basierend auf allen vergangenen Turnieren."
+      }
+}

@@ -1,0 +1,7 @@
+{
+    "MATCH_SCHEDULE": {
+      "title": "📋 Spielplan Übersicht",
+      "description": "Hier siehst du alle geplanten Matches!",
+      "footer": "Spielplan wird automatisch aktualisiert."
+      }
+}

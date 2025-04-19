@@ -1,0 +1,21 @@
+{
+    "REGISTRATION_OPEN_ANNOUNCEMENT": {
+      "title": "📥 Anmeldung geöffnet!",
+      "description": "Die Anmeldung für das Turnier läuft jetzt! Sichere dir deinen Platz und mach mit!",
+      "fields": [
+        {
+          "name": "🛠 Wie melde ich mich an?",
+          "value": "Benutze den Befehl **/anmelden** und gib deine Verfügbarkeit an."
+        },
+        {
+          "name": "👥 Teams bilden",
+          "value": "Optional kannst du dich gemeinsam mit einem Freund anmelden."
+        },
+        {
+          "name": "⏳ Anmeldefrist",
+          "value": "**PLACEHOLDER_ENDTIME** Uhr – Danach ist keine Anmeldung mehr möglich!"
+        }
+      ],
+      "footer": "Viel Erfolg – möge das beste Team gewinnen!"
+    }
+  }

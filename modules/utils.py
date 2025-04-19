@@ -2,16 +2,36 @@
 import discord
 import re
 import logging
+import random
+import time
+
 from collections import Counter
-from discord import app_commands
-from datetime import datetime
+from random import randint, choice
+from discord import app_commands, Interaction, Embed
+from datetime import datetime, timedelta
 from typing import List
-from .logger import setup_logger
+from typing import Optional
+
+# Lokale Module
+from .logger import logger
 from .dataStorage import load_config, load_global_data, save_global_data, load_tournament_data
 
-# Konfiguration laden (falls nicht schon global geladen)
+# Konfiguration laden
 config = load_config()
-logger = setup_logger("logs", level=logging.INFO)
+
+# Listen für zufällige Namen
+ADJEKTIVE = [
+    "Mutige", "Wilde", "Eiserne", "Schnelle", "Stille", "Kühne", "Tapfere", "Listige",
+    "Freche", "Donnernde", "Flinke", "Mächtige", "Verwegene", "Legendäre", "Lustige", 
+    "Athletische", "Beglückende", "Elegante", "Fabelhafte", "Feurige", "Grandiose",
+    "Mysteriöse", "Garstige", "Hinterhältige", "Gebrechliche", "Unwürdige", "Verdächtige"
+]
+
+SUBSTANTIVE = [
+    "Wölfe", "Drachen", "Falken", "Titanen", "Krieger", "Panther", "Schlangen", "Ninjas",
+    "Löwen", "Bären", "Adler", "Haie", "Berserker", "Wächter", "Hobbits", "Goblins", "Ratten",
+    "Hühner", "Flöten"
+]
 
 def has_permission(member: discord.Member, *required_permissions: str) -> bool:
     """
@@ -34,20 +54,6 @@ def has_permission(member: discord.Member, *required_permissions: str) -> bool:
     
     # Prüfe, ob eine der erlaubten Rollen in den Member-Rollen enthalten ist:
     return any(role in member_role_names for role in allowed_roles)
-
-def validate_availability(zeitraum: str) -> (bool, str):
-    """
-    Prüft, ob der übergebene Verfügbarkeitszeitraum dem Format HH:MM-HH:MM entspricht.
-    Erlaubt Zeiten von 00:00 bis 23:59.
-    
-    :param availability: Der Zeitbereich als String, z.B. "12:00-18:00".
-    :return: (True, "") wenn valid, sonst (False, Fehlermeldung).
-    """
-    pattern = r"^(?:[01]?\d|2[0-3]):[0-5]\d-(?:[01]?\d|2[0-3]):[0-5]\d$"
-    if not re.match(pattern, zeitraum):
-        logger.info(f"Fehlerhafte Uhrzeit angegeben: {zeitraum}")
-        return False, "Bitte gib die Verfügbarkeitszeit im Format HH:MM-HH:MM an (z.B. 12:00-18:00)."
-    return True, ""
 
 def validate_string(input_str: str, max_length: int = None) -> (bool, str):
     """
@@ -152,18 +158,16 @@ def update_player_stats(winner_mentions: list[str]) -> None:
     save_global_data(global_data)
     logger.info("Spielerstatistiken aktualisiert.")
 
-async def remove_game_autocomplete(interaction: discord.Interaction, current: str) -> List[app_commands.Choice[str]]:
-    """
-    Liefert eine Liste von app_commands.Choice, die Spiele enthalten, 
-    deren Name den aktuellen Suchtext (current) beinhaltet.
-    """
-    data = load_global_data()
-    games = data.get("games", [])
-    # Filtere alle Spiele, die "current" (case-insensitive) enthalten.
+async def game_autocomplete(interaction: Interaction, current: str):
+    global_data = load_global_data()
+    games = global_data.get("games", [])
+
+    # Nur Spiele vorschlagen, die zum aktuellen Eingabetext passen
     return [
         app_commands.Choice(name=game, value=game)
-        for game in games if current.lower() in game.lower()
-    ]
+        for game in games
+        if current.lower() in game.lower()
+    ][:25]  # Maximal 25 Ergebnisse laut Discord-API
 
 def add_manual_win(user_id: int):
     """
@@ -285,3 +289,167 @@ def finalize_tournament(winning_team: str, winners: list[int], game: str, points
 
     save_global_data(data)
     logger.info(f"[TOURNAMENT] Abschluss gespeichert für Team '{winning_team}' mit Spiel: {game}")
+
+def generate_team_name() -> str:
+    """
+    Erzeugt einen zufälligen Teamnamen aus einer Adjektiv- und einer Substantivliste.
+
+    :return: Der generierte Teamname als String.
+    """
+    adjektiv = random.choice(ADJEKTIVE)
+    substantiv = random.choice(SUBSTANTIVE)
+    return f"{adjektiv} {substantiv}"
+
+async def smart_send(interaction: Interaction, *, content: str = None, embed: Embed = None, ephemeral: bool = False):
+    """
+    Sendet eine Nachricht über interaction.response.send_message,
+    oder über interaction.followup.send, falls bereits geantwortet wurde.
+    """
+    try:
+        await interaction.response.send_message(content=content, embed=embed, ephemeral=ephemeral)
+    except discord.InteractionResponded:
+        await interaction.followup.send(content=content, embed=embed, ephemeral=ephemeral)
+
+    # Hilfsfunktion für zufällige Verfügbarkeiten
+
+def parse_availability(avail_str: str) -> tuple[time, time]:
+    """
+    Wandelt einen String wie '12:00-18:00' in zwei datetime.time Objekte um.
+    """
+    try:
+        start_str, end_str = avail_str.split("-")
+        start_time = datetime.strptime(start_str.strip(), "%H:%M").time()
+        end_time = datetime.strptime(end_str.strip(), "%H:%M").time()
+        return start_time, end_time
+    except Exception as e:
+        logger.warning(f"[MATCHMAKER] Fehler beim Parsen der Verfügbarkeit '{avail_str}': {e}")
+        return None, None
+
+def intersect_availability(avail1: str, avail2: str) -> Optional[str]:
+    """
+    Berechnet die Schnittmenge von zwei Zeiträumen im Format 'HH:MM-HH:MM'.
+    Gibt None zurück, wenn keine Überschneidung vorhanden ist.
+    """
+    try:
+        start1_str, end1_str = avail1.split("-")
+        start2_str, end2_str = avail2.split("-")
+
+        start1 = datetime.strptime(start1_str, "%H:%M").time()
+        end1 = datetime.strptime(end1_str, "%H:%M").time()
+        start2 = datetime.strptime(start2_str, "%H:%M").time()
+        end2 = datetime.strptime(end2_str, "%H:%M").time()
+
+        latest_start = max(start1, start2)
+        earliest_end = min(end1, end2)
+
+        if latest_start >= earliest_end:
+            return None  # Keine Überschneidung
+
+        return f"{latest_start.strftime('%H:%M')}-{earliest_end.strftime('%H:%M')}"
+    except Exception:
+        return None
+
+def get_player_team(user_mention_or_id: str) -> Optional[str]:
+    """
+    Findet das Team eines Spielers anhand seiner ID oder Mention.
+    
+    :param user_mention_or_id: String (Mention z.B. "<@123456789>" oder ID "123456789")
+    :return: Teamname oder None
+    """
+    tournament = load_tournament_data()
+
+    for team_name, team_data in tournament.get("teams", {}).items():
+        for member in team_data.get("members", []):
+            if user_mention_or_id in member:
+                return team_name
+    return None
+
+def get_team_open_matches(team_name: str) -> list:
+    """
+    Gibt alle offenen Matches eines Teams zurück.
+    
+    :param team_name: Der Name des Teams
+    :return: Liste von Match-Objekten
+    """
+    tournament = load_tournament_data()
+    open_matches = []
+
+    for match in tournament.get("matches", []):
+        if match.get("status") != "erledigt" and (match.get("team1") == team_name or match.get("team2") == team_name):
+            open_matches.append(match)
+
+    return open_matches
+
+async def autocomplete_players(interaction: Interaction, current: str):
+    global_data = load_global_data()
+    player_stats = global_data.get("player_stats", {})
+
+    choices = []
+    for user_id, stats in player_stats.items():
+        member = interaction.guild.get_member(int(user_id))
+        if member:
+            display_name = member.display_name
+        else:
+            display_name = stats.get("display_name") or stats.get("name") or f"Unbekannt ({user_id})"
+        
+        if current.lower() in display_name.lower():
+            choices.append(app_commands.Choice(name=display_name, value=user_id))
+
+    return choices[:25]
+
+async def autocomplete_teams(interaction: Interaction, current: str):
+    logger.info(f"[AUTOCOMPLETE] Aufgerufen – Eingabe: {current}")
+
+    tournament = load_tournament_data()
+    if not tournament:
+        logger.error("[AUTOCOMPLETE] Keine Turnierdaten geladen!")
+        return []
+
+    teams = tournament.get("teams", {})
+    if not teams:
+        logger.warning("[AUTOCOMPLETE] Keine Teams vorhanden im Turnier.")
+        return []
+
+    logger.info(f"[AUTOCOMPLETE] Gefundene Teams: {list(teams.keys())}")
+
+    # Filtere die Teams, die zum aktuellen Eingabetext passen
+    suggestions = [
+        app_commands.Choice(name=team, value=team)
+        for team in teams.keys()
+        if current.lower() in team.lower()
+    ][:25]
+
+    logger.info(f"[AUTOCOMPLETE] {len(suggestions)} Vorschläge erstellt.")
+
+    return suggestions
+
+
+
+# Hilfsfunktion für den dummy gen
+def generate_random_availability() -> tuple[str, dict[str, str]]:
+    """
+    Generiert eine sinnvoll breite Verfügbarkeit für einen Dummy-Spieler:
+    - Allgemein: 6–10 Stunden Zeitfenster
+    - Samstag/Sonntag: extra spezielle Zeiten (optional)
+    """
+    start_hour = random.randint(8, 14)  # zwischen 08:00 und 14:00 starten
+    duration = random.randint(6, 10)     # Verfügbarkeit 6 bis 10 Stunden
+    end_hour = min(start_hour + duration, 23)
+
+    allgemeine_verfugbarkeit = f"{start_hour:02d}:00-{end_hour:02d}:00"
+
+    # Spezielle Verfügbarkeiten für Samstag und Sonntag (50% Chance)
+    special = {}
+    if random.random() < 0.5:
+        start_samstag = random.randint(9, 14)
+        end_samstag = min(start_samstag + random.randint(4, 8), 23)
+        special["samstag"] = f"{start_samstag:02d}:00-{end_samstag:02d}:00"
+
+    if random.random() < 0.5:
+        start_sonntag = random.randint(9, 14)
+        end_sonntag = min(start_sonntag + random.randint(4, 8), 23)
+        special["sonntag"] = f"{start_sonntag:02d}:00-{end_sonntag:02d}:00"
+
+    return allgemeine_verfugbarkeit, special
+
+
