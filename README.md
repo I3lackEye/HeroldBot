@@ -18,12 +18,14 @@
 
 ## 🚀 Installation
 
-`bash
+```
+bash
 git clone https://github.com/dein-benutzername/HeroldBot.git
 cd HeroldBot
 python3.13 -m venv .venv
 source .venv/bin/activate  # oder .venv\Scripts\activate auf Windows
-pip install -r requirements.txt`
+pip install -r requirements.txt
+```
 
 ---
 
