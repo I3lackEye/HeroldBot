@@ -7,13 +7,12 @@ import discord
 from discord import ButtonStyle, Interaction, TextChannel
 from discord.ui import View, Button
 
-from .dataStorage import load_tournament_data, save_tournament_data, load_global_data
-from .logger import setup_logger
-from .embeds import send_registration_open, create_embed_from_config
-from .utils import has_permission
 
-# Setup Logger
-logger = setup_logger()
+# Lokale Module
+from .dataStorage import load_tournament_data, save_tournament_data, load_global_data
+from .logger import logger
+from .embeds import send_registration_open, send_poll_results, send_tournament_announcement
+from .utils import has_permission
 
 class PollView(View):
     def __init__(self, options: list, registration_period: int = 604800):
@@ -37,12 +36,12 @@ class PollView(View):
         async def callback(interaction: Interaction):
             user_id = interaction.user.id
 
-            # Hat der User schon gewählt?
+            # Alte Stimme entfernen
             previous_vote = self.votes.get(user_id)
             if previous_vote is not None:
-                self.results[previous_vote] -= 1  # Alte Stimme entfernen
+                self.results[previous_vote] -= 1
 
-            # Neue Stimme eintragen
+            # Neue Stimme setzen
             self.votes[user_id] = index
             self.results[index] += 1
 
@@ -76,13 +75,6 @@ class PollView(View):
             else:
                 logger.info(f"[POLL] Spiel gewählt: {chosen_game} ({max_votes} Stimmen)")
 
-         # Hole die bereits gespeicherte Registrierung-Endzeit
-        registration_end_str = tournament.get("registration_end")
-        if registration_end_str:
-            registration_end = datetime.fromisoformat(registration_end_str)
-        else:
-            registration_end = datetime.now() + timedelta(hours=48)  # Fallback, falls irgendwas schiefging
-
         # Update der Tournament-Daten
         tournament["poll_results"] = poll_result_mapping
         tournament["poll_results"]["chosen_game"] = chosen_game
@@ -90,21 +82,21 @@ class PollView(View):
         save_tournament_data(tournament)
 
         # Logger mit richtiger Zeit
+        registration_end_str = tournament.get("registration_end")
+        if registration_end_str:
+            registration_end = datetime.fromisoformat(registration_end_str)
+        else:
+            registration_end = datetime.now() + timedelta(hours=48)  # Fallback
+
         logger.info(f"[POLL] Poll beendet – Registrierung offen bis {registration_end.strftime('%d.%m.%Y %H:%M')}.")
 
-        # Poll-Result-Embed senden
-        embed_template = create_embed_from_config("POLL_RESULT_EMBED")
-        for game, votes in sorted_games:
-            embed_template.add_field(name=game, value=f"**{votes} Stimmen**", inline=False)
+        # 🆕 Neuer Schritt: Poll-Ergebnisse schön per Embed schicken
+        placeholders = {
+            "chosen_game": chosen_game
+        }
+        await send_poll_results(interaction.channel, placeholders, poll_result_mapping)
 
-        if sorted_games and sorted_games[0][1] > 0:
-            embed_template.add_field(name="🏆 Gewonnen", value=f"**{chosen_game}**", inline=False)
-
-        await interaction.channel.send(embed=embed_template)
-
-        # Anmelde-Embed senden
+        # 🆕 Anmeldung öffnen
         formatted_end = registration_end.strftime("%d.%m.%Y %H:%M")
-        await send_registration_open(interaction.channel, {"PLACEHOLDER_ENDTIME": formatted_end})
+        await send_registration_open(interaction.channel, {"endtime": formatted_end})
 
-        # Abschlussmeldung
-        #await interaction.response.send_message("✅ Umfrage erfolgreich beendet. Anmeldung ist jetzt offen!", ephemeral=True)

@@ -8,13 +8,14 @@ from random import randint, choice
 
 # Lokale Module
 from .dataStorage import load_global_data, save_global_data, load_tournament_data, save_tournament_data, load_config
-from .utils import has_permission, generate_team_name, smart_send, generate_random_availability, parse_availability
-from .logger import setup_logger
-from .stats import autocomplete_players, autocomplete_teams
+from .utils import has_permission, generate_team_name, smart_send, generate_random_availability, parse_availability, game_autocomplete, autocomplete_teams, autocomplete_players
+from .logger import logger
+from .stats import autocomplete_players
 from .matchmaker import auto_match_solo, create_round_robin_schedule, assign_matches_to_slots, generate_schedule_overview, cleanup_orphan_teams
-from .embeds import send_match_schedule_embed, create_embed_from_config
+from .embeds import send_match_schedule
+from modules.archive import archive_current_tournament
 
-logger = setup_logger("logs")
+
 
 # ----------------------------------------
 # Admin-Hilfsfunktionen
@@ -137,6 +138,7 @@ async def add_game(interaction: Interaction, game: str):
 
 @app_commands.command(name="remove_game", description="Admin-Befehl: Entfernt ein Spiel aus der Spielauswahl.")
 @app_commands.describe(game="Name des Spiels, das entfernt werden soll.")
+@app_commands.autocomplete(game=game_autocomplete)
 async def remove_game(interaction: Interaction, game: str):
     if not has_permission(interaction.user, "Moderator", "Admin"):
         await interaction.response.send_message("🚫 Du hast keine Berechtigung für diesen Befehl.", ephemeral=True)
@@ -262,7 +264,7 @@ async def close_registration(interaction: Interaction):
 
     # Schritt 6: Überblick posten
     description_text = generate_schedule_overview()
-    await send_match_schedule_embed(interaction, description_text)
+    await send_match_schedule(interaction, description_text)
 
 @app_commands.command(name="generate_dummy", description="(Admin) Erzeugt Dummy-Solos und Dummy-Teams zum Testen.")
 @app_commands.describe(num_solo="Anzahl Solo-Spieler", num_teams="Anzahl Teams")
@@ -312,9 +314,6 @@ async def generate_dummy_teams(interaction: Interaction, num_solo: int = 4, num_
     logger.info(f"[DUMMY] {num_solo} Solo-Spieler und {num_teams} Teams erstellt.")
     await interaction.response.send_message(f"✅ {num_solo} Solo-Spieler und {num_teams} Teams wurden erfolgreich erzeugt!", ephemeral=True)
 
-import random
-from discord import app_commands, Interaction
-
 @app_commands.command(name="test_reminder", description="Testet ein Reminder-Embed mit einem zufälligen Match.")
 async def test_reminder(interaction: Interaction):
     config = load_config()
@@ -340,24 +339,36 @@ async def test_reminder(interaction: Interaction):
     # Zufälliges Match wählen
     match = random.choice(matches)
 
-    team1 = match.get("team1", "Team 1")
-    team2 = match.get("team2", "Team 2")
-    match_id = match.get("match_id", "???")
-    scheduled_time = match.get("scheduled_time", "Kein Termin")
+    placeholders = {
+        "match_id": match.get("match_id", "???"),
+        "team1": match.get("team1", "Team 1"),
+        "team2": match.get("team2", "Team 2"),
+        "scheduled_time": match.get("scheduled_time", "Kein Termin").replace("T", " ")[:16]  # bisschen schöner formatiert
+    }
 
-    embed = create_embed_from_config("reminder_embed")
-    embed.title = f"📢 Match-Reminder (Test)"
-    embed.description = (
-        f"**Match ID:** {match_id}\n"
-        f"**Teams:** {team1} vs {team2}\n"
-        f"**Geplanter Termin:** {scheduled_time}\n\n"
-        f"Dies ist ein **Test-Reminder** für ein zufällig gewähltes Match."
-    )
+    # Template laden
+    template = load_embed_template("reminder", category="default").get("REMINDER_EMBED")
+    if not template:
+        logger.error("[EMBED] REMINDER_EMBED Template fehlt.")
+        await smart_send(interaction, content="🚫 Reminder-Template fehlt.", ephemeral=True)
+        return
+
+    # Embed bauen
+    embed = build_embed_from_template(template, placeholders)
 
     await channel.send(embed=embed)
-    await smart_send(interaction, content=f"✅ Reminder-Test mit Match-ID {match_id} erfolgreich gesendet.", ephemeral=True)
+    await smart_send(interaction, content=f"✅ Reminder-Test mit Match-ID {placeholders['match_id']} erfolgreich gesendet.", ephemeral=True)
 
-    logger.info(f"[TEST] Reminder-Embed für Match {match_id} ({team1} vs {team2}) erfolgreich im Channel #{channel.name} gesendet.")
+    logger.info(f"[TEST] Reminder-Embed für Match {placeholders['match_id']} ({placeholders['team1']} vs {placeholders['team2']}) erfolgreich im Channel #{channel.name} gesendet.")
 
+@app_commands.command(name="archive_tournament", description="Archiviert das aktuelle Turnier.")
+async def archive_tournament(interaction: Interaction):
+    if not has_permission(interaction.user, "Moderator", "Admin"):
+        await interaction.response.send_message("🚫 Du hast keine Berechtigung für diesen Befehl.", ephemeral=True)
+        return
 
+    file_path = archive_current_tournament()
+    await interaction.response.send_message(f"✅ Turnier archiviert: `{file_path}`", ephemeral=True)
+
+    logger.info(f"[ARCHIVE] Turnier erfolgreich archiviert unter {file_path}")
 

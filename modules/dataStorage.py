@@ -1,17 +1,17 @@
 import os
 import json
 import logging
-from .logger import setup_logger
+from .logger import logger
 from dotenv import load_dotenv
 from typing import Optional
+from datetime import datetime
+import shutil
 
-# Logger Setup
-logger = setup_logger("logs", level=logging.INFO)
 
 # Lade .env files
 load_dotenv()
 
-def load_config(config_path="../config.json"):
+def load_config(config_path="../configs/config.json"):
     try:
         current_dir = os.path.dirname(__file__)
         full_path = os.path.join(current_dir, config_path)
@@ -30,8 +30,8 @@ config = load_config()
 
 
 # Hole Pfade aus Umgebungsvariablen (mit Fallback auf Standardwerte)
-data_path_env = os.getenv("DATA_PATH", "data.json")
-tournament_path_env = os.getenv("TOURNAMENT_PATH", "tournament.json")
+data_path_env = os.getenv("DATA_PATH", "data/data.json")
+tournament_path_env = os.getenv("TOURNAMENT_PATH", "data/tournament.json")
 
 # Berechne die vollständigen Pfade
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -112,15 +112,24 @@ def save_tournament_data(tournament):
     with open(TOURNAMENT_FILE_PATH, "w", encoding="utf-8") as file:
         json.dump(tournament, file, indent=4, ensure_ascii=False)
 
-def reset_tournament_data():
+def reset_tournament():
     """
-    Setzt die turnierspezifischen Daten zurück, indem tournament.json
-    mit den Standard-Werten überschrieben wird.
+    Setzt alle Turnierdaten zurück.
+    Die Daten werden auf 'Startzustand' gebracht, bereit für ein neues Turnier.
     """
-    with open(TOURNAMENT_FILE_PATH, "w", encoding="utf-8") as file:
-        json.dump(DEFAULT_TOURNAMENT_DATA, file, indent=4, ensure_ascii=False)
-    logger.info("tournament.json wurde zurückgesetzt und neu initialisiert.")
-    return DEFAULT_TOURNAMENT_DATA.copy()
+    empty_tournament = {
+        "registration_open": False,
+        "registration_end": None,
+        "tournament_end": None,
+        "matches": [],
+        "teams": {},
+        "poll_results": {}
+    }
+
+    with open("tournament.json", "w", encoding="utf-8") as f:
+        json.dump(empty_tournament, f, indent=4, ensure_ascii=False)
+
+    print("[RESET] Turnierdaten wurden erfolgreich zurückgesetzt.")
 
 def add_game_to_data(game_title):
     """
@@ -173,3 +182,35 @@ def remove_game_from_data(game_title: str):
     save_global_data(data)
     logger.info(f"Spiel '{game_title}' wurde aus den globalen Daten entfernt.")
 
+def backup_current_state():
+    """
+    Erstellt Backups der aktuellen Turnier- und Globaldaten aus /data/.
+    Speichert sie in /backups/ mit Zeitstempel.
+    """
+    backup_folder = "backups"
+    if not os.path.exists(backup_folder):
+        os.makedirs(backup_folder)
+
+    now = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    
+    files_to_backup = {
+        "data/tournament.json": f"tournament_backup_{now}.json",
+        "data/data.json": f"data_backup_{now}.json"
+    }
+
+    for source_file, backup_name in files_to_backup.items():
+        if os.path.exists(source_file):
+            shutil.copy(source_file, os.path.join(backup_folder, backup_name))
+            print(f"[BACKUP] Gesichert: {source_file}")
+        else:
+            print(f"[BACKUP] Achtung: {source_file} nicht gefunden – wird übersprungen.")
+
+def delete_tournament_file():
+    """
+    Löscht data/tournament.json nach Turnierende.
+    """
+    try:
+        os.remove("data/tournament.json")
+        print("[RESET] tournament.json erfolgreich gelöscht.")
+    except FileNotFoundError:
+        print("[RESET] tournament.json war nicht vorhanden.")

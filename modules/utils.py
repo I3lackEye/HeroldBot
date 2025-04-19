@@ -13,13 +13,11 @@ from typing import List
 from typing import Optional
 
 # Lokale Module
-from .logger import setup_logger
+from .logger import logger
 from .dataStorage import load_config, load_global_data, save_global_data, load_tournament_data
 
-# Konfiguration laden (falls nicht schon global geladen)
+# Konfiguration laden
 config = load_config()
-logger = setup_logger("logs", level=logging.INFO)
-
 
 # Listen für zufällige Namen
 ADJEKTIVE = [
@@ -160,18 +158,16 @@ def update_player_stats(winner_mentions: list[str]) -> None:
     save_global_data(global_data)
     logger.info("Spielerstatistiken aktualisiert.")
 
-async def remove_game_autocomplete(interaction: discord.Interaction, current: str) -> List[app_commands.Choice[str]]:
-    """
-    Liefert eine Liste von app_commands.Choice, die Spiele enthalten, 
-    deren Name den aktuellen Suchtext (current) beinhaltet.
-    """
-    data = load_global_data()
-    games = data.get("games", [])
-    # Filtere alle Spiele, die "current" (case-insensitive) enthalten.
+async def game_autocomplete(interaction: Interaction, current: str):
+    global_data = load_global_data()
+    games = global_data.get("games", [])
+
+    # Nur Spiele vorschlagen, die zum aktuellen Eingabetext passen
     return [
         app_commands.Choice(name=game, value=game)
-        for game in games if current.lower() in game.lower()
-    ]
+        for game in games
+        if current.lower() in game.lower()
+    ][:25]  # Maximal 25 Ergebnisse laut Discord-API
 
 def add_manual_win(user_id: int):
     """
@@ -329,23 +325,6 @@ def parse_availability(avail_str: str) -> tuple[time, time]:
         logger.warning(f"[MATCHMAKER] Fehler beim Parsen der Verfügbarkeit '{avail_str}': {e}")
         return None, None
 
-def generate_weekend_slots(start_date: datetime, end_date: datetime) -> list[str]:
-    """
-    Erzeugt alle 30-Minuten Slots zwischen start_date und end_date,
-    aber nur an Samstagen und Sonntagen.
-    Gibt sie im ISO-Format zurück (z.B. '2025-04-20T14:30').
-    """
-    slots = []
-    current = start_date.replace(minute=0, second=0, microsecond=0)
-
-    while current <= end_date:
-        if current.weekday() in (5, 6):  # Samstag oder Sonntag
-            slot = current.isoformat()
-            slots.append(slot)
-        current += timedelta(minutes=60)
-
-    return slots
-
 def intersect_availability(avail1: str, avail2: str) -> Optional[str]:
     """
     Berechnet die Schnittmenge von zwei Zeiträumen im Format 'HH:MM-HH:MM'.
@@ -400,7 +379,52 @@ def get_team_open_matches(team_name: str) -> list:
             open_matches.append(match)
 
     return open_matches
-    
+
+async def autocomplete_players(interaction: Interaction, current: str):
+    global_data = load_global_data()
+    player_stats = global_data.get("player_stats", {})
+
+    choices = []
+    for user_id, stats in player_stats.items():
+        member = interaction.guild.get_member(int(user_id))
+        if member:
+            display_name = member.display_name
+        else:
+            display_name = stats.get("display_name") or stats.get("name") or f"Unbekannt ({user_id})"
+        
+        if current.lower() in display_name.lower():
+            choices.append(app_commands.Choice(name=display_name, value=user_id))
+
+    return choices[:25]
+
+async def autocomplete_teams(interaction: Interaction, current: str):
+    logger.info(f"[AUTOCOMPLETE] Aufgerufen – Eingabe: {current}")
+
+    tournament = load_tournament_data()
+    if not tournament:
+        logger.error("[AUTOCOMPLETE] Keine Turnierdaten geladen!")
+        return []
+
+    teams = tournament.get("teams", {})
+    if not teams:
+        logger.warning("[AUTOCOMPLETE] Keine Teams vorhanden im Turnier.")
+        return []
+
+    logger.info(f"[AUTOCOMPLETE] Gefundene Teams: {list(teams.keys())}")
+
+    # Filtere die Teams, die zum aktuellen Eingabetext passen
+    suggestions = [
+        app_commands.Choice(name=team, value=team)
+        for team in teams.keys()
+        if current.lower() in team.lower()
+    ][:25]
+
+    logger.info(f"[AUTOCOMPLETE] {len(suggestions)} Vorschläge erstellt.")
+
+    return suggestions
+
+
+
 # Hilfsfunktion für den dummy gen
 def generate_random_availability() -> tuple[str, dict[str, str]]:
     """

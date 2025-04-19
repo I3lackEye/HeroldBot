@@ -1,0 +1,7 @@
+{
+    "GLOBAL_STATS": {
+        "title": "📊 Turnier-Übersicht",
+        "description": "Globale Statistiken über alle bisherigen Turniere.",
+        "footer": "Statistiken werden automatisch aktualisiert."
+      }
+}

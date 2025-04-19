@@ -4,11 +4,13 @@ from datetime import datetime
 import logging
 import re
 
+# Lokale modules
 from .dataStorage import load_tournament_data, save_tournament_data, load_config
-from .utils import smart_send, get_player_team, get_team_open_matches, generate_weekend_slots
-from .embeds import create_embed_from_config
+from .utils import smart_send, get_player_team, get_team_open_matches
+from modules.matchmaker import generate_weekend_slots
+from .embeds import send_notify_team_members
+from .logger import logger
 
-logger = logging.getLogger("discord")
 
 config = load_config()
 RESCHEDULE_CHANNEL_ID = int(config.get("CHANNELS", {}).get("RESCHEDULE_CHANNEL_ID", 0))
@@ -78,7 +80,6 @@ class RescheduleView(View):
                 child.disabled = True
         await interaction.message.edit(view=self)
 
-
 # ---------------------------------------
 # Helper: IDs extrahieren
 # ---------------------------------------
@@ -92,49 +93,11 @@ def extract_ids(members):
     return ids
 
 # ---------------------------------------
-# Helper: DMs schicken
-# ---------------------------------------
-
-async def notify_team_members(interaction: Interaction, team1_members, team2_members, requesting_team, opponent_team, neuer_zeitpunkt, match_id: int):
-    all_members = team1_members + team2_members
-    failed = False
-
-    for member_str in all_members:
-        user_id_match = re.search(r"\d+", member_str)
-        if not user_id_match:
-            continue
-
-        user_id = int(user_id_match.group(0))
-        user = interaction.guild.get_member(user_id)
-
-        if user:
-            try:
-                embed = create_embed_from_config("reminder_embed")
-                embed.title = "🔄 Reschedule-Anfrage"
-                embed.description = (
-                    f"**{requesting_team}** möchte das Match gegen **{opponent_team}** verschieben.\n\n"
-                    f"📅 Neuer vorgeschlagener Termin: **{neuer_zeitpunkt.strftime('%d.%m.%Y %H:%M')} Uhr**\n\n"
-                    f"Bitte klicke auf einen Button, um zuzustimmen oder abzulehnen!"
-                )
-
-                view = RescheduleView(match_id, requesting_team, opponent_team)
-                await user.send(embed=embed, view=view)
-
-            except Exception as e:
-                logger.warning(f"[RESCHEDULE] Konnte DM an {user.display_name} ({user.id}) nicht senden: {e}")
-                failed = True
-
-    return failed  # True wenn mindestens eine DM fehlgeschlagen ist
-
-# ---------------------------------------
 # Command: /request_reschedule
 # ---------------------------------------
 
 @app_commands.command(name="request_reschedule", description="Fordere eine Neuansetzung für ein Match an.")
-@app_commands.describe(
-    match_id="Match, das du verschieben möchtest",
-    neuer_zeitpunkt="Wunschtermin im Format TT.MM.JJJJ HH:MM"
-)
+@app_commands.describe(match_id="Match, das du verschieben möchtest", neuer_zeitpunkt="Wunschtermin im Format TT.MM.JJJJ HH:MM")
 async def request_reschedule(interaction: Interaction, match_id: int, neuer_zeitpunkt: str):
     tournament = load_tournament_data()
     user_id = str(interaction.user.id)
@@ -172,7 +135,7 @@ async def request_reschedule(interaction: Interaction, match_id: int, neuer_zeit
     team2_members = tournament.get("teams", {}).get(match.get("team2"), {}).get("members", [])
 
     # ➔ Schritt 1: DMs an alle betroffenen Spieler schicken
-    await notify_team_members(interaction, team1_members, team2_members, team_name, opponent_team, parsed_datetime, match_id)
+    await send_notify_team_members(interaction, team1_members, team2_members, team_name, opponent_team, parsed_datetime, match_id)
 
     # ➔ Schritt 2: IMMER Embed + Buttons im Reschedule-Channel posten
     channel = guild.get_channel(RESCHEDULE_CHANNEL_ID)

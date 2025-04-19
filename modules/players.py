@@ -1,14 +1,13 @@
 import discord
 from discord import app_commands, Interaction, Member
 from typing import Optional
+
+# Lokale Module
 from .dataStorage import load_tournament_data, save_tournament_data, config
 from .utils import has_permission, parse_availability, validate_string, intersect_availability
-from .logger import setup_logger
-from .embeds import send_help_embed
+from .logger import logger
+from .embeds import send_help
 from .stats import autocomplete_teams
-
-logger = setup_logger("logs")
-
 
 # ----------------------------------------
 # Slash-Commands
@@ -289,4 +288,4 @@ async def help_command(interaction: Interaction):
     """
     Zeigt das Hilfe-Embed an.
     """
-    await send_help_embed(interaction)
+    await send_help(interaction)

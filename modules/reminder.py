@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 from discord import TextChannel
 
 # Lokale Module
+from .logger import logger
 from .dataStorage import load_tournament_data, save_tournament_data
 
 

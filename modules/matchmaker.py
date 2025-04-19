@@ -11,12 +11,10 @@ from discord import TextChannel
 
 # Lokale Module
 from .dataStorage import load_tournament_data, save_tournament_data
-from .logger import setup_logger
-from .utils import generate_team_name, generate_weekend_slots
+from .logger import logger
+from .utils import generate_team_name
 from .embeds import send_cleanup_summary
 
-# Setup logger
-logger = setup_logger("logs", level=logging.INFO)
 
 def auto_match_solo():
     """
@@ -94,7 +92,7 @@ def create_round_robin_schedule():
 async def assign_matches_to_slots():
     """
     Ordnet Matches passenden Slots zu – fair verteilt über die verfügbaren Wochenenden.
-    Achtet darauf, dass Teams nicht direkt nacheinander spielen müssen.
+    Achtet darauf, dass Teams nicht gleichzeitig mehrere Matches haben.
     """
     tournament = load_tournament_data()
     matches = tournament.get("matches", [])
@@ -106,7 +104,7 @@ async def assign_matches_to_slots():
 
     registration_end = datetime.fromisoformat(tournament.get("registration_end"))
     tournament_end = datetime.fromisoformat(tournament.get("tournament_end"))
-    slots = generate_weekend_slots(registration_end, tournament_end)
+    slots = generate_weekend_slots(tournament)
 
     if not slots:
         logger.warning("[MATCHMAKER] Keine verfügbaren Slots gefunden.")
@@ -118,6 +116,7 @@ async def assign_matches_to_slots():
     scheduled_slots = []
     team_last_played = {}
     day_match_counter = {}
+    matches_without_slot = []
 
     for match in matches:
         team1 = match["team1"]
@@ -128,14 +127,23 @@ async def assign_matches_to_slots():
 
         common_slots = sorted(available_for_team1 & available_for_team2)
 
-        if not common_slots:
-            logger.warning(f"[MATCHMAKER] Kein gemeinsamer Slot für {team1} vs {team2} gefunden!")
-            continue
-
         best_slot = None
         lowest_penalty = float('inf')
 
         for slot in common_slots:
+            # NEU: Überprüfen ob Team1 oder Team2 schon ein anderes Match zu diesem Zeitpunkt hat
+            conflict = any(
+                other_match.get("scheduled_time") == slot and (
+                    other_match.get("team1") in (team1, team2) or
+                    other_match.get("team2") in (team1, team2)
+                )
+                for other_match in matches if other_match.get("scheduled_time")
+            )
+
+            if conflict:
+                continue  # Slot ist blockiert
+
+            # Bewertung: Vermeide gleiche Tage direkt hintereinander
             dt = datetime.strptime(slot, "%Y-%m-%dT%H:%M:%S")
             date_key = dt.strftime("%Y-%m-%d")
 
@@ -154,7 +162,6 @@ async def assign_matches_to_slots():
             match["scheduled_time"] = best_slot
             scheduled_slots.append(best_slot)
 
-            # Aktualisiere Zähler
             dt = datetime.strptime(best_slot, "%Y-%m-%dT%H:%M:%S")
             date_key = dt.strftime("%Y-%m-%d")
             day_match_counter[date_key] = day_match_counter.get(date_key, 0) + 1
@@ -163,9 +170,14 @@ async def assign_matches_to_slots():
 
             team_slots[team1].remove(best_slot)
             team_slots[team2].remove(best_slot)
+        else:
+            matches_without_slot.append(match)
 
     save_tournament_data(tournament)
-    logger.info(f"[MATCHMAKER] {len(matches)} Matches erfolgreich verteilt.")
+    logger.info(f"[MATCHMAKER] {len(matches) - len(matches_without_slot)} Matches erfolgreich verteilt.")
+    
+    if matches_without_slot:
+        logger.warning(f"[MATCHMAKER] {len(matches_without_slot)} Matches konnten nicht eingeplant werden!")
 
 def calculate_overlap(zeitraum1: str, zeitraum2: str) -> str:
     """
@@ -287,4 +299,59 @@ async def cleanup_orphan_teams(channel: TextChannel):
 
     logger.info(f"[CLEANUP] {teams_deleted} leere Teams gelöscht, {players_rescued} Spieler gerettet.")
 
+def generate_weekend_slots(tournament: dict) -> list:
+    """
+    Generiert Zeitslots für ein Turnier:
+    - Dynamische Slotanzahl basierend auf Matches
+    - Begrenzung auf maximal Slots pro Tag
+    - Mindestpausen (Slot-Interval)
+    - Automatischer Slot-Report ins Log
+    """
+    slots = []
+    matches = tournament.get("matches", [])
+    if not matches:
+        raise ValueError("Keine Matches im Turnier gefunden!")
 
+    registration_end = datetime.fromisoformat(tournament.get("registration_end"))
+    tournament_end = datetime.fromisoformat(tournament.get("tournament_end"))
+
+    current_date = registration_end
+    weekend_days = []
+
+    # Wochenendtage finden
+    while current_date <= tournament_end:
+        if current_date.weekday() in (5, 6):  # Samstag (5) oder Sonntag (6)
+            weekend_days.append(current_date)
+        current_date += timedelta(days=1)
+
+    total_days = len(weekend_days)
+    total_matches = len(matches)
+
+    if total_days == 0:
+        raise ValueError("Keine Wochenendtage im angegebenen Zeitraum gefunden!")
+
+    # Slotberechnung
+    required_slots_per_day = ceil(total_matches / total_days)
+
+    # Konfiguration
+    first_hour = 10          # Startzeit der Matches
+    slot_interval = 2        # Pause zwischen Matches (Stunden)
+    max_slots_per_day = 5    # Maximal mögliche Matches pro Tag
+
+    slots_per_day = min(required_slots_per_day, max_slots_per_day)
+
+    for day in weekend_days:
+        for i in range(slots_per_day):
+            hour = first_hour + (i * slot_interval)
+            if hour >= 24:
+                break  # Keine Slots über Mitternacht
+            slot_time = day.replace(hour=hour, minute=0, second=0, microsecond=0)
+            slots.append(slot_time.strftime("%Y-%m-%dT%H:%M:%S"))
+
+    # 📢 Slot-Report ins Log!
+    logger.info(f"[SLOT-PLANUNG] Gesamtmatches: {total_matches}")
+    logger.info(f"[SLOT-PLANUNG] Wochenendtage gefunden: {total_days}")
+    logger.info(f"[SLOT-PLANUNG] Erforderliche Slots pro Tag: {required_slots_per_day} (begrenzt auf {slots_per_day})")
+    logger.info(f"[SLOT-PLANUNG] Insgesamt {len(slots)} Slots generiert.")
+
+    return slots

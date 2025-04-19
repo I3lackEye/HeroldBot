@@ -27,7 +27,10 @@ def setup_logger(log_folder="logs", level=logging.INFO):
     # FileHandler
     file_handler = logging.FileHandler(log_file, encoding="utf-8")
     file_handler.setLevel(level)
-    formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(message)s")
+    formatter = logging.Formatter(
+        "%(asctime)s [%(levelname)s] %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S"  # ➔ Hier! Datum + Uhrzeit OHNE Millisekunden
+    )
     file_handler.setFormatter(formatter)
     logger.addHandler(file_handler)
     
@@ -39,16 +42,5 @@ def setup_logger(log_folder="logs", level=logging.INFO):
     
     return logger
 
-if __name__ == "__main__":
-    # Beispiel: Lade Konfiguration um DEBUG zu erhalten
-    import json
-    config_path = "config.json"  # Passe den Pfad bei Bedarf an
-    with open(config_path, "r", encoding="utf-8") as f:
-        config = json.load(f)
-    debug_value = config.get("DEBUG", 0)
-    
-    # Setze ein Environment-Variable, falls du das im Logger-Setup nutzen möchtest:
-    os.environ["DEBUG"] = str(debug_value)
-    logger = setup_logger()
-    logger.debug("Dies ist eine Debug-Nachricht.")
-    logger.info("Dies ist eine Informationsnachricht.")
+# Direkt einmal initialisieren
+logger = setup_logger()

@@ -8,10 +8,9 @@ from datetime import datetime
 
 # Lokale Module
 from .dataStorage import load_global_data, save_global_data, load_tournament_data
-from .utils import has_permission
-from .logger import setup_logger
-from .embeds import send_tournament_stats_embed, send_status_embed
-logger = setup_logger("logs")
+from .utils import has_permission, autocomplete_players, autocomplete_teams
+from .logger import logger
+from .embeds import send_tournament_stats, send_status
 
 # ----------------------------------------
 # Hilfsfunktionen
@@ -118,58 +117,36 @@ def get_favorite_game() -> str:
     most_played_game, count = max(game_stats.items(), key=lambda item: item[1])
     return f"{most_played_game} ({count}x gespielt)"
 
-
-
-# ----------------------------------------
-# Autocomplete
-# ----------------------------------------
-
-async def autocomplete_players(interaction: Interaction, current: str):
+def get_mvp() -> str:
+    """
+    Ermittelt den MVP (Spieler mit den meisten Siegen) aus den globalen Statistiken.
+    Gibt den Spielernamen oder eine Usermention zurück.
+    """
     global_data = load_global_data()
     player_stats = global_data.get("player_stats", {})
 
-    choices = []
-    for user_id, stats in player_stats.items():
-        member = interaction.guild.get_member(int(user_id))
-        if member:
-            display_name = member.display_name
-        else:
-            display_name = stats.get("display_name") or stats.get("name") or f"Unbekannt ({user_id})"
-        
-        if current.lower() in display_name.lower():
-            choices.append(app_commands.Choice(name=display_name, value=user_id))
+    if not player_stats:
+        return None
 
-    return choices[:25]
+    # Spieler mit meisten Siegen finden
+    sorted_players = sorted(
+        player_stats.items(),
+        key=lambda item: item[1].get("wins", 0),
+        reverse=True
+    )
 
-async def autocomplete_teams(interaction: Interaction, current: str):
-    logger.info(f"[AUTOCOMPLETE] Aufgerufen – Eingabe: {current}")
+    if not sorted_players or sorted_players[0][1].get("wins", 0) == 0:
+        return None  # Keine Siege vorhanden
 
-    tournament = load_tournament_data()
-    if not tournament:
-        logger.error("[AUTOCOMPLETE] Keine Turnierdaten geladen!")
-        return []
+    mvp_id, mvp_data = sorted_players[0]
+    mvp_name = mvp_data.get("name", f"<@{mvp_id}>")
 
-    teams = tournament.get("teams", {})
-    if not teams:
-        logger.warning("[AUTOCOMPLETE] Keine Teams vorhanden im Turnier.")
-        return []
-
-    logger.info(f"[AUTOCOMPLETE] Gefundene Teams: {list(teams.keys())}")
-
-    # Filtere die Teams, die zum aktuellen Eingabetext passen
-    suggestions = [
-        app_commands.Choice(name=team, value=team)
-        for team in teams.keys()
-        if current.lower() in team.lower()
-    ][:25]
-
-    logger.info(f"[AUTOCOMPLETE] {len(suggestions)} Vorschläge erstellt.")
-
-    return suggestions
+    return mvp_name
 
 
-
-
+# ----------------------------------------
+# Autocomplete Funktions
+# ----------------------------------------
 
 # ----------------------------------------
 # Slash-Commands
@@ -247,7 +224,7 @@ async def tournament_stats(interaction: Interaction):
         favorite_game = "Keine Spiele gespielt."
 
     # Embed verschicken
-    await send_tournament_stats_embed(interaction, total_players, total_wins, best_player, favorite_game)
+    await send_tournament_stats(interaction, total_players, total_wins, best_player, favorite_game)
 
 @app_commands.command(name="team_stats", description="Zeigt Statistiken eines bestimmten Teams.")
 @app_commands.describe(team="Wähle ein Team aus")

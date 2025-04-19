@@ -8,12 +8,12 @@ from dotenv import load_dotenv
 
 
 # Lokale Module
-from .dataStorage import load_global_data, load_tournament_data, load_config
-from .logger import setup_logger
-from .reminder import match_reminder_loop
-from .reschedule import request_reschedule
-from .players import anmelden, update_availability, sign_out, participants, help_command
-from .tournament import (
+from modules.dataStorage import load_global_data, load_tournament_data, load_config
+from modules.logger import logger
+from modules.reminder import match_reminder_loop
+from modules.reschedule import request_reschedule
+from modules.players import anmelden, update_availability, sign_out, participants, help_command
+from modules.tournament import (
     start_tournament,
     close_registration_after_delay,
     close_tournament_after_delay,
@@ -32,7 +32,8 @@ from .admin_tools import (
     reload_commands,
     close_registration,
     generate_dummy_teams,
-    test_reminder
+    test_reminder,
+    archive_tournament
 )
 from .stats import (
     team_stats,
@@ -42,9 +43,6 @@ from .stats import (
     match_history,
     status
 )
-
-# Setup Logger
-logger = setup_logger("logs")
 
 # Globale Variable für Task-Handling
 reminder_task = None  
@@ -161,6 +159,7 @@ tree.add_command(award_overall_winner)
 tree.add_command(reload_commands)
 tree.add_command(close_registration)
 tree.add_command(generate_dummy_teams)
+tree.add_command(archive_tournament)
 
 # --------------------------------
 # Bot starten

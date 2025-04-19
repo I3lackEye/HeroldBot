@@ -1,0 +1,10 @@
+{
+    "RESCHEDULE": {
+        "title": "⏳ Anfrage zur Terminverschiebung",
+        "description_template": "**{team1}** bittet darum, das Match **{match_id}** zu verschieben.\n\n🏆 Gegner: **{team2}**\n🕒 Neuer Termin: **{new_time}**\n\nBitte stimme zu oder lehne ab.",
+        "color": "#F39C12",
+        "footer": "Eine Antwort ist erforderlich.",
+        "icon": "📅"
+    }
+}
+    

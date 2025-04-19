@@ -1,0 +1,21 @@
+{
+    "HELP": {
+        "title": "🆘 HeroldBot Hilfe",
+        "description": "Hier findest du alle wichtigen Informationen zum Ablauf und den verfügbaren Befehlen.",
+        "fields": [
+          {
+            "name": "🚀 Turnierablauf",
+            "value": "1️⃣ Spiel wählen (Voting)\n2️⃣ Anmeldung öffnen\n3️⃣ Teams erstellen\n4️⃣ Matches spielen\n5️⃣ Sieger küren!"
+          },
+          {
+            "name": "📜 Wichtige Befehle",
+            "value": "`/anmelden` – Anmeldung fürs Turnier\n`/sign_out` – Vom Turnier abmelden\n`/stats` – Eigene Statistiken ansehen\n`/report_match` – Spielergebnis melden\n`/participants` – Aktuelle Teilnehmerliste"
+          },
+          {
+            "name": "📢 Hinweise",
+            "value": "⚠ Achte auf die Anmeldefrist!\n⚡ Sei pünktlich bei deinen Matches!\n💬 Fragen? ➔ Mods anschreiben!"
+          }
+        ],
+        "footer": "Viel Erfolg und viel Spaß – dein HeroldBot-Team!"
+      }
+}

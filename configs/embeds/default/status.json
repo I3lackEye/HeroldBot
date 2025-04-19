@@ -1,0 +1,25 @@
+{
+    "STATUS": {
+        "title": "🎮 Turnierstatus",
+        "description": "Hier findest du alle wichtigen Infos zum aktuellen Turnier:",
+        "fields": [
+          {
+            "name": "📥 Anmeldung",
+            "value": "PLACEHOLDER_REGISTRATION"
+          },
+          {
+            "name": "🕹️ Turnierstatus",
+            "value": "PLACEHOLDER_TOURNAMENT"
+          },
+          {
+            "name": "🎯 Gespieltes Spiel",
+            "value": "PLACEHOLDER_GAME"
+          },
+          {
+            "name": "📝 Anstehende Matches",
+            "value": "PLACEHOLDER_MATCHES"
+          }
+        ],
+        "footer": "Nutze /anmelden um dich anzumelden oder /stats für deine Statistik."
+      }
+}
