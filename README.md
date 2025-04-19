@@ -1,204 +1,102 @@
-# HeroldBot
+# 🛡️ HeroldBot
 
-Ein leistungsstarker Discord-Turnierbot für die Organisation und Verwaltung von Community-Turnieren.  
-Mit Features wie automatischem Matchmaking, Solo-/Team-Anmeldung, Umfragen, Leaderboards und Statistiken!
+> Dein zuverlässiger Assistent für die Organisation und Verwaltung von Discord-Turnieren.
 
 ---
 
-## 📋 Features
+## 🛠️ Funktionen
 
-- ✅ Solo- und Team-Anmeldungen
-- ✅ Automatisches Matchmaking nach Verfügbarkeit
-- ✅ Dynamisches Poll-System zur Spielauswahl
-- ✅ Spieler- und Turnier-Statistiken (Siege, Winrate, Lieblingsspiel)
-- ✅ Leaderboard für motivierende Wettbewerbe
-- ✅ Admin-Tools für Turnierverwaltung
-- ✅ Umfangreicher Debug-Modus (optional aktivierbar)
-- ✅ Sicherer Umgang mit Token und Konfigurationsdaten (.env basiert)
+- 🎮 Intelligente Match-Verteilung auf freie Slots
+- 🔔 Automatische Erinnerungen an bevorstehende Matches
+- 🔄 Reschedule-Anfragen per DM oder im Channel
+- 🏆 MVP- und Bestenlisten-Tracking
+- 📦 Vollständige Archivierung abgeschlossener Turniere
+- 📈 Match- und Turnierstatistiken auf Knopfdruck
+- 🛡️ Umfassende Admin-Tools für maximale Kontrolle
 
 ---
 
 ## 🚀 Installation
 
-1. **Projekt klonen:**
-
-- bash
-- git clone https://github.com/dein-benutzername/HeroldBotV2.git
-- cd HeroldBot
-
----
-
-## Virtuelle Umgebung erstellen (optional, empfohlen):
-
-- python -m venv .venv
-- source .venv/bin/activate   # (Linux/macOS)
-- .venv\Scripts\activate      # (Windows)
-
----
-
-## Abhängigkeiten installieren:
-
-pip install -r requirements.txt
-
----
-
-## .env Datei erstellen:
-
-Erstelle eine Datei .env im Hauptverzeichnis basierend auf .env.example:
-
-DISCORD_TOKEN=hier-dein-token-einfügen
-DEBUG=1
-DATA_PATH=data.json
-TOURNAMENT_PATH=tournament.json
-
----
-
-## Bot starten
-
-python -m scripts.bot
+`bash
+git clone https://github.com/dein-benutzername/HeroldBot.git
+cd HeroldBot
+python3.13 -m venv .venv
+source .venv/bin/activate  # oder .venv\Scripts\activate auf Windows
+pip install -r requirements.txt`
 
 ---
 
 ## ⚙️ Konfiguration
 
-### Konfigurationsdateien:
+- Lege eine `.env` Datei an basierend auf `.env.example`.
+- Passe die `config.json` an deine Bedürfnisse an.
+- Embeds und Texte befinden sich in `/configs/` und können angepasst werden.
+- Sprachpakete (Deutsch/Englisch) findest du unter `/langs/`.
 
-| Datei            | Zweck |
-|:-----------------|:------|
-| `.env`            | Umgebungsvariablen wie Bot-Token, Debug-Status, Pfade |
-| `config.json`     | Texte, Embed-Designs, Rollenzuweisungen |
-| `data.json`       | Globale Spielerstatistiken (wird automatisch erzeugt) |
-| `tournament.json` | Aktuelle Turnierdaten (wird automatisch erzeugt) |
+---
+
+## 📚 Slash-Commands Übersicht
+
+### 📥 Anmeldung & Verfügbarkeit
+- `/anmelden` – Spieler anmelden
+- `/update_availability` – Verfügbarkeit aktualisieren
+- `/sign_out` – Abmelden vom Turnier
+- `/participants` – Teilnehmerliste anzeigen
+
+### ❓ Hilfe
+- `/help` – Übersicht aller verfügbaren Befehle
+
+### 📜 Matchorganisation
+- `/list_matches` – Alle geplanten Matches anzeigen
+- `/request_reschedule` – Anfrage zur Matchverschiebung stellen
+- `/test_reminder` – Testet einen Match-Reminder
+
+### 📊 Statistiken
+- `/leaderboard` – Bestenliste anzeigen
+- `/stats` – Eigene Turnierstatistik abrufen
+- `/tournament_stats` – Turnierstatistiken anzeigen
+- `/status` – Statusübersicht des Turniers
+
+### 🎮 Turniermanagement
+- `/report_match` – Match-Ergebnis eintragen
+- `/match_history` – Match-Historie anzeigen
+- `/team_stats` – Teamstatistiken anzeigen
+- `/match_schedule` – Spielplan anzeigen
+
+### 🛡️ Adminbefehle
+- `/admin_abmelden` – Spieler administrativ abmelden
+- `/admin_add_win` – Spieler administrativ einen Sieg hinzufügen
+- `/start_tournament` – Neues Turnier starten
+- `/end_tournament` – Turnier abschließen
+- `/add_game` – Spiel hinzufügen
+- `/remove_game` – Spiel entfernen
+- `/award_overall_winner` – Gesamtsieger auszeichnen
+- `/reload_commands` – Slash-Commands neu laden
+- `/close_registration` – Anmeldung schließen
+- `/generate_dummy_teams` – Dummy-Teams generieren
+- `/archive_tournament` – Turnier archivieren
 
 ---
 
 ## 🛡️ Sicherheitshinweis
 
-- **Niemals** die `.env` Datei ins Repository committen.
-- **Immer** `.env` in `.gitignore` eintragen.
+- Speichere deine `.env` Datei niemals öffentlich ab!
+- Nutze `.gitignore`, um sensible Daten zuverlässig auszuschließen.
 
 ---
 
-## 🛠 Verfügbare Slash-Commands
+## 🛣️ Roadmap V3 (geplant)
 
-| Befehl                | Beschreibung |
-|:----------------------|:--------------|
-| `/anmelden`            | Spieler für das Turnier anmelden |
-| `/update_availability` | Verfügbarkeit aktualisieren |
-| `/sign_out`            | Vom Turnier abmelden |
-| `/participants`        | Liste der Teilnehmer anzeigen |
-| `/leaderboard`         | Bestes Ranking anzeigen |
-| `/stats <User>`        | Statistiken eines Spielers anzeigen |
-| `/start_tournament`    | (Admin) Neues Turnier starten |
-| `/end_tournament`      | (Admin) Turnier beenden |
-| `/admin_abmelden`      | (Admin) Spieler zwangsabmelden |
-| `/admin_add_win`       | (Admin) Siege manuell hinzufügen |
-| `/add_game` / `/remove_game` | (Admin) Spiele für Polls verwalten |
-| `/award_overall_winner` | (Admin) Turniersieg manuell vergeben |
-| `/report_match`        | (User) Ergebnis eines Matches eintragen |
+- 🌍 Mehrsprachige Unterstützung (erweiterte Sprachpakete)
+- 🛡️ Erweiterte Turniermodi (Double Elimination etc.)
+- 🎯 Voting-System für Sonderpreise
+- 🛠️ Anpassbare Regeln pro Spiel
+- 🏆 Saisonale Bestenlisten
+- 🚀 Dynamische Slotgenerierung je nach Teilnehmerzahl
 
 ---
 
-## 🧠 Geplante Erweiterungen
+## ✨ Credits
 
-### 📦 Version 2 – Fokus: Stabilität & Kernfeatures
-
-- [ ] **1h vor Match Benachrichtigung**  
-  Spieler erhalten automatisch eine Erinnerung an ihr anstehendes Match.
-
-- [ ] **/request_reschedule – Matches verschieben**  
-  Spieler können eine einmalige Anfrage zum Matchverschieben stellen, die vom Gegner bestätigt werden muss.
-
-- [ ] **/update_availability – Verfügbarkeit ändern**  
-  Teilnehmer können ihre Spielzeiten nachträglich anpassen. Der Matchplan wird intelligent aktualisiert.
-
-- [ ] **Reminder mit @Mention**  
-  Erinnerungen mentionen die betroffenen Spieler direkt im Chat.
-
-- [ ] **Handling bei No-Shows**  
-  Moderatoren können Matches als "Nicht angetreten" markieren.
-
-- [ ] **Maximale Reschedules**  
-  Schutz vor Missbrauch – nur 1 erlaubte Verschiebung pro Match.
-
-- [ ] **/next_matches Command**  
-  Zeigt Spielern ihre nächsten geplanten Matches kompakt an.
-
----
-
-### 🚀 Version 3 – Fokus: Komfort & Flexibilität
-
-- [ ] **Dynamische Teamgrößen (1vs1, 2vs2, 3vs3)**  
-  Unterschiedliche Teamgrößen je Turnier möglich.
-
-- [ ] **Mehrstufige Match-Verwaltung (Best-of-3, Finale, etc.)**  
-  Unterstützung für Best-of-Formate und spezielle Finalrunden.
-
-- [ ] **Live-Scoreboard während des Turniers**  
-  Turnierergebnisse in Echtzeit sichtbar.
-
-- [ ] **Fortgeschrittene Rescheduling-Logik**  
-  Bei Terminänderungen automatische neue Vorschläge.
-
-- [ ] **Smartes Balancing bei Ausfällen**  
-  Dynamisches Anpassen des Spielplans, wenn ein Spieler ausfällt.
-
----
-
-### 🌟 Version 4 – Fokus: Community & Luxus
-
-- [ ] **Web-Dashboard für Matches und Leaderboards**  
-  Schicke Browser-Oberfläche für Spieler, Zuschauer und Admins.
-
-- [ ] **Serverübergreifende Statistiken**  
-  Turniererfolge getrennt nach Discord-Server verwalten.
-
-- [ ] **Turnierhistorie mit Archivfunktion**  
-  Überblick über vergangene Turniere, Sieger und Statistiken.
-
-- [ ] **Trophäensystem und Belohnungen**  
-  Spieler erhalten Awards für Meilensteine (z.B. 3 Turniersiege).
-
-- [ ] **Automatisierte Siegerehrung**  
-  Nach Turnierende werden Rollen oder Titel automatisch verteilt.
-
----
-
-## ✅ Bonusideen
-
-- [ ] **Playoff- oder K.O.-System nach Gruppenphase**  
-- [ ] **Integration von Preisgeldern oder Spiele-Keys**  
-- [ ] **Internationale Zeitzonenunterstützung**  
-- [ ] **Custom Matchregeln pro Turnier (z.B. Map-Pools, Sonderregeln)**
-
----
-
-# 📋 Zusammenfassung
-
-| Phase  | Ziel                  | Geplante Features                             |
-|:-------|:----------------------|:----------------------------------------------|
-| **V2** | Stabiler Turnierablauf | Erinnerungen, Reschedules, Verfügbarkeiten    |
-| **V3** | Komfort & Erweiterungen | Dynamische Teams, Bo3, Live-Scoreboard       |
-| **V4** | Community Features     | Web-Dashboard, Archiv, Preise & Awards        |
-
----
-
-# 🤝 Contributing
-
-Du hast eine coole Idee für **HeroldBot** oder möchtest helfen?  
-> **Melde dich gerne oder öffne ein Issue! 🚀**
-
----
-
-## 🧡 Credits
-
-- [discord.py](https://discordpy.readthedocs.io/en/stable/) – Python Discord API Wrapper
-- [python-dotenv](https://pypi.org/project/python-dotenv/) – Sicheres Management von Umgebungsvariablen
-
----
-
-## 📜 Lizenz
-
-Dieses Projekt steht unter der [MIT License](LICENSE).
-
-
+- **BlackEye**
