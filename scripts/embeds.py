@@ -127,6 +127,34 @@ async def send_list_matches_embed(interaction: Interaction, matches: list):
     await interaction.response.send_message(embed=embed, ephemeral=True)
 
 async def send_match_schedule_embed(interaction: Interaction, description_text: str):
-    embed = create_embed_from_config("MATCH_SCHEDULE_EMBED")
-    embed.description = description_text
-    await smart_send(interaction, embed=embed)
+    embed_template = create_embed_from_config("MATCH_SCHEDULE_EMBED")
+
+    if len(description_text) <= 4096:
+        embed_template.description = description_text
+        await smart_send(interaction, embed=embed_template)
+    else:
+        # Text aufteilen in 4096-Blöcke
+        chunks = [description_text[i:i+4096] for i in range(0, len(description_text), 4096)]
+
+        for idx, chunk in enumerate(chunks):
+            embed = create_embed_from_config("MATCH_SCHEDULE_EMBED")
+            embed.description = chunk
+            if idx == 0:
+                await smart_send(interaction, embed=embed)  # erstes Mal
+            else:
+                await interaction.channel.send(embed=embed)  # danach normal in den Channel posten
+
+async def send_cleanup_summary(channel: discord.TextChannel, teams_deleted: list, players_rescued: list):
+    embed = create_embed_from_config("CLEANUP_SUMMARY_EMBED")
+
+    desc = ""
+    if teams_deleted:
+        desc += "**🗑️ Gelöschte Teams:**\n" + "\n".join(f"• {team}" for team in teams_deleted) + "\n\n"
+    if players_rescued:
+        desc += "**👤 Gerettete Spieler:**\n" + "\n".join(f"• {player}" for player in players_rescued)
+
+    if not desc:
+        desc = "Keine unvollständigen Teams gefunden."
+
+    embed.description = desc
+    await channel.send(embed=embed)

@@ -161,6 +161,11 @@
       "title": "📋 Spielplan Übersicht",
       "description": "Hier siehst du alle geplanten Matches!",
       "footer": "Spielplan wird automatisch aktualisiert."
+      },
+      "CLEANUP_SUMMARY_EMBED": {
+        "title": "🔍 Aufräumen abgeschlossen",
+        "description": "Hier sind die Ergebnisse des Aufräumvorgangs:",
+        "color": "0x3498db"
       }
     }
 }

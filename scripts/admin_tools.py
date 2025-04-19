@@ -3,12 +3,15 @@ from discord import app_commands, Interaction
 from typing import Optional
 from datetime import datetime
 import random
+from random import randint, choice
 
+
+# Lokale Module
 from .dataStorage import load_global_data, save_global_data, load_tournament_data, save_tournament_data
 from .utils import has_permission, generate_team_name, smart_send, generate_random_availability, parse_availability
 from .logger import setup_logger
 from .stats import autocomplete_players, autocomplete_teams
-from .matchmaker import auto_match_solo, create_round_robin_schedule, assign_matches_to_slots, generate_schedule_overview
+from .matchmaker import auto_match_solo, create_round_robin_schedule, assign_matches_to_slots, generate_schedule_overview, cleanup_orphan_teams
 from .embeds import send_match_schedule_embed
 
 logger = setup_logger("logs")
@@ -226,31 +229,41 @@ async def reload_commands(interaction: Interaction):
         await interaction.edit_original_response(content=f"❌ Fehler beim Neuladen: {e}")
         logger.error(f"[RELOAD ERROR] {e}")
 
-@app_commands.command(name="close_registration", description="(DEBUG) Schließt manuell die Anmeldung.")
+@app_commands.command(name="close_registration", description="(Admin) Schließt die Anmeldung und startet die Matchgenerierung.")
 async def close_registration(interaction: Interaction):
     if not has_permission(interaction.user, "Moderator", "Admin"):
-        await interaction.response.send_message("🚫 Keine Berechtigung!", ephemeral=True)
+        await interaction.response.send_message("🚫 Du hast keine Berechtigung.", ephemeral=True)
         return
 
     tournament = load_tournament_data()
+
     if not tournament.get("running", False) or not tournament.get("registration_open", False):
         await interaction.response.send_message("⚠️ Die Anmeldung ist bereits geschlossen oder es läuft kein Turnier.", ephemeral=True)
         return
 
-    # Anmeldung schließen
+    # Schritt 1: Anmeldung schließen
     tournament["registration_open"] = False
     save_tournament_data(tournament)
 
-    # Matchmaking starten
-    auto_match_solo()
-    create_round_robin_schedule()
-    assign_matches_to_slots()
+    await smart_send(interaction, content="🚫 **Die Anmeldung wurde geschlossen.**")
+    logger.info("[TOURNAMENT] Anmeldung manuell geschlossen.")
 
-    # Kurze Bestätigung senden
-    await interaction.response.send_message("✅ Anmeldung geschlossen. Teams erstellt und Matches geplant.", ephemeral=True)
-    
+    # Schritt 2: Verwaiste Teams aufräumen
+    await cleanup_orphan_teams(interaction.channel)
+
+    # Schritt 3: Solo-Spieler automatisch matchen
+    auto_match_solo()
+
+    # Schritt 4: Matchplan erstellen
+    create_round_robin_schedule()
+
+    # Schritt 5: Matches auf Slots verteilen
+    await assign_matches_to_slots()
+
+    # Schritt 6: Überblick posten
     description_text = generate_schedule_overview()
     await send_match_schedule_embed(interaction, description_text)
+
 
 @app_commands.command(name="generate_dummy", description="(Admin) Erzeugt Dummy-Solos und Dummy-Teams zum Testen.")
 @app_commands.describe(num_solo="Anzahl Solo-Spieler", num_teams="Anzahl Teams")
@@ -265,8 +278,16 @@ async def generate_dummy_teams(interaction: Interaction, num_solo: int = 4, num_
     solo_players = []
     for i in range(num_solo):
         player_name = f"DummySolo_{i+1}"
-        availability = generate_random_availability()
-        solo_players.append({"player": player_name, "verfügbarkeit": availability})
+        availability, special = generate_random_availability()
+
+        player_entry = {
+            "player": player_name,
+            "verfügbarkeit": availability
+        }
+        if special:
+            player_entry.update(special)
+
+        solo_players.append(player_entry)
 
     tournament.setdefault("solo", []).extend(solo_players)
 
@@ -276,13 +297,22 @@ async def generate_dummy_teams(interaction: Interaction, num_solo: int = 4, num_
         team_name = f"DummyTeam_{i+1}"
         member1 = f"TeamMember_{i+1}_1"
         member2 = f"TeamMember_{i+1}_2"
-        availability = generate_random_availability()
-        teams[team_name] = {
+        availability, special = generate_random_availability()
+
+        team_entry = {
             "members": [member1, member2],
             "verfügbarkeit": availability
         }
+        if special:
+            team_entry.update(special)
+
+        teams[team_name] = team_entry
 
     save_tournament_data(tournament)
 
     logger.info(f"[DUMMY] {num_solo} Solo-Spieler und {num_teams} Teams erstellt.")
     await interaction.response.send_message(f"✅ {num_solo} Solo-Spieler und {num_teams} Teams wurden erfolgreich erzeugt!", ephemeral=True)
+
+
+
+

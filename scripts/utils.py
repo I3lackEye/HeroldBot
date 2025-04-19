@@ -4,10 +4,15 @@ import re
 import logging
 import random
 import time
+
 from collections import Counter
+from random import randint, choice
 from discord import app_commands, Interaction, Embed
 from datetime import datetime, timedelta
 from typing import List
+from typing import Optional
+
+# Lokale Module
 from .logger import setup_logger
 from .dataStorage import load_config, load_global_data, save_global_data, load_tournament_data
 
@@ -21,12 +26,12 @@ ADJEKTIVE = [
     "Mutige", "Wilde", "Eiserne", "Schnelle", "Stille", "Kühne", "Tapfere", "Listige",
     "Freche", "Donnernde", "Flinke", "Mächtige", "Verwegene", "Legendäre", "Lustige", 
     "Athletische", "Beglückende", "Elegante", "Fabelhafte", "Feurige", "Grandiose",
-    "Mysteriöse"
+    "Mysteriöse", "Garstige", "Hinterhältige"
 ]
 
 SUBSTANTIVE = [
     "Wölfe", "Drachen", "Falken", "Titanen", "Krieger", "Panther", "Schlangen", "Ninjas",
-    "Löwen", "Bären", "Adler", "Haie", "Berserker", "Wächter"
+    "Löwen", "Bären", "Adler", "Haie", "Berserker", "Wächter", "Hobbits", "Goblins"
 ]
 
 def has_permission(member: discord.Member, *required_permissions: str) -> bool:
@@ -310,15 +315,6 @@ async def smart_send(interaction: Interaction, *, content: str = None, embed: Em
 
     # Hilfsfunktion für zufällige Verfügbarkeiten
 
-def generate_random_availability():
-    start_hour = random.randint(8, 16)  # 8-16 Uhr
-    duration = random.randint(2, 6)     # 2-6 Stunden Spielzeit
-    end_hour = start_hour + duration
-    if end_hour > 23:
-        end_hour = 23
-
-    return f"{start_hour:02d}:00-{end_hour:02d}:00"
-
 def parse_availability(avail_str: str) -> tuple[time, time]:
     """
     Wandelt einen String wie '12:00-18:00' in zwei datetime.time Objekte um.
@@ -345,6 +341,59 @@ def generate_weekend_slots(start_date: datetime, end_date: datetime) -> list[str
         if current.weekday() in (5, 6):  # Samstag oder Sonntag
             slot = current.isoformat()
             slots.append(slot)
-        current += timedelta(minutes=30)
+        current += timedelta(minutes=60)
 
     return slots
+
+def intersect_availability(avail1: str, avail2: str) -> Optional[str]:
+    """
+    Berechnet die Schnittmenge von zwei Zeiträumen im Format 'HH:MM-HH:MM'.
+    Gibt None zurück, wenn keine Überschneidung vorhanden ist.
+    """
+    try:
+        start1_str, end1_str = avail1.split("-")
+        start2_str, end2_str = avail2.split("-")
+
+        start1 = datetime.strptime(start1_str, "%H:%M").time()
+        end1 = datetime.strptime(end1_str, "%H:%M").time()
+        start2 = datetime.strptime(start2_str, "%H:%M").time()
+        end2 = datetime.strptime(end2_str, "%H:%M").time()
+
+        latest_start = max(start1, start2)
+        earliest_end = min(end1, end2)
+
+        if latest_start >= earliest_end:
+            return None  # Keine Überschneidung
+
+        return f"{latest_start.strftime('%H:%M')}-{earliest_end.strftime('%H:%M')}"
+    except Exception:
+        return None
+
+# Hilfsfunktion für den dummy gen
+def generate_random_availability() -> tuple[str, dict[str, str]]:
+    """
+    Generiert eine sinnvoll breite Verfügbarkeit für einen Dummy-Spieler:
+    - Allgemein: 6–10 Stunden Zeitfenster
+    - Samstag/Sonntag: extra spezielle Zeiten (optional)
+    """
+    start_hour = random.randint(8, 14)  # zwischen 08:00 und 14:00 starten
+    duration = random.randint(6, 10)     # Verfügbarkeit 6 bis 10 Stunden
+    end_hour = min(start_hour + duration, 23)
+
+    allgemeine_verfugbarkeit = f"{start_hour:02d}:00-{end_hour:02d}:00"
+
+    # Spezielle Verfügbarkeiten für Samstag und Sonntag (50% Chance)
+    special = {}
+    if random.random() < 0.5:
+        start_samstag = random.randint(9, 14)
+        end_samstag = min(start_samstag + random.randint(4, 8), 23)
+        special["samstag"] = f"{start_samstag:02d}:00-{end_samstag:02d}:00"
+
+    if random.random() < 0.5:
+        start_sonntag = random.randint(9, 14)
+        end_sonntag = min(start_sonntag + random.randint(4, 8), 23)
+        special["sonntag"] = f"{start_sonntag:02d}:00-{end_sonntag:02d}:00"
+
+    return allgemeine_verfugbarkeit, special
+
+
