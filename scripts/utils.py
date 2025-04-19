@@ -26,12 +26,13 @@ ADJEKTIVE = [
     "Mutige", "Wilde", "Eiserne", "Schnelle", "Stille", "Kühne", "Tapfere", "Listige",
     "Freche", "Donnernde", "Flinke", "Mächtige", "Verwegene", "Legendäre", "Lustige", 
     "Athletische", "Beglückende", "Elegante", "Fabelhafte", "Feurige", "Grandiose",
-    "Mysteriöse", "Garstige", "Hinterhältige"
+    "Mysteriöse", "Garstige", "Hinterhältige", "Gebrechliche"
 ]
 
 SUBSTANTIVE = [
     "Wölfe", "Drachen", "Falken", "Titanen", "Krieger", "Panther", "Schlangen", "Ninjas",
-    "Löwen", "Bären", "Adler", "Haie", "Berserker", "Wächter", "Hobbits", "Goblins"
+    "Löwen", "Bären", "Adler", "Haie", "Berserker", "Wächter", "Hobbits", "Goblins", "Ratten",
+    "Hühner"
 ]
 
 def has_permission(member: discord.Member, *required_permissions: str) -> bool:
