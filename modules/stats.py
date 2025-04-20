@@ -1,10 +1,12 @@
 #stats.py
 
 import discord
+import re
 from discord import app_commands, Interaction, Embed, User
 from discord.app_commands import Choice
 from collections import Counter
 from datetime import datetime
+from typing import Optional
 
 # Lokale Module
 from .dataStorage import load_global_data, save_global_data, load_tournament_data
@@ -143,6 +145,83 @@ def get_mvp() -> str:
 
     return mvp_name
 
+def update_player_stats(winner_ids: list, chosen_game: str):
+    """
+    Aktualisiert die Spielerstatistiken und die Turnier-Historie.
+    
+    :param winner_ids: Liste von Gewinner-UserIDs (als Strings).
+    :param chosen_game: Das Spiel, das gespielt wurde.
+    """
+    global_data = load_global_data()
+
+    # Sicherstellen, dass diese Bereiche existieren
+    if "player_stats" not in global_data:
+        global_data["player_stats"] = {}
+    if "tournament_history" not in global_data:
+        global_data["tournament_history"] = []
+
+    # Gewinner aktualisieren
+    for user_id in winner_ids:
+        player = global_data["player_stats"].setdefault(str(user_id), {
+            "wins": 0,
+            "participations": 0,
+            "mention": f"<@{user_id}>",
+            "display_name": f"User {user_id}",
+            "game_stats": {}
+        })
+
+        player["wins"] += 1
+        player["participations"] += 1
+        player["game_stats"][chosen_game] = player["game_stats"].get(chosen_game, 0) + 1
+
+    # Turnier-Historie ergänzen
+    global_data["tournament_history"].append({
+        "game": chosen_game,
+        "ended_at": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S")
+    })
+
+    save_global_data(global_data)
+    logger.info(f"[END] Statistiken aktualisiert für Gewinner {winner_ids} im Spiel '{chosen_game}'.")
+
+def get_winner_ids() -> list:
+    """
+    Bestimmt die User-IDs der Gewinner basierend auf dem aktuellen Turnierstand.
+    Sucht nach dem Team mit den meisten Siegen.
+    """
+    tournament = load_tournament_data()
+    teams = tournament.get("teams", {})
+
+    if not teams:
+        logger.warning("[GET_WINNER_IDS] Keine Teams im Turnier gefunden.")
+        return []
+
+    # Team mit den meisten Siegen finden
+    winning_team = max(teams.values(), key=lambda t: t.get("wins", 0))
+    winner_members = winning_team.get("members", [])
+
+    winner_ids = []
+    for member in winner_members:
+        match = re.search(r'\d+', member)
+        if match:
+            winner_ids.append(match.group(0))
+
+    logger.info(f"[GET_WINNER_IDS] Gewinner-IDs gefunden: {winner_ids}")
+    return winner_ids
+
+def get_winner_team(winner_ids: list) -> Optional[str]:
+    """
+    Findet das Team basierend auf der Gewinner-Spieler-IDs.
+    Gibt den Teamnamen zurück oder None, wenn nicht gefunden.
+    """
+    tournament = load_tournament_data()
+    teams = tournament.get("teams", {})
+
+    for team_name, team_info in teams.items():
+        team_members = [str(member_id) for member_id in team_info.get("members", [])]
+        if all(winner_id in team_members for winner_id in winner_ids):
+            return team_name
+
+    return None
 
 # ----------------------------------------
 # Autocomplete Funktions
@@ -317,10 +396,10 @@ async def status(interaction: Interaction):
         tournament_text = f"Läuft – endet in {days} Tagen, {hours} Stunden"
 
     placeholders = {
-        "PLACEHOLDER_REGISTRATION": registration_text,
-        "PLACEHOLDER_TOURNAMENT": tournament_text,
-        "PLACEHOLDER_GAME": chosen_game,
-        "PLACEHOLDER_MATCHES": str(len(matches))
+        "registration": registration_text,
+        "tournament": tournament_text,
+        "game": chosen_game,
+        "matches": str(len(matches))
     }
 
-    await send_status_embed(interaction, placeholders)
+    await send_status(interaction, placeholders)

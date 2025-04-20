@@ -3,11 +3,40 @@ from discord import app_commands, Interaction, Member
 from typing import Optional
 
 # Lokale Module
-from .dataStorage import load_tournament_data, save_tournament_data, config
-from .utils import has_permission, parse_availability, validate_string, intersect_availability
-from .logger import logger
-from .embeds import send_help
-from .stats import autocomplete_teams
+from modules.dataStorage import load_tournament_data, save_tournament_data, config
+from modules.utils import has_permission, parse_availability, validate_string, intersect_availability, generate_team_name
+from modules.logger import logger
+from modules.embeds import send_help, send_registration_confirmation, send_participants_overview, send_wrong_channel
+
+
+# ----------------------------------------
+# Hilfsfunktion 
+# ----------------------------------------
+def generate_participants_list() -> str:
+    """
+    Erstellt die Beschreibung für den Teilnehmer-Embed.
+    """
+    tournament = load_tournament_data()
+    teams = tournament.get("teams", {})
+    solo = tournament.get("solo", [])
+
+    lines = []
+
+    if teams:
+        lines.append("**Teams:**")
+        for name, team_entry in teams.items():
+            members = ", ".join(team_entry.get("members", []))
+            lines.append(f"- {name}: {members}")
+
+    if solo:
+        lines.append("\n**Einzelspieler:**")
+        for solo_entry in solo:
+            lines.append(f"- {solo_entry.get('player')}")
+
+    if not lines:
+        return "Es sind noch keine Teilnehmer angemeldet."
+
+    return "\n".join(lines)
 
 # ----------------------------------------
 # Slash-Commands
@@ -16,20 +45,23 @@ from .stats import autocomplete_teams
 @app_commands.command(name="anmelden", description="Melde dich für das Turnier an (Solo oder Team).")
 @app_commands.describe(
     verfugbarkeit="Deine allgemeine Verfügbarkeit (z.B. 10:00-20:00)",
-    team_name="Teamname (optional, wenn du einem Team beitreten oder ein neues Team gründen möchtest)",
+    team_name="Teamname (optional, wenn du selbst einen vergeben möchtest)",
+    team_random_name="Teamnamen automatisch generieren lassen?",
+    mitspieler="Discord-Mitspieler, wenn du ein Team zusammen anmelden möchtest",
     samstag="Verfügbarkeit am Samstag (optional, z.B. 12:00-18:00)",
     sonntag="Verfügbarkeit am Sonntag (optional, z.B. 08:00-22:00)"
 )
-@app_commands.autocomplete(team_name=autocomplete_teams)
 async def anmelden(
     interaction: Interaction,
     verfugbarkeit: str,
     team_name: Optional[str] = None,
+    team_random_name: Optional[bool] = False,
+    mitspieler: Optional[discord.Member] = None,
     samstag: Optional[str] = None,
     sonntag: Optional[str] = None
- ):
+):
     """
-    Meldet einen Spieler für das Turnier an. Entweder Solo oder Team.
+    Meldet einen Spieler für das Turnier an (Solo, Teamgründung oder Teambeitritt).
     """
     tournament = load_tournament_data()
 
@@ -39,77 +71,85 @@ async def anmelden(
 
     # Validierung
     try:
-        if verfugbarkeit:
-            parse_availability(verfugbarkeit)
+        parse_availability(verfugbarkeit)
         if samstag:
             parse_availability(samstag)
         if sonntag:
             parse_availability(sonntag)
-        if team_name:
-            validate_string(team_name)
     except ValueError as e:
         await interaction.response.send_message(f"🚫 Ungültiges Format: {str(e)}", ephemeral=True)
         return
 
     user_mention = interaction.user.mention
 
-    # Doppelte Anmeldung verhindern
+    # Check: Spieler schon angemeldet?
     for solo in tournament.get("solo", []):
         if solo["player"] == user_mention:
             await interaction.response.send_message("⚠️ Du bist bereits als Einzelspieler angemeldet.", ephemeral=True)
             return
-
-    for team, data in tournament.get("teams", {}).items():
-        if user_mention in data.get("members", []):
-            await interaction.response.send_message(f"⚠️ Du bist bereits im Team **{team}** angemeldet.", ephemeral=True)
+    for team_data in tournament.get("teams", {}).values():
+        if user_mention in team_data.get("members", []):
+            await interaction.response.send_message("⚠️ Du bist bereits in einem Team angemeldet.", ephemeral=True)
             return
 
-    if team_name:
+    # === TEAM-ANMELDUNG ===
+    if team_name or team_random_name:
         teams = tournament.setdefault("teams", {})
 
-        if team_name in teams:
-            # Team existiert ➔ Spieler tritt bei
-            team_entry = teams[team_name]
-
-            # Verfügbarkeits-Schnittmenge bilden
-            existing_availability = team_entry.get("verfügbarkeit", "00:00-23:59")
-            new_availability = intersect_availability(existing_availability, verfugbarkeit)
-
-            if not new_availability:
-                await interaction.response.send_message(
-                    f"⚠️ Deine Verfügbarkeit überschneidet sich nicht mit dem Team {team_name}. Bitte stimmt euch ab!",
-                    ephemeral=True
-                )
+        # Falls zufälliger Name gewünscht
+        if team_random_name:
+            team_name = generate_team_name()
+            tries = 0
+            while team_name in teams and tries < 5:
+                team_name = generate_team_name()
+                tries += 1
+            if tries >= 5:
+                await interaction.response.send_message("🚫 Konnte keinen freien Teamnamen finden. Bitte versuche es erneut.", ephemeral=True)
                 return
+            logger.info(f"[ANMELDUNG] Zufälliger Teamname generiert: {team_name}")
 
-            team_entry["members"].append(user_mention)
-            team_entry["verfügbarkeit"] = new_availability
+        # Name prüfen
+        if team_name in teams:
+            await interaction.response.send_message(f"⚠️ Das Team **{team_name}** existiert bereits. Bitte wähle einen anderen Namen.", ephemeral=True)
+            return
 
-            # Spezielle Verfügbarkeiten (Samstag/Sonntag) aktualisieren, falls vorhanden
-            if samstag:
-                team_entry["samstag"] = intersect_availability(team_entry.get("samstag", "00:00-23:59"), samstag)
-            if sonntag:
-                team_entry["sonntag"] = intersect_availability(team_entry.get("sonntag", "00:00-23:59"), sonntag)
+        # Zusatzcheck: Mitspieler
+        mitspieler_mention = None
+        if mitspieler:
+            if mitspieler.id == interaction.user.id:
+                await interaction.response.send_message("⚠️ Du kannst dich nicht selbst als Mitspieler angeben.", ephemeral=True)
+                return
+            for team_data in teams.values():
+                if mitspieler.mention in team_data.get("members", []):
+                    await interaction.response.send_message(f"⚠️ {mitspieler.display_name} ist bereits in einem anderen Team angemeldet.", ephemeral=True)
+                    return
+            mitspieler_mention = mitspieler.mention
 
-            logger.info(f"[ANMELDUNG] {user_mention} ist Team {team_name} beigetreten.")
-            await interaction.response.send_message(f"✅ Du bist dem Team **{team_name}** beigetreten!", ephemeral=True)
+        # Team anlegen
+        team_entry = {
+            "members": [user_mention],
+            "verfügbarkeit": verfugbarkeit,
+        }
+        if mitspieler_mention:
+            team_entry["members"].append(mitspieler_mention)
 
-        else:
-            # Neues Team gründen
-            teams[team_name] = {
-                "members": [user_mention],
-                "verfügbarkeit": verfugbarkeit,
-            }
-            if samstag:
-                teams[team_name]["samstag"] = samstag
-            if sonntag:
-                teams[team_name]["sonntag"] = sonntag
+        if samstag:
+            team_entry["samstag"] = samstag
+        if sonntag:
+            team_entry["sonntag"] = sonntag
 
-            logger.info(f"[ANMELDUNG] Neues Team {team_name} erstellt von {user_mention}.")
-            await interaction.response.send_message(f"✅ Team **{team_name}** wurde erstellt und du bist beigetreten!", ephemeral=True)
+        teams[team_name] = team_entry
 
+        logger.info(f"[ANMELDUNG] {user_mention} hat Team {team_name} gegründet. Mitspieler: {mitspieler.display_name if mitspieler else 'keiner'}")
+
+        detail_text = f"Mitspieler: {mitspieler.display_name}" if mitspieler else "Du startest alleine."
+        await send_registration_confirmation(interaction, {
+            "TYPE": f"im neuen Team **{team_name}**",
+            "DETAILS": detail_text
+        })
+
+    # === SOLO-ANMELDUNG ===
     else:
-        # Solo anmelden
         solo_entry = {
             "player": user_mention,
             "verfügbarkeit": verfugbarkeit
@@ -120,11 +160,15 @@ async def anmelden(
             solo_entry["sonntag"] = sonntag
 
         tournament.setdefault("solo", []).append(solo_entry)
-        logger.info(f"[ANMELDUNG] {user_mention} hat sich als Einzelspieler angemeldet.")
-        await interaction.response.send_message(f"✅ Du wurdest erfolgreich als Solo-Spieler angemeldet!", ephemeral=True)
+
+        logger.info(f"[ANMELDUNG] {user_mention} hat sich als Solo-Spieler angemeldet.")
+
+        await send_registration_confirmation(interaction, {
+            "TYPE": "als Solo-Spieler",
+            "DETAILS": "Du nimmst alleine am Turnier teil."
+        })
 
     save_tournament_data(tournament)
-
 
 @app_commands.command(name="update_availability", description="Aktualisiere deine Verfügbarkeiten für das Turnier.")
 @app_commands.describe(
@@ -198,10 +242,6 @@ async def sign_out(interaction: Interaction):
     """
     Meldet den User vom Turnier ab.
     """
-    channel_limit_ids = config.get("CHANNEL_LIMIT", {}).get("ID", [])
-    if str(interaction.channel_id) not in channel_limit_ids:
-        await interaction.response.send_message("🚫 Dieser Befehl kann nur in einem bestimmten Kanal verwendet werden!", ephemeral=True)
-        return
 
     tournament = load_tournament_data()
 
@@ -259,29 +299,41 @@ async def sign_out(interaction: Interaction):
 @app_commands.command(name="participants", description="Liste aller Teilnehmer anzeigen.")
 async def participants(interaction: Interaction):
     """
-    Listet alle aktuellen Teilnehmer.
+    Listet alle aktuellen Teilnehmer (Teams und Einzelspieler), alphabetisch sortiert.
     """
     tournament = load_tournament_data()
 
     teams = tournament.get("teams", {})
     solo = tournament.get("solo", [])
 
-    lines = []
+    # Teams alphabetisch sortieren
+    sorted_teams = sorted(teams.items(), key=lambda x: x[0].lower())
 
-    if teams:
-        lines.append("**Teams:**")
-        for name, team_entry in teams.items():
-            members = ", ".join(team_entry.get("members", []))
-            lines.append(f"- {name}: {members}")
-    if solo:
-        lines.append("\n**Einzelspieler:**")
-        for solo_entry in solo:
-            lines.append(f"- {solo_entry.get('player')}")
+    # Solo-Spieler alphabetisch sortieren (nach Mention)
+    sorted_solo = sorted(solo, key=lambda x: x.get("player", "").lower())
 
-    if not lines:
-        await interaction.response.send_message("Es sind noch keine Teilnehmer angemeldet.", ephemeral=True)
+    team_lines = []
+    for name, team_entry in sorted_teams:
+        members = ", ".join(team_entry.get("members", []))
+        team_lines.append(f"- {name}: {members}")
+
+    solo_lines = []
+    for solo_entry in sorted_solo:
+        solo_lines.append(f"- {solo_entry.get('player')}")
+
+    # Text zusammensetzen
+    full_text = ""
+
+    if team_lines:
+        full_text += "**Teams:**\n" + "\n".join(team_lines) + "\n\n"
+
+    if solo_lines:
+        full_text += "**Einzelspieler:**\n" + "\n".join(solo_lines)
+
+    if not full_text:
+        await interaction.response.send_message("❌ Es sind noch keine Teilnehmer angemeldet.", ephemeral=True)
     else:
-        await interaction.response.send_message("\n".join(lines), ephemeral=False)
+        await send_participants_overview(interaction, full_text)
 
 @app_commands.command(name="help", description="Zeigt alle wichtigen Infos und Befehle zum HeroldBot an.")
 async def help_command(interaction: Interaction):

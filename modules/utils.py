@@ -11,27 +11,15 @@ from discord import app_commands, Interaction, Embed
 from datetime import datetime, timedelta
 from typing import List
 from typing import Optional
+from discord.app_commands import Choice
 
 # Lokale Module
 from .logger import logger
-from .dataStorage import load_config, load_global_data, save_global_data, load_tournament_data
+from .dataStorage import load_config, load_global_data, save_global_data, load_tournament_data, load_games, load_names
 
 # Konfiguration laden
 config = load_config()
 
-# Listen für zufällige Namen
-ADJEKTIVE = [
-    "Mutige", "Wilde", "Eiserne", "Schnelle", "Stille", "Kühne", "Tapfere", "Listige",
-    "Freche", "Donnernde", "Flinke", "Mächtige", "Verwegene", "Legendäre", "Lustige", 
-    "Athletische", "Beglückende", "Elegante", "Fabelhafte", "Feurige", "Grandiose",
-    "Mysteriöse", "Garstige", "Hinterhältige", "Gebrechliche", "Unwürdige", "Verdächtige"
-]
-
-SUBSTANTIVE = [
-    "Wölfe", "Drachen", "Falken", "Titanen", "Krieger", "Panther", "Schlangen", "Ninjas",
-    "Löwen", "Bären", "Adler", "Haie", "Berserker", "Wächter", "Hobbits", "Goblins", "Ratten",
-    "Hühner", "Flöten"
-]
 
 def has_permission(member: discord.Member, *required_permissions: str) -> bool:
     """
@@ -133,8 +121,8 @@ def get_tournament_status() -> str:
 
 def update_player_stats(winner_mentions: list[str]) -> None:
     """
-    Aktualisiert in data.json unter "player_stats" den Sieg-Zähler für die angegebenen Spieler.
-    :param winner_mentions: Liste von Discord-Mentions, z.B. ["<@123456789>", "<@987654321>"]
+    Aktualisiert in global_data unter "player_stats" den Sieg-Zähler für die angegebenen Spieler.
+    Falls ein Spieler noch nicht existiert, wird ein neuer Eintrag angelegt.
     """
     global_data = load_global_data()
     player_stats = global_data.setdefault("player_stats", {})
@@ -146,11 +134,21 @@ def update_player_stats(winner_mentions: list[str]) -> None:
             continue
 
         user_id = match.group(0)
-        user_mention = f"<@{user_id}>"
 
-        stats = player_stats.get(user_id, {})
-        stats["wins"] = stats.get("wins", 0) + 1
-        stats["name"] = user_mention  # immer korrekt setzen
+        # Spieler existiert noch nicht ➔ anlegen
+        stats = player_stats.get(user_id)
+        if stats is None:
+            stats = {
+                "wins": 0,
+                "participations": 0,
+                "mention": f"<@{user_id}>",
+                "display_name": f"User {user_id}",
+                "game_stats": {}
+            }
+
+        # Statistiken aktualisieren
+        stats["wins"] += 1
+        stats["participations"] += 1
 
         player_stats[user_id] = stats
 
@@ -159,15 +157,13 @@ def update_player_stats(winner_mentions: list[str]) -> None:
     logger.info("Spielerstatistiken aktualisiert.")
 
 async def game_autocomplete(interaction: Interaction, current: str):
-    global_data = load_global_data()
-    games = global_data.get("games", [])
+    games = load_games()
 
-    # Nur Spiele vorschlagen, die zum aktuellen Eingabetext passen
     return [
         app_commands.Choice(name=game, value=game)
         for game in games
         if current.lower() in game.lower()
-    ][:25]  # Maximal 25 Ergebnisse laut Discord-API
+    ][:25]  # Discord API erlaubt max 25 Ergebnisse
 
 def add_manual_win(user_id: int):
     """
@@ -293,11 +289,12 @@ def finalize_tournament(winning_team: str, winners: list[int], game: str, points
 def generate_team_name() -> str:
     """
     Erzeugt einen zufälligen Teamnamen aus einer Adjektiv- und einer Substantivliste.
-
+    
     :return: Der generierte Teamname als String.
     """
-    adjektiv = random.choice(ADJEKTIVE)
-    substantiv = random.choice(SUBSTANTIVE)
+    names = load_names()
+    adjektiv = random.choice(names["adjektive"])
+    substantiv = random.choice(names["substantive"])
     return f"{adjektiv} {substantiv}"
 
 async def smart_send(interaction: Interaction, *, content: str = None, embed: Embed = None, ephemeral: bool = False):
@@ -423,6 +420,65 @@ async def autocomplete_teams(interaction: Interaction, current: str):
 
     return suggestions
 
+def all_matches_completed() -> bool:
+    tournament = load_tournament_data()
+    matches = tournament.get("matches", [])
+
+    return all(match.get("status") == "completed" for match in matches)
+
+def get_current_chosen_game() -> str:
+    """
+    Holt das aktuell gewählte Spiel aus der Tournament-Datei.
+    """
+    tournament = load_tournament_data()
+    poll_results = tournament.get("poll_results") or {}
+
+    chosen_game = poll_results.get("chosen_game", "Unbekannt")
+    return chosen_game
+
+async def update_all_participants():
+    """
+    Erhöht die Participation-Zahl für alle Teilnehmer eines Turniers.
+    """
+    global_data = load_global_data()
+    player_stats = global_data.setdefault("player_stats", {})
+
+    tournament = load_tournament_data()
+
+    # Teams
+    for team_entry in tournament.get("teams", {}).values():
+        for member in team_entry.get("members", []):
+            user_id = re.search(r"\d+", member).group(0)
+            stats = player_stats.get(user_id)
+            if stats is None:
+                stats = {
+                    "wins": 0,
+                    "participations": 0,
+                    "mention": f"<@{user_id}>",
+                    "display_name": f"User {user_id}",
+                    "game_stats": {}
+                }
+            stats["participations"] += 1
+            player_stats[user_id] = stats
+
+    # Solo-Spieler
+    for solo_entry in tournament.get("solo", []):
+        user_id = re.search(r"\d+", solo_entry.get("player")).group(0)
+        stats = player_stats.get(user_id)
+        if stats is None:
+            stats = {
+                "wins": 0,
+                "participations": 0,
+                "mention": f"<@{user_id}>",
+                "display_name": f"User {user_id}",
+                "game_stats": {}
+            }
+        stats["participations"] += 1
+        player_stats[user_id] = stats
+
+    global_data["player_stats"] = player_stats
+    save_global_data(global_data)
+    logger.info("[STATS] Participation-Zahlen für alle Teilnehmer aktualisiert.")
 
 
 # Hilfsfunktion für den dummy gen

@@ -7,15 +7,15 @@ from discord import Interaction, Embed
 from discord import app_commands
 
 # Lokale Module
-from .dataStorage import load_global_data
+from .dataStorage import load_global_data, load_games
 from .logger import logger
 from .matchmaker import auto_match_solo, create_round_robin_schedule, generate_schedule_overview, assign_matches_to_slots, cleanup_orphan_teams
-from .utils import has_permission, update_player_stats, get_player_team, autocomplete_teams
+from .utils import has_permission, update_player_stats, get_player_team, autocomplete_teams, get_current_chosen_game, smart_send, update_all_participants
 from .dataStorage import load_tournament_data, save_tournament_data, backup_current_state, reset_tournament, delete_tournament_file
 from .poll import PollView
 from .embeds import send_tournament_announcement, send_list_matches, send_match_schedule, load_embed_template, build_embed_from_template, send_tournament_end_announcement  
-from .stats import autocomplete_players, autocomplete_teams, get_mvp
-from modules.archive import archive_current_tournament
+from .stats import autocomplete_players, autocomplete_teams, get_mvp, update_player_stats, get_winner_ids, get_winner_team
+from modules.archive import archive_current_tournament, update_tournament_history
 
 # ---------------------------------------
 # 🎯 Start Turnier Command
@@ -67,7 +67,7 @@ async def start_tournament(interaction: Interaction, registration_hours: Optiona
     await interaction.response.send_message(embed=embed)
 
     # Umfrage starten
-    poll_options = load_global_data().get("games", [])
+    poll_options = load_games()
     view = PollView(options=poll_options, registration_period=registration_hours * 3600)
     await interaction.followup.send(content="🎮 Bitte stimmt ab, welches Spiel gespielt werden soll:", view=view)
 
@@ -85,30 +85,8 @@ async def end_tournament(interaction: Interaction):
         await interaction.response.send_message("🚫 Du hast keine Berechtigung für diesen Befehl.", ephemeral=True)
         return
 
-    # 1. Archivieren
-    archive_path = archive_current_tournament()
-    logger.info(f"[END] Turnier archiviert unter: {archive_path}")
-
-    # 2. MVP bestimmen
-    mvp = get_mvp()  # kleine Hilfsfunktion basierend auf player_stats
-    mvp_message = f"🏆 MVP des Turniers: **{mvp}**!" if mvp else "🏆 Kein MVP ermittelt."
-
-    # 3. Backup vor Reset erstellen
-    backup_current_state()
-
-    # 4. Cleanup durchführen
-    reset_tournament()
-
-    # 5. Turnierdatei löschen
-    delete_tournament_file()
-
-    # 6. Abschluss-Embed senden
-    await send_tournament_end_announcement(interaction.channel, mvp_message)
-
-    await interaction.response.send_message("✅ Turnier erfolgreich beendet, archiviert und aufgeräumt.", ephemeral=True)
-
-    logger.info("[END] Turnier abgeschlossen, System bereit für neue Turniere.")
-
+    await end_tournament_procedure(interaction.channel, manual_trigger=True)
+    await interaction.response.send_message("✅ Turnier wurde manuell beendet und archiviert.", ephemeral=True)
 
 @app_commands.command(name="list_matches", description="Zeigt alle geplanten Matches oder die eines bestimmten Teams.")
 @app_commands.describe(team="Optional: Name des Teams oder 'meine' für eigene Matches.")
@@ -117,26 +95,30 @@ async def list_matches(interaction: Interaction, team: Optional[str] = None):
     tournament = load_tournament_data()
     matches = tournament.get("matches", [])
 
+    user_id = str(interaction.user.id)
+
     if team:
-        # Nur bestimmte Matches
-        user_id = str(interaction.user.id)
-        if team.lower() == "meine":
-            # Eigene Matches basierend auf User-ID finden
+        team = team.lower()
+
+        if team == "meine":
+            # Eigene Teamzugehörigkeit herausfinden
             my_team = get_player_team(tournament, user_id)
             if not my_team:
                 await smart_send(interaction, content="🚫 Du bist in keinem Team registriert.", ephemeral=True)
                 return
-            matches = [m for m in matches if m.get("team1") == my_team or m.get("team2") == my_team]
+
+            matches = [m for m in matches if m.get("team1", "").lower() == my_team.lower() or m.get("team2", "").lower() == my_team.lower()]
         else:
-            # Bestimmtes Team gesucht
-            matches = [m for m in matches if m.get("team1") == team or m.get("team2") == team]
+            # Nach spezifischem Team suchen
+            matches = [m for m in matches if m.get("team1", "").lower() == team or m.get("team2", "").lower() == team]
 
     if not matches:
         await smart_send(interaction, content="⚠️ Keine passenden Matches gefunden.", ephemeral=True)
         return
 
     await send_list_matches(interaction, matches)
-    logger.info(f"[MATCHES] {len(matches)} Matches aufgelistet (Filter: {team or 'alle'}).")
+
+    logger.info(f"[MATCHES] {len(matches)} Matches aufgelistet (Filter: '{team or 'alle'}').")
 
 @app_commands.command(name="match_schedule", description="Zeigt den aktuellen Spielplan an.")
 async def match_schedule(interaction: Interaction):
@@ -147,20 +129,60 @@ async def match_schedule(interaction: Interaction):
         await interaction.response.send_message("⚠️ Kein Spielplan vorhanden.", ephemeral=True)
         return
 
-    lines = []
-    for match in sorted(matches, key=lambda m: m["scheduled_time"] or ""):
-        time = match.get("scheduled_time", "Noch nicht geplant")
-        team1 = match.get("team1")
-        team2 = match.get("team2")
-        status = match.get("status", "offen")
-        emoji = "✅" if status == "erledigt" else "🕒"
-        lines.append(f"{emoji} {time} – **{team1}** vs **{team2}**")
+    description_text = generate_schedule_overview(matches)
+    await send_match_schedule(interaction, description_text)
 
-    description = "\n".join(lines) if lines else "Keine Matches geplant."
+# ---------------------------------------
+# Hilfsfunktion
+# ---------------------------------------
 
-    # ➔ Jetzt schickst du das Embed los!
-    description_text = generate_schedule_overview()
-    await send_match_schedule_embed(interaction, description_text)
+async def end_tournament_procedure(channel: discord.TextChannel, manual_trigger: bool = False):
+    tournament = load_tournament_data()
+
+    if not manual_trigger and not all_matches_completed():
+        logger.info("[TOURNAMENT] Nicht alle Matches abgeschlossen. Abbruch des automatischen Endes.")
+        await channel.send("⚠️ Es sind noch nicht alle Matches abgeschlossen. Turnier bleibt offen.")
+        return
+
+    # Archivieren
+    archive_path = archive_current_tournament()
+    logger.info(f"[END] Turnier archiviert unter: {archive_path}")
+
+    # Backup
+    backup_current_state()
+
+    # Gewinner und Spiel holen
+    winner_ids = get_winner_ids()
+    chosen_game = get_current_chosen_game()
+    mvp = get_mvp()
+
+    # 🆕 Teilnehmerstatistiken aktualisieren
+    await update_all_participants()
+
+    # Gewinner in Statistik eintragen
+    if winner_ids and chosen_game != "Unbekannt":
+        update_player_stats(winner_ids, chosen_game)
+        logger.info(f"[END] Gewinner gespeichert: {winner_ids} für Spiel: {chosen_game}")
+    else:
+        logger.warning("[END] Keine Gewinner oder kein Spielname gefunden – Statistik nicht aktualisiert.")
+
+    # Tournament-History aktualisieren
+    update_tournament_history(
+        winner_ids=winner_ids,
+        chosen_game=chosen_game or "Unbekannt",
+        mvp_name=mvp or "Kein MVP"
+    )
+
+    # System aufräumen
+    reset_tournament()
+    delete_tournament_file()
+
+    # Abschlussmeldung als Embed
+    mvp_message = f"🏆 MVP des Turniers: **{mvp}**!" if mvp else "🏆 Kein MVP ermittelt."
+    await send_tournament_end_announcement(channel, mvp_message, winner_ids)
+
+    logger.info("[END] Turnier abgeschlossen, System bereit für neue Turniere.")
+
 
 # ---------------------------------------
 # ⏳ Hintergrundaufgaben
@@ -183,7 +205,13 @@ async def close_registration_after_delay(delay_seconds: int, channel: discord.Te
     # Starte automatisches Matchmaking
     new_teams = auto_match_solo()
     create_round_robin_schedule()
-    assign_matches_to_slots()
+
+    # ➡️ Matches und Slots neu laden und zuweisen
+    matches = load_tournament_data().get("matches", [])
+    slots = generate_weekend_slots(load_tournament_data())
+    assign_matches_to_slots(matches, slots)
+
+    save_tournament_data(load_tournament_data())
 
     # Ausgabe neu gebildeter Teams
     if new_teams:
@@ -201,12 +229,9 @@ async def close_registration_after_delay(delay_seconds: int, channel: discord.Te
 
 async def close_tournament_after_delay(delay_seconds: int, channel: discord.TextChannel):
     await asyncio.sleep(delay_seconds)
-    tournament = load_tournament_data()
-    tournament["running"] = False
-    save_tournament_data(tournament)
 
-    await channel.send("🏁 **Das Turnier ist offiziell beendet! Glückwunsch an alle Teilnehmer!**")
-    logger.info("[TOURNAMENT] Turnier automatisch beendet.")
+    await end_tournament_procedure(channel)
+
 
 
 

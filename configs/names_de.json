@@ -1,0 +1,16 @@
+{
+    "adjektive": [
+      "Mutige", "Wilde", "Eiserne", "Schnelle", "Stille", "Kühne", "Tapfere", "Listige",
+      "Freche", "Donnernde", "Flinke", "Mächtige", "Verwegene", "Legendäre", "Lustige", 
+      "Athletische", "Beglückende", "Elegante", "Fabelhafte", "Feurige", "Grandiose",
+      "Mysteriöse", "Garstige", "Hinterhältige", "Gebrechliche", "Unwürdige", "Verdächtige",
+      "Läppische", "Königliche", "Luftige", "Wässrige", "Erdige", "Göttliche", "Zauberhafte",
+      "Famose", "Grazile", "Anmutige", "Chaotische"
+    ],
+    "substantive": [
+      "Wölfe", "Drachen", "Falken", "Titanen", "Krieger", "Panther", "Schlangen", "Ninjas",
+      "Löwen", "Bären", "Adler", "Haie", "Berserker", "Wächter", "Hobbits", "Goblins", "Ratten",
+      "Hühner", "Flöten", "Feen", "Orks", "Elfen", "Vampire", "Lappen", "Seepferdchen", "Einhörner",
+      "Abenteurer", "Schurken", "Viper", "Marder"
+    ]
+  }

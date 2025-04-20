@@ -6,10 +6,14 @@ import json
 import os
 import re
 from discord import Embed, Interaction, TextChannel
+from datetime import datetime
+from typing import Union
 
 # Lokale Module
 from .utils import load_config, smart_send
 from .logger import logger
+from modules.dataStorage import load_tournament_data
+from views.reschedule_view import RescheduleView
 
 
 
@@ -31,18 +35,23 @@ def load_embed_template(template_name: str, category: str = "default") -> dict:
         return {}
 
 def build_embed_from_template(template: dict, placeholders: dict = None) -> Embed:
+    # Farbe sicher verarbeiten
+    color_value = template.get("color", 0x3498DB)
+    if isinstance(color_value, str):
+        color_value = int(color_value.replace("#", "0x"), 16)
+
     embed = Embed(
         title=template.get("title", "Kein Titel"),
         description=template.get("description", ""),
-        color=int(template.get("color", "0x3498DB").replace("#", "0x"), 16)
+        color=color_value
     )
 
     if placeholders:
-        # Beschreibung
+        # Beschreibung Platzhalter ersetzen
         for key, value in placeholders.items():
             embed.description = embed.description.replace(f"PLACEHOLDER_{key.upper()}", str(value))
 
-        # Felder
+        # Felder Platzhalter ersetzen
         for field in template.get("fields", []):
             name = field.get("name", "")
             value = field.get("value", "")
@@ -53,6 +62,7 @@ def build_embed_from_template(template: dict, placeholders: dict = None) -> Embe
 
             embed.add_field(name=name, value=value, inline=False)
     else:
+        # Falls keine Platzhalter: Felder normal hinzufügen
         for field in template.get("fields", []):
             embed.add_field(name=field.get("name", ""), value=field.get("value", ""), inline=False)
 
@@ -60,6 +70,7 @@ def build_embed_from_template(template: dict, placeholders: dict = None) -> Embe
         embed.set_footer(text=footer)
 
     return embed
+
 
 
 # ==== SEND FUNKTIONEN ====
@@ -70,12 +81,26 @@ async def send_registration_open(channel: TextChannel, placeholders: dict):
         logger.error("[EMBED] REGISTRATION_OPEN_ANNOUNCEMENT Template fehlt.")
         return
     embed = build_embed_from_template(template, placeholders)
-    await channel.send(embed=embed)
+    await interaction.response.send_message(embed=embed, ephemeral=False)
 
 async def send_registration_closed(channel: discord.TextChannel):
     template = load_embed_template("close", category="default").get("REGISTRATION_CLOSED_ANNOUNCEMENT")
     embed = create_embed_from_config("REGISTRATION_CLOSED_ANNOUNCEMENT")
-    await channel.send(embed=embed)
+    await interaction.response.send_message(embed=embed, ephemeral=False)
+
+async def send_registration_confirmation(interaction: Interaction, placeholders: dict):
+    """
+    Sendet ein Bestätigungs-Embed nach erfolgreicher Anmeldung.
+    """
+    template_data = load_embed_template("registration", category="default")
+    template = template_data.get("REGISTRATION_CONFIRMATION")
+
+    if not template:
+        logger.error("[EMBED] REGISTRATION_CONFIRMATION Template fehlt.")
+        return
+
+    embed = build_embed_from_template(template, placeholders)
+    await interaction.response.send_message(embed=embed, ephemeral=True)
 
 async def send_tournament_announcement(channel: TextChannel, placeholders: dict):
     template = load_embed_template("tournament_start", category="default").get("TOURNAMENT_ANNOUNCEMENT")
@@ -85,22 +110,42 @@ async def send_tournament_announcement(channel: TextChannel, placeholders: dict)
     embed = build_embed_from_template(template, placeholders)
     await channel.send(embed=embed)
 
-async def send_tournament_end_announcement(channel: TextChannel, mvp_message: str):
-    # Template laden
+async def send_tournament_end_announcement(channel: discord.TextChannel, mvp_message: str, winner_ids: list[str]):
+    """
+    Sendet ein Abschluss-Embed für das Turnier basierend auf tournament_end.json.
+    """
+
     template = load_embed_template("tournament_end", category="default").get("TOURNAMENT_END")
     if not template:
         logger.error("[EMBED] TOURNAMENT_END Template fehlt.")
         return
 
-    # Platzhalter
+    tournament = load_tournament_data()
+    if tournament is None:
+        logger.error("[TOURNAMENT] Kein aktives Turnier gefunden beim Senden des Abschluss-Embeds!")
+        await channel.send("❌ Fehler: Es konnte kein Turnier gefunden werden, um den Abschluss-Embed zu senden.")
+        return
+
+    poll_results = tournament.get("poll_results") or {}
+    if not isinstance(poll_results, dict):
+        poll_results = {}
+
+    chosen_game = poll_results.get("chosen_game", "Unbekannt")
+
+    # Gewinner richtig verarbeiten
+    if winner_ids:
+        winners_mentions = ", ".join(f"<@{winner_id}>" for winner_id in winner_ids)
+    else:
+        winners_mentions = "Keine Gewinner ermittelt."
+
     placeholders = {
-        "MVP_MESSAGE": mvp_message
+        "MVP_MESSAGE": mvp_message,
+        "WINNERS": winners_mentions,
+        "CHOSEN_GAME": chosen_game
     }
 
-    # Embed bauen
     embed = build_embed_from_template(template, placeholders)
 
-    # Abschicken
     await channel.send(embed=embed)
 
 async def send_tournament_stats(interaction: Interaction, total_players: int, total_wins: int, best_player: str, favorite_game: str):
@@ -169,12 +214,16 @@ async def send_notify_team_members(interaction: Interaction, team1_members, team
     return failed
 
 async def send_status(interaction: Interaction, placeholders: dict):
+    """
+    Sendet ein Status-Embed basierend auf den Platzhaltern.
+    """
     template = load_embed_template("status", category="default").get("STATUS")
     if not template:
         logger.error("[EMBED] STATUS Template fehlt.")
         return
+
     embed = build_embed_from_template(template, placeholders)
-    await channel.send(embed=embed)
+    await interaction.response.send_message(embed=embed, ephemeral=True)
 
 async def send_match_schedule(interaction: Interaction, description_text: str):
     template = load_embed_template("match_schedule", category="default").get("MATCH_SCHEDULE")
@@ -240,9 +289,7 @@ async def send_global_stats(interaction: Interaction, description_text: str):
     await channel.send(embed=embed)
 
 async def send_list_matches(interaction: Interaction, matches: list):
-    """
-    Schickt eine Übersicht der geplanten Matches als Embeds.
-    """
+
     template_data = load_embed_template("list_matches", category="default")
     template = template_data.get("LIST_MATCHES")
 
@@ -323,3 +370,54 @@ async def send_cleanup_summary(channel: discord.TextChannel, teams_deleted: list
 
     await channel.send(embed=embed)
 
+async def send_participants_overview(interaction: Interaction, participants_text: str):
+    """
+    Sendet eine Übersicht aller Teilnehmer als Embed.
+    """
+    template = load_embed_template("participants", category="default").get("PARTICIPANTS_OVERVIEW")
+
+    if not template:
+        logger.error("[EMBED] PARTICIPANTS_OVERVIEW Template fehlt.")
+        return
+
+    placeholders = {
+        "PARTICIPANTS": participants_text
+    }
+
+    embed = build_embed_from_template(template, placeholders)
+    await interaction.response.send_message(embed=embed, ephemeral=False)
+
+async def send_request_reschedule(destination: Union[discord.Member, discord.TextChannel], match_id: int, team1: str, team2: str, new_datetime: datetime, players_mentions: list[str]):
+    """
+    Sendet eine Reschedule-Anfrage als Embed + Buttons.
+    """
+    template = load_embed_template("reschedule", category="default").get("RESCHEDULE")
+
+    if not template:
+        logger.error("[EMBED] RESCHEDULE Template fehlt.")
+        return
+
+    placeholders = {
+        "MATCH_INFO": f"{team1} vs {team2}",
+        "NEW_SLOT": new_datetime.strftime("%d.%m.%Y %H:%M")
+    }
+
+    embed = build_embed_from_template(template, placeholders)
+
+    view = RescheduleView(
+        match_id=match_id,
+        team1=team1,
+        team2=team2,
+        players=players_mentions,
+        new_datetime=new_datetime.strftime("%Y-%m-%dT%H:%M:%S")  # Einheitliches Format
+    )
+
+    await destination.send(embed=embed, view=view)
+
+async def send_wrong_channel(interaction: Interaction):
+    template = load_embed_template("wrong_channel", category="default").get("WRONG_CHANNEL")
+    if not template:
+        logger.error("[EMBED] WRONG_CHANNEL Template fehlt.")
+        return
+    embed = build_embed_from_template(template)
+    await interaction.response.send_message(embed=embed, ephemeral=False)

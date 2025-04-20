@@ -89,96 +89,6 @@ def create_round_robin_schedule():
     logger.info(f"[MATCHMAKER] {len(matches)} Matches für {len(teams)} Teams erstellt.")
     return matches
 
-async def assign_matches_to_slots():
-    """
-    Ordnet Matches passenden Slots zu – fair verteilt über die verfügbaren Wochenenden.
-    Achtet darauf, dass Teams nicht gleichzeitig mehrere Matches haben.
-    """
-    tournament = load_tournament_data()
-    matches = tournament.get("matches", [])
-    teams = tournament.get("teams", {})
-
-    if not matches or not teams:
-        logger.warning("[MATCHMAKER] Keine Matches oder Teams zum Planen gefunden.")
-        return
-
-    registration_end = datetime.fromisoformat(tournament.get("registration_end"))
-    tournament_end = datetime.fromisoformat(tournament.get("tournament_end"))
-    slots = generate_weekend_slots(tournament)
-
-    if not slots:
-        logger.warning("[MATCHMAKER] Keine verfügbaren Slots gefunden.")
-        return
-
-    team_slots = {team_name: calculate_team_slots(team_entry, slots) for team_name, team_entry in teams.items()}
-
-    # Matches besser verteilen
-    scheduled_slots = []
-    team_last_played = {}
-    day_match_counter = {}
-    matches_without_slot = []
-
-    for match in matches:
-        team1 = match["team1"]
-        team2 = match["team2"]
-
-        available_for_team1 = set(team_slots.get(team1, []))
-        available_for_team2 = set(team_slots.get(team2, []))
-
-        common_slots = sorted(available_for_team1 & available_for_team2)
-
-        best_slot = None
-        lowest_penalty = float('inf')
-
-        for slot in common_slots:
-            # NEU: Überprüfen ob Team1 oder Team2 schon ein anderes Match zu diesem Zeitpunkt hat
-            conflict = any(
-                other_match.get("scheduled_time") == slot and (
-                    other_match.get("team1") in (team1, team2) or
-                    other_match.get("team2") in (team1, team2)
-                )
-                for other_match in matches if other_match.get("scheduled_time")
-            )
-
-            if conflict:
-                continue  # Slot ist blockiert
-
-            # Bewertung: Vermeide gleiche Tage direkt hintereinander
-            dt = datetime.strptime(slot, "%Y-%m-%dT%H:%M:%S")
-            date_key = dt.strftime("%Y-%m-%d")
-
-            penalty = day_match_counter.get(date_key, 0)
-
-            if team_last_played.get(team1) == date_key:
-                penalty += 5
-            if team_last_played.get(team2) == date_key:
-                penalty += 5
-
-            if penalty < lowest_penalty:
-                best_slot = slot
-                lowest_penalty = penalty
-
-        if best_slot:
-            match["scheduled_time"] = best_slot
-            scheduled_slots.append(best_slot)
-
-            dt = datetime.strptime(best_slot, "%Y-%m-%dT%H:%M:%S")
-            date_key = dt.strftime("%Y-%m-%d")
-            day_match_counter[date_key] = day_match_counter.get(date_key, 0) + 1
-            team_last_played[team1] = date_key
-            team_last_played[team2] = date_key
-
-            team_slots[team1].remove(best_slot)
-            team_slots[team2].remove(best_slot)
-        else:
-            matches_without_slot.append(match)
-
-    save_tournament_data(tournament)
-    logger.info(f"[MATCHMAKER] {len(matches) - len(matches_without_slot)} Matches erfolgreich verteilt.")
-    
-    if matches_without_slot:
-        logger.warning(f"[MATCHMAKER] {len(matches_without_slot)} Matches konnten nicht eingeplant werden!")
-
 def calculate_overlap(zeitraum1: str, zeitraum2: str) -> str:
     """
     Berechnet die Überschneidung von zwei Zeiträumen im Format 'HH:MM-HH:MM'.
@@ -205,38 +115,15 @@ def calculate_overlap(zeitraum1: str, zeitraum2: str) -> str:
 
     return f"{latest_start.strftime('%H:%M')}-{earliest_end.strftime('%H:%M')}"
 
-def calculate_team_slots(team_entry: dict, available_slots: list[str]) -> list[str]:
+def generate_schedule_overview(matches: list) -> str:
     """
-    Ermittelt verfügbare Slots für ein Team auf Basis von special_availability oder allgemeiner Verfügbarkeit.
+    Erzeugt einen schön gruppierten Spielplan aus der übergebenen Matchliste.
+    Hebt Matches von HEUTE mit 🔥 hervor, erledigte Matches mit ✅.
     """
-    from .utils import parse_availability
-
-    team_slots = set()
-    special = team_entry.get("special_availability", {})
-
-    for slot in available_slots:
-        dt = datetime.strptime(slot, "%Y-%m-%dT%H:%M:%S")
-        weekday = dt.strftime("%A").lower()  # z.B. "saturday" oder "sunday"
-
-        # Falls spezielle Verfügbarkeit für diesen Tag existiert
-        if weekday in special:
-            start_time, end_time = parse_availability(special[weekday])
-        else:
-            # Normale Verfügbarkeit
-            start_time, end_time = parse_availability(team_entry.get("verfügbarkeit", "00:00-23:59"))
-
-        # Check, ob Slot innerhalb der Zeiten liegt
-        if start_time <= dt.time() <= end_time:
-            team_slots.add(slot)
-
-    return list(sorted(team_slots))
-
-def generate_schedule_overview():
-    tournament = load_tournament_data()
-    matches = tournament.get("matches", [])
-    
     if not matches:
         return "Keine Matches geplant."
+
+    today = datetime.now().date()  # Heutiges Datum
 
     # Gruppiere nach Datum
     schedule_by_day = defaultdict(list)
@@ -257,7 +144,17 @@ def generate_schedule_overview():
         for dt, match in matches_list:
             team1 = match.get("team1", "Unbekannt")
             team2 = match.get("team2", "Unbekannt")
-            description += f"🕒 {dt.strftime('%H:%M')} – **{team1}** vs **{team2}**\n"
+            match_status = match.get("status", "offen")
+
+            # Emoji bestimmen
+            if match_status == "erledigt":
+                emoji = "✅"
+            elif dt.date() == today:
+                emoji = "🔥"
+            else:
+                emoji = "🕒"
+
+            description += f"{emoji} {dt.strftime('%H:%M')} – **{team1}** vs **{team2}**\n"
 
         description += "\n"
 
@@ -299,13 +196,55 @@ async def cleanup_orphan_teams(channel: TextChannel):
 
     logger.info(f"[CLEANUP] {teams_deleted} leere Teams gelöscht, {players_rescued} Spieler gerettet.")
 
+def parse_start_hour(availability_str: str) -> int:
+    """
+    Extrahiert die Startstunde aus einem Zeitbereich (z.B. "12:00-20:00").
+    """
+    try:
+        start_time = availability_str.split("-")[0]
+        hour = int(start_time.split(":")[0])
+        return hour
+    except Exception:
+        logger.warning(f"[SLOT-PLANUNG] Fehler beim Parsen der Verfügbarkeit: {availability_str}")
+        return 10  # Falls etwas schiefgeht, Standardwert 10 Uhr
+
+
+# ------------------
+# Dynamische Slot-Generierung
+# ------------------
+def calculate_dynamic_first_hour(tournament: dict) -> int:
+    """
+    Bestimmt die früheste verfügbare Startstunde aller Teams.
+    Fällt zurück auf 10 Uhr, falls keine Verfügbarkeiten gefunden werden können.
+    """
+    solo_players = tournament.get("solo", [])
+    teams = tournament.get("teams", {})
+
+    earliest_hours = []
+
+    # Solo-Spieler durchgehen
+    for player in solo_players:
+        availability = player.get("verfügbarkeit")
+        if availability:
+            start_hour = parse_start_hour(availability)
+            earliest_hours.append(start_hour)
+
+    # Teams durchgehen
+    for team_data in teams.values():
+        availability = team_data.get("verfügbarkeit")
+        if availability:
+            start_hour = parse_start_hour(availability)
+            earliest_hours.append(start_hour)
+
+    if earliest_hours:
+        return min(earliest_hours)
+    
+    # Fallback auf 10 Uhr
+    return 10
+
 def generate_weekend_slots(tournament: dict) -> list:
     """
-    Generiert Zeitslots für ein Turnier:
-    - Dynamische Slotanzahl basierend auf Matches
-    - Begrenzung auf maximal Slots pro Tag
-    - Mindestpausen (Slot-Interval)
-    - Automatischer Slot-Report ins Log
+    Generiert verfügbare Zeitslots für Matches.
     """
     slots = []
     matches = tournament.get("matches", [])
@@ -318,9 +257,8 @@ def generate_weekend_slots(tournament: dict) -> list:
     current_date = registration_end
     weekend_days = []
 
-    # Wochenendtage finden
     while current_date <= tournament_end:
-        if current_date.weekday() in (5, 6):  # Samstag (5) oder Sonntag (6)
+        if current_date.weekday() in (5, 6):
             weekend_days.append(current_date)
         current_date += timedelta(days=1)
 
@@ -330,28 +268,99 @@ def generate_weekend_slots(tournament: dict) -> list:
     if total_days == 0:
         raise ValueError("Keine Wochenendtage im angegebenen Zeitraum gefunden!")
 
-    # Slotberechnung
+    first_hour = calculate_dynamic_first_hour(tournament)
+    slot_interval = 2
+
     required_slots_per_day = ceil(total_matches / total_days)
-
-    # Konfiguration
-    first_hour = 10          # Startzeit der Matches
-    slot_interval = 2        # Pause zwischen Matches (Stunden)
-    max_slots_per_day = 5    # Maximal mögliche Matches pro Tag
-
+    max_slots_per_day = 6
     slots_per_day = min(required_slots_per_day, max_slots_per_day)
 
     for day in weekend_days:
         for i in range(slots_per_day):
             hour = first_hour + (i * slot_interval)
             if hour >= 24:
-                break  # Keine Slots über Mitternacht
+                break
             slot_time = day.replace(hour=hour, minute=0, second=0, microsecond=0)
             slots.append(slot_time.strftime("%Y-%m-%dT%H:%M:%S"))
 
-    # 📢 Slot-Report ins Log!
     logger.info(f"[SLOT-PLANUNG] Gesamtmatches: {total_matches}")
     logger.info(f"[SLOT-PLANUNG] Wochenendtage gefunden: {total_days}")
     logger.info(f"[SLOT-PLANUNG] Erforderliche Slots pro Tag: {required_slots_per_day} (begrenzt auf {slots_per_day})")
     logger.info(f"[SLOT-PLANUNG] Insgesamt {len(slots)} Slots generiert.")
 
     return slots
+
+
+# ------------------
+# Matches zu Slots zuweisen
+# ------------------ 
+def assign_matches_to_slots(matches: list, slots: list):
+    """
+    Weist Matches den Slots zu, unter Beachtung:
+    - Keine Überschneidungen (ein Slot = ein Match)
+    - Teams spielen nicht mehrfach hintereinander
+    - Teams spielen möglichst nicht mehrmals am gleichen Tag
+    """
+    logger.info(f"[MATCHMAKER] Starte Slot-Zuweisung für {len(matches)} Matches auf {len(slots)} Slots.")
+    
+    scheduled_slots = set()
+    team_last_slot = {}
+    team_matches_per_day = {}
+
+    for match in matches:
+        team1 = match["team1"]
+        team2 = match["team2"]
+        assigned = False
+
+        for slot in slots:
+            slot_date = slot.split("T")[0]
+
+            if slot in scheduled_slots:
+                continue
+
+            if team_matches_per_day.get((team1, slot_date)) or team_matches_per_day.get((team2, slot_date)):
+                continue
+
+            if team_last_slot.get(team1) == slot or team_last_slot.get(team2) == slot:
+                continue
+
+            match["scheduled_time"] = slot
+            scheduled_slots.add(slot)
+            team_last_slot[team1] = slot
+            team_last_slot[team2] = slot
+            team_matches_per_day[(team1, slot_date)] = True
+            team_matches_per_day[(team2, slot_date)] = True
+            assigned = True
+
+            logger.info(f"[MATCHMAKER] {team1} vs {team2} eingeplant am {slot}.")
+            break
+
+        if not assigned:
+            logger.warning(f"[MATCHMAKER] Rescue-Modus: Kein freier Slot für {team1} vs {team2} ohne Konflikte. Erzwinge Zuweisung.")
+            for slot in slots:
+                if slot not in scheduled_slots:
+                    match["scheduled_time"] = slot
+                    scheduled_slots.add(slot)
+                    logger.warning(f"[MATCHMAKER] [RESCUE] {team1} vs {team2} auf {slot} zwangsweise gelegt.")
+                    break
+
+    logger.info(f"[MATCHMAKER] Slot-Zuweisung abgeschlossen. {len(scheduled_slots)} Slots wurden belegt.")
+
+# ------------------
+# Alles zusammenbauen
+# ------------------
+async def generate_and_assign_slots():
+    """
+    Hauptfunktion zur Slot-Erzeugung und Zuweisung der Matches.
+    """
+    tournament = load_tournament_data()
+    slots = generate_weekend_slots(tournament)
+    matches = tournament.get("matches", [])
+
+    assign_matches_to_slots(matches, slots)
+    tournament["matches"] = matches
+
+    save_tournament_data(tournament)
+    logger.info("[MATCHMAKER] Matches erfolgreich auf Slots verteilt.")
+
+

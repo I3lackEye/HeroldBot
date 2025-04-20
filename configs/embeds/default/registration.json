@@ -1,0 +1,9 @@
+{
+    "REGISTRATION_CONFIRMATION": {
+      "title": "✅ Anmeldung erfolgreich!",
+      "description_template": "Du wurdest erfolgreich {TYPE} angemeldet.\n\n{DETAILS}",
+      "color": "#2ECC71",
+      "footer": "Wir wünschen dir viel Spaß im Turnier! 🎮",
+      "thumbnail": "https://cdn-icons-png.flaticon.com/512/190/190411.png"
+    }
+  }

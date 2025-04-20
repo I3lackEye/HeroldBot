@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 
 
 # Lokale Module
-from modules.dataStorage import load_global_data, load_tournament_data, load_config
+from modules.dataStorage import load_global_data, load_tournament_data, load_config, validate_channels
 from modules.logger import logger
 from modules.reminder import match_reminder_loop
 from modules.reschedule import request_reschedule
@@ -19,9 +19,6 @@ from modules.tournament import (
     close_tournament_after_delay,
     end_tournament,
     list_matches,
-    match_history,
-    team_stats,
-    set_winner_command,
     match_schedule
 
 )
@@ -30,8 +27,8 @@ from .admin_tools import (
     force_sign_out,
     admin_abmelden,
     admin_add_win,
-    add_game,
-    remove_game,
+    add_game_command,
+    remove_game_command,
     award_overall_winner,
     reload_commands,
     close_registration,
@@ -104,13 +101,13 @@ tree = bot.tree
 async def on_ready():
     global reminder_task
 
-    logger.info(f"✅ Bot ist eingeloggt als {bot.user}")
+    logger.info(f"[SYSTEM] Bot ist eingeloggt als {bot.user}")
     try:
         synced = await tree.sync()
         debug_dump_configs()
-        logger.info(f"🔄 {len(synced)} Slash-Commands synchronisiert.")
+        logger.info(f"[SYSTEM] {len(synced)} Slash-Commands synchronisiert.")
     except Exception as e:
-        print(f"❌ Fehler beim Synchronisieren der Commands: {e}")
+        logger.error(f"[SYSTEM] Fehler beim Synchronisieren der Commands: {e}")
 
     # Reminder-Task starten
     if reminder_task is None or reminder_task.done():
@@ -120,12 +117,13 @@ async def on_ready():
         
         if channel:
             reminder_task = bot.loop.create_task(match_reminder_loop(channel))
-            logger.info(f"🔔 Match-Reminder gestartet im Channel {channel.name}.")
+            logger.info(f"[SYSTEM] Match-Reminder gestartet im Channel {channel.name}.")
         else:
-            logger.error("❌ Reminder-Channel nicht gefunden oder ungültige ID!")
+            logger.error("[SYSTEM] Reminder-Channel nicht gefunden oder ungültige ID!")
     else:
-        logger.info("ℹ️ Reminder-Task läuft bereits.")
-
+        logger.warning("[SYSTEM] Reminder-Task läuft bereits.")
+    # Channel-Checker starten
+    await validate_channels(bot)
 # --------------------------------
 # Slash-Commands Registrieren
 # --------------------------------
@@ -157,8 +155,8 @@ tree.add_command(admin_abmelden)
 tree.add_command(admin_add_win)
 tree.add_command(start_tournament)
 tree.add_command(end_tournament)
-tree.add_command(add_game)
-tree.add_command(remove_game)
+tree.add_command(add_game_command)
+tree.add_command(remove_game_command)
 tree.add_command(award_overall_winner)
 tree.add_command(reload_commands)
 tree.add_command(close_registration)

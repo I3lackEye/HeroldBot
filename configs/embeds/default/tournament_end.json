@@ -1,9 +1,9 @@
 {
   "TOURNAMENT_END": {
     "title": "🏁 Turnier abgeschlossen!",
-    "description_template": "Das Turnier ist offiziell beendet!\n\n🏆 {MVP_MESSAGE}\n\nWir danken allen Teilnehmern für ihren Einsatz, spannende Matches und die gute Stimmung! 🥳\n\nBleibt dran – schon bald startet ein neues Turnier! 🚀",
+    "description_template": "Das Turnier ist offiziell beendet!\n\n🏆 MVP: {MVP_MESSAGE}\n\n🥇 Gewinner: {WINNERS}\n🎮 Gespieltes Spiel: {CHOSEN_GAME}\n\nWir danken allen Teilnehmern für spannende Matches! 🚀",
     "color": "#2ECC71",
-    "footer": "Danke, dass ihr ein Teil unserer Community seid! ❤️",
+    "footer": "Danke, dass ihr Teil unserer Community seid! ❤️",
     "thumbnail": "https://cdn-icons-png.flaticon.com/512/3135/3135715.png"
   }
 }

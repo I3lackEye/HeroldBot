@@ -5,6 +5,7 @@ from .logger import logger
 from dotenv import load_dotenv
 from typing import Optional
 from datetime import datetime
+import discord
 import shutil
 
 
@@ -24,6 +25,28 @@ def load_config(config_path="../configs/config.json"):
     except json.JSONDecodeError as e:
         print(f"Error parsing config file: {e}")
         return {}
+
+def load_games() -> list:
+    """
+    Lädt die Liste aller verfügbaren Spiele aus data/games.json.
+    """
+    try:
+        current_dir = os.path.dirname(__file__)
+        games_path = os.path.join(current_dir, "../data/games.json")
+        with open(games_path, "r", encoding="utf-8") as file:
+            games_data = json.load(file)
+        return games_data.get("games", [])
+    except FileNotFoundError:
+        logger.error("[GAMES] games.json nicht gefunden!")
+        return []
+    except json.JSONDecodeError as e:
+        logger.error(f"[GAMES] Fehler beim Parsen der games.json: {e}")
+        return []
+
+def load_names(language="de"):
+    path = f"configs/names_{language}.json"
+    with open(path, "r", encoding="utf-8") as f:
+        return json.load(f)
 
 # Konfiguration laden
 config = load_config()
@@ -52,14 +75,46 @@ DEFAULT_TOURNAMENT_DATA = {
     "punkte": {},
     "running": False,
     "registration_open": False,
-    "poll_results": None,
-    "schedule": []
+    "poll_results": None
 }
 
-# Handling der Channel Limits
-channel_limit = config.get("CHANNEL_LIMIT", {})
-ids = channel_limit.get("ID", [])
-CHANNEL_LIMIT_1 = int(ids[0]) if ids else None
+async def validate_channels(bot: discord.Client):
+    config = load_config()
+    channels = config.get("CHANNELS", {})
+    
+    if not channels:
+        logger.error("[CHANNEL CHECKER] Keine CHANNELS in der Config gefunden.")
+        return
+
+    logger.info("[CHANNEL CHECKER] Starte Channel-Validierung...")
+
+    for name, channel_id_str in channels.items():
+        try:
+            channel_id = int(channel_id_str)
+        except (TypeError, ValueError):
+            logger.error(f"[CHANNEL CHECKER] Channel-ID für '{name}' ist ungültig: {channel_id_str}")
+            continue
+
+        channel = bot.get_channel(channel_id)
+
+        if not channel:
+            logger.error(f"[CHANNEL CHECKER] Channel '{name}' mit ID {channel_id} wurde NICHT gefunden!")
+            continue
+
+        if not isinstance(channel, discord.TextChannel):
+            logger.warning(f"[CHANNEL CHECKER] Channel '{name}' (ID {channel_id}) ist kein TextChannel.")
+
+        perms = channel.permissions_for(channel.guild.me)
+
+        if not perms.view_channel:
+            logger.error(f"[CHANNEL CHECKER] Bot hat KEINE Sichtbarkeit auf '{name}' (ID {channel_id})!")
+
+        if not perms.send_messages:
+            logger.error(f"[CHANNEL CHECKER] Bot kann NICHT in '{name}' schreiben (ID {channel_id})!")
+
+        logger.info(f"[CHANNEL CHECKER] OK: {name} (ID {channel_id})")
+
+    logger.info("[CHANNEL CHECKER] Channel-Validierung abgeschlossen.")
 
 def init_file(file_path, default_content):
     if not os.path.exists(file_path):
@@ -87,6 +142,18 @@ def load_global_data():
 def save_global_data(data):
     with open(DATA_FILE_PATH, "w", encoding="utf-8") as file:
         json.dump(data, file, indent=4, ensure_ascii=False)
+
+def save_games(games: list):
+    """
+    Speichert die Spieleliste in data/games.json.
+    """
+    try:
+        current_dir = os.path.dirname(__file__)
+        games_path = os.path.join(current_dir, "../data/games.json")
+        with open(games_path, "w", encoding="utf-8") as file:
+            json.dump({"games": games}, file, indent=2, ensure_ascii=False)
+    except Exception as e:
+        logger.error(f"[GAMES] Fehler beim Speichern der games.json: {e}")
 
 # Funktionen für turnierspezifische Daten (tournament.json)
 def load_tournament_data():
@@ -130,56 +197,43 @@ def reset_tournament():
 
     print("[RESET] Turnierdaten wurden erfolgreich zurückgesetzt.")
 
-def add_game_to_data(game_title):
+def add_game(game_title: str):
     """
-    Fügt ein neues Spiel mit dem gegebenen Titel in die globale data.json unter "games" hinzu.
-    
+    Fügt ein neues Spiel in data/games.json hinzu.
+
     :param game_title: Der Titel des Spiels als String.
     :raises ValueError: Falls der Spielname länger als die erlaubte Länge ist.
     """
-    MAX_TITLE_LENGTH = config.get("STR_MAX_LENGTH")
-    
-    # Prüfe, ob der Spielname die maximale Länge überschreitet.
+    MAX_TITLE_LENGTH = config.get("STR_MAX_LENGTH", 100)  # fallback falls config fehlt
+
     if len(game_title) > MAX_TITLE_LENGTH:
         raise ValueError(f"Der Spielname darf maximal {MAX_TITLE_LENGTH} Zeichen lang sein.")
     
-    # Lade die aktuellen globalen Daten
-    data = load_global_data()
-    
-    # Stelle sicher, dass data ein Dictionary ist und der Schlüssel "games" existiert und eine Liste ist.
-    if not isinstance(data, dict):
-        data = {}
-    if "games" not in data or not isinstance(data["games"], list):
-        data["games"] = []
-    
-    # Füge den neuen Spieltitel zur "games"-Liste hinzu
-    data["games"].append(game_title)
-    
-    # Speichere die Daten wieder ab
-    save_global_data(data)
-    logger.info(f"Spiel '{game_title}' wurde zu den globalen Daten hinzugefügt.")
+    games = load_games()
 
-def remove_game_from_data(game_title: str):
+    if game_title in games:
+        logger.warning(f"[GAMES] Das Spiel '{game_title}' existiert bereits.")
+        return
+
+    games.append(game_title)
+    save_games(games)
+    logger.info(f"[GAMES] Spiel '{game_title}' erfolgreich gespeichert.")
+
+def remove_game(game_title: str):
     """
-    Entfernt ein Spiel mit dem angegebenen Titel aus der globalen data.json unter "games".
-    
-    :param game_title: Der Titel des zu entfernenden Spiels als String.
-    :raises ValueError: Falls das Spiel nicht in der Liste enthalten ist.
+    Entfernt ein Spiel aus data/games.json.
+
+    :param game_title: Der Titel des Spiels, das entfernt werden soll.
     """
-    # Lade die aktuellen globalen Daten
-    data = load_global_data()
-    
-    # Prüfe, ob der Schlüssel "games" existiert und ob der Spielname darin enthalten ist
-    games = data.get("games", [])
+    games = load_games()
+
     if game_title not in games:
-        raise ValueError(f"Das Spiel '{game_title}' ist nicht in der Liste enthalten.")
-    
-    # Entferne das Spiel aus der Liste
+        logger.warning(f"[GAMES] Das Spiel '{game_title}' wurde nicht gefunden.")
+        return
+
     games.remove(game_title)
-    data["games"] = games
-    # Speichere die aktualisierten Daten wieder ab
-    save_global_data(data)
-    logger.info(f"Spiel '{game_title}' wurde aus den globalen Daten entfernt.")
+    save_games(games)
+    logger.info(f"[GAMES] Spiel '{game_title}' erfolgreich entfernt.")
 
 def backup_current_state():
     """

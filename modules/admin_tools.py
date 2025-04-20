@@ -7,11 +7,11 @@ from random import randint, choice
 
 
 # Lokale Module
-from .dataStorage import load_global_data, save_global_data, load_tournament_data, save_tournament_data, load_config
+from .dataStorage import load_global_data, save_global_data, load_tournament_data, save_tournament_data, load_config, add_game, remove_game
 from .utils import has_permission, generate_team_name, smart_send, generate_random_availability, parse_availability, game_autocomplete, autocomplete_teams, autocomplete_players
 from .logger import logger
 from .stats import autocomplete_players
-from .matchmaker import auto_match_solo, create_round_robin_schedule, assign_matches_to_slots, generate_schedule_overview, cleanup_orphan_teams
+from .matchmaker import auto_match_solo, create_round_robin_schedule, generate_and_assign_slots, generate_schedule_overview, cleanup_orphan_teams, generate_weekend_slots
 from .embeds import send_match_schedule
 from modules.archive import archive_current_tournament
 
@@ -119,42 +119,30 @@ async def end_tournament(interaction: Interaction):
 
 @app_commands.command(name="add_game", description="Admin-Befehl: Fügt ein neues Spiel zur Spielauswahl hinzu.")
 @app_commands.describe(game="Name des Spiels, das hinzugefügt werden soll.")
-async def add_game(interaction: Interaction, game: str):
+async def add_game_command(interaction: Interaction, game: str):
     if not has_permission(interaction.user, "Moderator", "Admin"):
         await interaction.response.send_message("🚫 Du hast keine Berechtigung für diesen Befehl.", ephemeral=True)
         return
 
-    global_data = load_global_data()
-    games = global_data.setdefault("games", [])
-
-    if game in games:
-        await interaction.response.send_message("⚠ Dieses Spiel ist bereits in der Liste.", ephemeral=True)
-        return
-
-    games.append(game)
-    save_global_data(global_data)
-    await interaction.response.send_message(f"✅ Das Spiel **{game}** wurde hinzugefügt.", ephemeral=True)
-    logger.info(f"[ADMIN] Spiel {game} zur Auswahl hinzugefügt.")
+    try:
+        add_game(game)  # --> nutzt deine Backend-Logik!
+        await interaction.response.send_message(f"✅ Das Spiel **{game}** wurde erfolgreich hinzugefügt.", ephemeral=True)
+    except ValueError as e:
+        await interaction.response.send_message(f"⚠️ {str(e)}", ephemeral=True)
 
 @app_commands.command(name="remove_game", description="Admin-Befehl: Entfernt ein Spiel aus der Spielauswahl.")
 @app_commands.describe(game="Name des Spiels, das entfernt werden soll.")
 @app_commands.autocomplete(game=game_autocomplete)
-async def remove_game(interaction: Interaction, game: str):
+async def remove_game_command(interaction: Interaction, game: str):
     if not has_permission(interaction.user, "Moderator", "Admin"):
         await interaction.response.send_message("🚫 Du hast keine Berechtigung für diesen Befehl.", ephemeral=True)
         return
 
-    global_data = load_global_data()
-    games = global_data.get("games", [])
-
-    if game not in games:
-        await interaction.response.send_message("⚠ Dieses Spiel wurde nicht gefunden.", ephemeral=True)
-        return
-
-    games.remove(game)
-    save_global_data(global_data)
-    await interaction.response.send_message(f"✅ Das Spiel **{game}** wurde entfernt.", ephemeral=True)
-    logger.info(f"[ADMIN] Spiel {game} aus der Auswahl entfernt.")
+    try:
+        remove_game(game)
+        await interaction.response.send_message(f"✅ Das Spiel **{game}** wurde erfolgreich entfernt.", ephemeral=True)
+    except ValueError as e:
+        await interaction.response.send_message(f"⚠️ {str(e)}", ephemeral=True)
 
 @app_commands.command(name="award_overall_winner", description="Admin-Befehl: Trägt den Gesamtsieger des Turniers ein.")
 @app_commands.describe(winning_team="Name des Gewinnerteams.", points="Erzielte Punkte.", game="Gespieltes Spiel.")
@@ -259,11 +247,19 @@ async def close_registration(interaction: Interaction):
     # Schritt 4: Matchplan erstellen
     create_round_robin_schedule()
 
-    # Schritt 5: Matches auf Slots verteilen
-    await assign_matches_to_slots()
+    # Schritt 5: Matches laden
+    tournament = load_tournament_data()
+    matches = tournament.get("matches", [])
+
+    # Slots generieren und Matches verteilen
+    await generate_and_assign_slots()
+
+    # Nach dem Verteilen neu laden
+    tournament = load_tournament_data()
+    matches = tournament.get("matches", [])
 
     # Schritt 6: Überblick posten
-    description_text = generate_schedule_overview()
+    description_text = generate_schedule_overview(matches)
     await send_match_schedule(interaction, description_text)
 
 @app_commands.command(name="generate_dummy", description="(Admin) Erzeugt Dummy-Solos und Dummy-Teams zum Testen.")
