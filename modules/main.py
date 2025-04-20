@@ -12,14 +12,14 @@ from modules.dataStorage import load_global_data, load_tournament_data, load_con
 from modules.logger import logger
 from modules.reminder import match_reminder_loop
 from modules.reschedule import request_reschedule
-from modules.players import anmelden, update_availability, sign_out, participants, help_command
+from modules.info import InfoGroup
+from modules.players import anmelden, update_availability, sign_out
 from modules.tournament import (
     start_tournament,
     close_registration_after_delay,
     close_tournament_after_delay,
     end_tournament,
-    list_matches,
-    match_schedule
+    list_matches
 
 )
 from .admin_tools import (
@@ -132,11 +132,10 @@ async def on_ready():
 tree.add_command(anmelden)
 tree.add_command(update_availability)
 tree.add_command(sign_out)
-tree.add_command(participants)
-tree.add_command(help_command)
 tree.add_command(list_matches)
 tree.add_command(request_reschedule)
 tree.add_command(test_reminder)
+tree.add_command(InfoGroup())
 
 # Statistikbefehle
 tree.add_command(leaderboard)
@@ -148,7 +147,6 @@ tree.add_command(status)
 tree.add_command(report_match)
 tree.add_command(match_history)
 tree.add_command(team_stats)
-tree.add_command(match_schedule)
 
 # Adminbefehle
 tree.add_command(admin_abmelden)

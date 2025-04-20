@@ -354,8 +354,13 @@ async def generate_and_assign_slots():
     Hauptfunktion zur Slot-Erzeugung und Zuweisung der Matches.
     """
     tournament = load_tournament_data()
-    slots = generate_weekend_slots(tournament)
     matches = tournament.get("matches", [])
+
+    if not matches:
+        logger.warning("[CLOSE REGISTRATION] Keine Matches im Turnier gefunden. Registrierung beendet, aber es gibt nichts zu planen.")
+        return  # Crash handler
+
+    slots = generate_weekend_slots(tournament)
 
     assign_matches_to_slots(matches, slots)
     tournament["matches"] = matches

@@ -13,7 +13,7 @@ from modules.matchmaker import generate_weekend_slots
 from modules.embeds import send_notify_team_members, send_request_reschedule, build_embed_from_template
 from modules.logger import logger
 from views.reschedule_view import RescheduleView
-
+from modules.shared_states import pending_reschedules
 
 config = load_config()
 RESCHEDULE_CHANNEL_ID = int(config.get("CHANNELS", {}).get("RESCHEDULE_CHANNEL_ID", 0))
@@ -37,8 +37,17 @@ def extract_ids(members):
 
 @app_commands.command(name="request_reschedule", description="Fordere eine Neuansetzung für ein Match an.")
 async def request_reschedule(interaction: Interaction, match_id: int, neuer_zeitpunkt: str):
+    global pending_reschedules
     tournament = load_tournament_data()
     user_id = str(interaction.user.id)
+
+    # ➔ Prüfen: Gibt es schon eine aktive Anfrage für dieses Match?
+    if match_id in pending_reschedules:
+        await interaction.response.send_message("🚫 Für dieses Match läuft bereits eine Reschedule-Anfrage!", ephemeral=True)
+        return
+
+    # ➔ Wenn alles gut, Match-ID als "offen" markieren
+    pending_reschedules.add(match_id)
 
     team_name = get_player_team(user_id)
     if not team_name:
@@ -53,6 +62,16 @@ async def request_reschedule(interaction: Interaction, match_id: int, neuer_zeit
     match = next((m for m in tournament.get("matches", []) if m.get("match_id") == match_id), None)
     if not match:
         await interaction.response.send_message("🚫 Match nicht gefunden.", ephemeral=True)
+        return
+
+    # ➔ Check: Steht der Matchbeginn kurz bevor?
+    scheduled_time_str = match.get("scheduled_time")
+    if scheduled_time_str:
+        scheduled_dt = datetime.strptime(scheduled_time_str, "%Y-%m-%dT%H:%M:%S")
+        now = datetime.utcnow()
+
+    if scheduled_dt - now <= timedelta(hours=1):
+        await interaction.response.send_message("🚫 Du kannst Matches nur bis spätestens 1 Stunde vor Beginn verschieben.", ephemeral=True)
         return
 
     try:
@@ -91,9 +110,7 @@ async def request_reschedule(interaction: Interaction, match_id: int, neuer_zeit
                 await interaction.response.send_message("🚫 Ich habe keine Berechtigung, in den Reschedule-Channel zu schreiben!", ephemeral=True)
                 logger.warning("[RESCHEDULE] Fehlende Schreibrechte im Reschedule-Channel.")
                 return
-            await send_request_reschedule(
-                member, match_id, team1, team2, parsed_datetime, [m.mention for m in valid_members]
-            )
+            await send_request_reschedule(member, match_id, team1, team2, parsed_datetime, [m.mention for m in valid_members])
             logger.info(f"[RESCHEDULE] DM an {member.display_name} erfolgreich gesendet.")
         except discord.Forbidden:
             logger.warning(f"[RESCHEDULE] DM an {member.display_name} fehlgeschlagen. Sende stattdessen in den Reschedule-Channel.")
@@ -101,9 +118,7 @@ async def request_reschedule(interaction: Interaction, match_id: int, neuer_zeit
             logger.error(f"[RESCHEDULE] Unerwarteter Fehler beim DM-Versand an {member.display_name}: {e}")
 
 
-    await send_request_reschedule(
-        reschedule_channel, match_id, team1, team2, parsed_datetime, [m.mention for m in valid_members]
-    )
+    await send_request_reschedule(reschedule_channel, match_id, team1, team2, parsed_datetime, [m.mention for m in valid_members])
 
     await interaction.response.send_message("✅ Deine Reschedule-Anfrage wurde erstellt!", ephemeral=True)
     logger.info(f"[RESCHEDULE] Anfrage von {team_name} für Match {match_id} erstellt.")

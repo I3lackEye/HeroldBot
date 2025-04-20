@@ -13,7 +13,7 @@ from .matchmaker import auto_match_solo, create_round_robin_schedule, generate_s
 from .utils import has_permission, update_player_stats, get_player_team, autocomplete_teams, get_current_chosen_game, smart_send, update_all_participants
 from .dataStorage import load_tournament_data, save_tournament_data, backup_current_state, reset_tournament, delete_tournament_file
 from .poll import PollView
-from .embeds import send_tournament_announcement, send_list_matches, send_match_schedule, load_embed_template, build_embed_from_template, send_tournament_end_announcement  
+from .embeds import send_tournament_announcement, send_list_matches, load_embed_template, build_embed_from_template, send_tournament_end_announcement  
 from .stats import autocomplete_players, autocomplete_teams, get_mvp, update_player_stats, get_winner_ids, get_winner_team
 from modules.archive import archive_current_tournament, update_tournament_history
 
@@ -119,18 +119,6 @@ async def list_matches(interaction: Interaction, team: Optional[str] = None):
     await send_list_matches(interaction, matches)
 
     logger.info(f"[MATCHES] {len(matches)} Matches aufgelistet (Filter: '{team or 'alle'}').")
-
-@app_commands.command(name="match_schedule", description="Zeigt den aktuellen Spielplan an.")
-async def match_schedule(interaction: Interaction):
-    tournament = load_tournament_data()
-    matches = tournament.get("matches", [])
-
-    if not matches:
-        await interaction.response.send_message("⚠️ Kein Spielplan vorhanden.", ephemeral=True)
-        return
-
-    description_text = generate_schedule_overview(matches)
-    await send_match_schedule(interaction, description_text)
 
 # ---------------------------------------
 # Hilfsfunktion

@@ -1,12 +1,12 @@
 import discord
-from discord import app_commands, Interaction, Member
+from discord import app_commands, Interaction, Member, Embed
 from typing import Optional
 
 # Lokale Module
 from modules.dataStorage import load_tournament_data, save_tournament_data, config
 from modules.utils import has_permission, parse_availability, validate_string, intersect_availability, generate_team_name
 from modules.logger import logger
-from modules.embeds import send_help, send_registration_confirmation, send_participants_overview, send_wrong_channel
+from modules.embeds import send_registration_confirmation, send_participants_overview, send_wrong_channel
 
 
 # ----------------------------------------
@@ -334,10 +334,3 @@ async def participants(interaction: Interaction):
         await interaction.response.send_message("❌ Es sind noch keine Teilnehmer angemeldet.", ephemeral=True)
     else:
         await send_participants_overview(interaction, full_text)
-
-@app_commands.command(name="help", description="Zeigt alle wichtigen Infos und Befehle zum HeroldBot an.")
-async def help_command(interaction: Interaction):
-    """
-    Zeigt das Hilfe-Embed an.
-    """
-    await send_help(interaction)

@@ -6,7 +6,7 @@ import json
 import os
 import re
 from discord import Embed, Interaction, TextChannel
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Union
 
 # Lokale Module
@@ -81,7 +81,7 @@ async def send_registration_open(channel: TextChannel, placeholders: dict):
         logger.error("[EMBED] REGISTRATION_OPEN_ANNOUNCEMENT Template fehlt.")
         return
     embed = build_embed_from_template(template, placeholders)
-    await interaction.response.send_message(embed=embed, ephemeral=False)
+    await channel.send(embed=embed)
 
 async def send_registration_closed(channel: discord.TextChannel):
     template = load_embed_template("close", category="default").get("REGISTRATION_CLOSED_ANNOUNCEMENT")
@@ -397,11 +397,15 @@ async def send_request_reschedule(destination: Union[discord.Member, discord.Tex
         logger.error("[EMBED] RESCHEDULE Template fehlt.")
         return
 
+    # ➔ Hier neue Platzhalter einfügen:
     placeholders = {
         "MATCH_INFO": f"{team1} vs {team2}",
-        "NEW_SLOT": new_datetime.strftime("%d.%m.%Y %H:%M")
+        "NEW_SLOT": new_datetime.strftime("%d.%m.%Y %H:%M"),
+        "PLAYERS": "\n".join(players_mentions),
+        "DEADLINE": (datetime.utcnow() + timedelta(hours=24)).strftime("%d.%m.%Y %H:%M")
     }
 
+    # Baue Embed korrekt mit neuen Platzhaltern
     embed = build_embed_from_template(template, placeholders)
 
     view = RescheduleView(
@@ -409,10 +413,11 @@ async def send_request_reschedule(destination: Union[discord.Member, discord.Tex
         team1=team1,
         team2=team2,
         players=players_mentions,
-        new_datetime=new_datetime.strftime("%Y-%m-%dT%H:%M:%S")  # Einheitliches Format
+        new_datetime=new_datetime.strftime("%Y-%m-%dT%H:%M:%S")
     )
 
     await destination.send(embed=embed, view=view)
+
 
 async def send_wrong_channel(interaction: Interaction):
     template = load_embed_template("wrong_channel", category="default").get("WRONG_CHANNEL")
