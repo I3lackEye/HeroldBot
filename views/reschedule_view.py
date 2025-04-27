@@ -28,7 +28,11 @@ class RescheduleView(ui.View):
 
     async def interaction_check(self, interaction: Interaction) -> bool:
         """Nur erlaubte Spieler dürfen klicken."""
-        return interaction.user in self.players
+        if interaction.user not in self.players:
+            logger.warning(f"[RESCHEDULE] {interaction.user.display_name} (ID {interaction.user.id}) hat versucht auf Match {self.match_id} zu klicken, war aber nicht berechtigt.")
+            await interaction.response.send_message("🚫 Du bist nicht berechtigt, an dieser Abstimmung teilzunehmen.", ephemeral=True)
+            return False
+        return True
 
     @ui.button(label="✅ Akzeptieren", style=ButtonStyle.success)
     async def accept(self, interaction: Interaction, button: ui.Button):
@@ -51,7 +55,8 @@ class RescheduleView(ui.View):
         else:
             await interaction.response.send_message("❌ Ablehnung gespeichert.", ephemeral=True)
 
-        logger.warning(f"[RESCHEDULE] {interaction.user.display_name} hat Reschedule für Match {self.match_id} abgelehnt.")
+        logger.warning(f"[RESCHEDULE] {interaction.user.display_name} hat Reschedule für Match {self.match_id} ABGELEHNT!")
+        logger.warning(f"[RESCHEDULE] Anfrage für Match {self.match_id} wird abgebrochen.")
         await self.abort(interaction)
 
     async def success(self, interaction: Interaction):

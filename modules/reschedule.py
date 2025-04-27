@@ -41,24 +41,20 @@ async def request_reschedule(interaction: Interaction, match_id: int, neuer_zeit
     global pending_reschedules
     tournament = load_tournament_data()
     user_id = str(interaction.user.id)
-    RESCHEDULE_TIMEOUT_HOURS = int(config.get("RESCHEDULE_TIMEOUT_HOURS", 24))
 
-    # ➔ Team des Spielers ermitteln
+    # 1️⃣ Team und Match prüfen
     team_name = get_player_team(user_id)
     if not team_name:
         await interaction.response.send_message("🚫 Du bist in keinem Team registriert.", ephemeral=True)
         return
 
-    # ➔ Offene Matches des Teams laden
     open_matches = get_team_open_matches(team_name)
     open_match_ids = [m["match_id"] for m in open_matches]
 
-    # ➔ 1️⃣ Match-ID Prüfung
     if match_id not in open_match_ids:
         await interaction.response.send_message("🚫 Ungültige Match-ID oder nicht dein Match!", ephemeral=True)
         return
 
-    # ➔ 2️⃣ Match bereits in pending_reschedules?
     if match_id in pending_reschedules:
         await interaction.response.send_message("🚫 Für dieses Match läuft bereits eine Reschedule-Anfrage!", ephemeral=True)
         return
@@ -68,19 +64,16 @@ async def request_reschedule(interaction: Interaction, match_id: int, neuer_zeit
         await interaction.response.send_message("🚫 Match nicht gefunden.", ephemeral=True)
         return
 
-    # ➔ 3️⃣ Neuer Zeitpunkt prüfen (Format, Zukunft, gültiger Slot)
-
-    # Zeitformat prüfen
+    # 2️⃣ Neuer Zeitpunkt prüfen
     try:
         new_dt = datetime.strptime(neuer_zeitpunkt, "%d.%m.%Y %H:%M")
     except ValueError:
         await interaction.response.send_message(
-            "🚫 Ungültiges Datumsformat! Bitte wähle einen vorgeschlagenen Slot oder benutze `TT.MM.JJJJ HH:MM`.",
+            "🚫 Ungültiges Datumsformat! Bitte benutze `TT.MM.JJJJ HH:MM`.",
             ephemeral=True
         )
         return
 
-    # In Zukunft?
     if new_dt <= datetime.now():
         await interaction.response.send_message(
             "🚫 Der neue Zeitpunkt muss in der Zukunft liegen!",
@@ -88,7 +81,6 @@ async def request_reschedule(interaction: Interaction, match_id: int, neuer_zeit
         )
         return
 
-    # Gültiger Slot?
     all_slots = generate_weekend_slots(tournament)
     booked_slots = set(m["scheduled_time"] for m in tournament.get("matches", []) if m.get("scheduled_time"))
     free_slots = [slot for slot in all_slots if slot not in booked_slots]
@@ -96,31 +88,37 @@ async def request_reschedule(interaction: Interaction, match_id: int, neuer_zeit
 
     if new_dt not in future_slots:
         await interaction.response.send_message(
-            "🚫 Der gewählte Zeitpunkt ist kein erlaubter freier Slot! Bitte wähle aus den vorgeschlagenen Optionen.",
+            "🚫 Der gewählte Zeitpunkt ist kein erlaubter Slot!",
             ephemeral=True
         )
         return
 
-    # ➔ 4️⃣ Match-Start zu nah dran (weniger als 1h)?
     scheduled_time_str = match.get("scheduled_time")
     if scheduled_time_str:
         scheduled_dt = datetime.fromisoformat(scheduled_time_str)
+        if scheduled_dt - datetime.utcnow() <= timedelta(hours=1):
+            await interaction.response.send_message(
+                "🚫 Du kannst Matches nur bis spätestens 1 Stunde vor geplantem Beginn verschieben.",
+                ephemeral=True
+            )
+            return
 
-    if scheduled_dt - datetime.utcnow() <= timedelta(hours=1):
-        await interaction.response.send_message(
-            "🚫 Du kannst Matches nur bis spätestens 1 Stunde vor geplantem Beginn verschieben.",
-            ephemeral=True
-        )
-        return
-
-    # ➔ 5️⃣ Anfrage starten
+    # 3️⃣ Anfrage starten
     pending_reschedules.add(match_id)
     interaction.client.loop.create_task(start_reschedule_timer(interaction.client, match_id))
 
-    # ➔ Interaction defer sofort!
     await interaction.response.defer(ephemeral=True)
 
-    # ➔ DMs verschicken und Channel informieren
+    reschedule_channel = interaction.guild.get_channel(RESCHEDULE_CHANNEL_ID)
+    if not reschedule_channel:
+        await interaction.followup.send("🚫 Reschedule-Channel nicht gefunden.", ephemeral=True)
+        return
+
+    if not reschedule_channel.permissions_for(interaction.guild.me).send_messages:
+        await interaction.followup.send("🚫 Keine Berechtigung im Reschedule-Channel.", ephemeral=True)
+        return
+
+    # 4️⃣ Teilnehmer vorbereiten
     team1 = match["team1"]
     team2 = match["team2"]
     members_team1 = tournament.get("teams", {}).get(team1, {}).get("members", [])
@@ -138,39 +136,22 @@ async def request_reschedule(interaction: Interaction, match_id: int, neuer_zeit
             except ValueError:
                 continue
 
-    reschedule_channel = interaction.guild.get_channel(RESCHEDULE_CHANNEL_ID)
-    if not reschedule_channel:
-        await interaction.followup.send("🚫 Reschedule-Channel nicht gefunden.", ephemeral=True)
+    if not valid_members:
+        await interaction.followup.send("🚫 Konnte keine gültigen Spieler für die Reschedule-Anfrage finden.", ephemeral=True)
         return
 
-    if not reschedule_channel.permissions_for(interaction.guild.me).send_messages:
-        await interaction.followup.send("🚫 Ich habe keine Berechtigung, in den Reschedule-Channel zu schreiben!", ephemeral=True)
-        return
+    # 5️⃣ Anfrage-Embed und View senden
+    await send_request_reschedule(
+        reschedule_channel,
+        match_id,
+        team1,
+        team2,
+        new_dt,
+        valid_members
+    )
 
-    # ➔ DMs verschicken
-    failed_members = []  # Liste für fehlgeschlagene DM-Versuche
-
-    for member in valid_members:
-        try:
-            await send_request_reschedule(member, match_id, team1, team2, new_dt, [m.mention for m in valid_members])
-        except discord.Forbidden:
-            logger.warning(f"[RESCHEDULE] DM an {member.display_name} fehlgeschlagen.")
-            failed_members.append(member)
-        except Exception as e:
-            logger.error(f"[RESCHEDULE] Fehler beim DM-Versand an {member.display_name}: {e}")
-            failed_members.append(member)
-
-    # ➔ Nur wenn mindestens eine DM fehlgeschlagen ist:
-    if failed_members:
-        # Kanal vorhanden und Bot hat Rechte wurde vorher geprüft
-        mentions_failed = ", ".join([m.mention for m in failed_members])
-
-        await send_request_reschedule(reschedule_channel, match_id, team1, team2, new_dt, valid_members)
-
-        await reschedule_channel.send(f"⚠️ Konnte die folgenden Spieler nicht per DM erreichen: {mentions_failed}")
-
-    # ➔ Am Ende optional kleines Confirm-Followup
-    await interaction.followup.send("✅ Deine Reschedule-Anfrage wurde erstellt und die Beteiligten wurden benachrichtigt!", ephemeral=True)
+    # 6️⃣ Abschlussnachricht
+    await interaction.followup.send("✅ Deine Reschedule-Anfrage wurde im Channel erstellt!", ephemeral=True)
 
     logger.info(f"[RESCHEDULE] Anfrage von {team_name} für Match {match_id} gestartet.")
 
