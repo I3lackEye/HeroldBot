@@ -5,6 +5,7 @@ import discord
 from datetime import datetime, timedelta
 import logging
 import re
+import asyncio
 
 # Lokale modules
 from modules.dataStorage import load_tournament_data, save_tournament_data, load_config
