@@ -369,7 +369,7 @@ class AdminGroup(app_commands.Group):
 
     @app_commands.command(name="reset_reschedule", description="Setzt eine offene Reschedule-Anfrage manuell zurück.")
     @app_commands.describe(match_id="Match-ID auswählen")
-    @app_commands.autocomplete(match_id=pending_match_autocomplete) 
+    @app_commands.autocomplete(match_id=match_id_autocomplete) 
     async def reset_reschedule(self, interaction: Interaction, match_id: int):
         global pending_reschedules
         if not has_permission(interaction.user, "Moderator", "Admin"):
