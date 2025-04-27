@@ -165,7 +165,7 @@ async def request_reschedule(interaction: Interaction, match_id: int, neuer_zeit
         # Kanal vorhanden und Bot hat Rechte wurde vorher geprüft
         mentions_failed = ", ".join([m.mention for m in failed_members])
 
-        await send_request_reschedule(reschedule_channel, match_id, team1, team2, new_dt, [m.mention for m in valid_members])
+        await send_request_reschedule(reschedule_channel, match_id, team1, team2, new_dt, valid_members)
 
         await reschedule_channel.send(f"⚠️ Konnte die folgenden Spieler nicht per DM erreichen: {mentions_failed}")
 
