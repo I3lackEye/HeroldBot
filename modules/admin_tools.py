@@ -59,19 +59,24 @@ async def force_sign_out(interaction: Interaction, user_mention: str):
 
 async def pending_match_autocomplete(interaction: Interaction, current: str):
     """
-    Bietet alle aktuell offenen Reschedule-Match-IDs für Admins zur Auswahl an.
+    Autocomplete für offene Reschedule-Matches (nur IDs).
     """
-    tournament = load_tournament_data()
     choices = []
+    
+    # Falls keine offenen Reschedules existieren ➔ nichts vorschlagen
+    if not pending_reschedules:
+        return []
+
     for match_id in pending_reschedules:
-        if current in str(match_id):
+        if current in str(match_id):  # Filtert nach eingegebener Zahl
             choices.append(
                 app_commands.Choice(
                     name=f"Match {match_id}",
                     value=match_id
                 )
             )
-    return choices[:25]  # Discord erlaubt max. 25 Vorschläge
+
+    return choices[:25]  # Maximal 25 Einträge zurückgeben
 
 # ----------------------------------------
 # Admin Slash-Commands
