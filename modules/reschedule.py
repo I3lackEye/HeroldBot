@@ -148,7 +148,7 @@ async def request_reschedule(interaction: Interaction, match_id: int, neuer_zeit
         return
 
     # ➔ DMs verschicken
-    failed_members = []  # Neu: Liste für fehlgeschlagene DM-Versuche
+    failed_members = []  # Liste für fehlgeschlagene DM-Versuche
 
     for member in valid_members:
         try:
