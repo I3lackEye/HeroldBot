@@ -17,7 +17,7 @@ from modules.shared_states import pending_reschedules
 
 config = load_config()
 RESCHEDULE_CHANNEL_ID = int(config.get("CHANNELS", {}).get("RESCHEDULE_CHANNEL_ID", 0))
-
+RESCHEDULE_TIMEOUT_HOURS = int(config.get("RESCHEDULE_TIMEOUT_HOURS", 24))
 
 # ---------------------------------------
 # Helper: IDs extrahieren
@@ -36,13 +36,11 @@ def extract_ids(members):
 # ---------------------------------------
 
 @app_commands.command(name="request_reschedule", description="Fordere eine Neuansetzung für ein Match an.")
-async def request_reschedule(interaction: Interaction, match_id: int, neuer_zeitpunkt: str):
+async def request_reschedule(interaction: Interaction, match_id: int, neuer_zeitpunkt: app_commands.Choice[str]):
     global pending_reschedules
     tournament = load_tournament_data()
     user_id = str(interaction.user.id)
-    RESCHEDULE_TIMEOUT_HOURS = int(config.get("RESCHEDULE_TIMEOUT_HOURS", 24))
-    RESCHEDULE_CHANNEL_ID = int(config.get("CHANNELS", {}).get("RESCHEDULE_CHANNEL_ID", 0))
-    new_dt = datetime.strptime(neuer_zeitpunkt, "%d.%m.%Y %H:%M")
+    new_dt = datetime.strptime(neuer_zeitpunkt.value, "%d.%m.%Y %H:%M")
 
     # ➔ Prüfen: Gibt es schon eine aktive Anfrage für dieses Match?
     if match_id in pending_reschedules:
@@ -62,16 +60,6 @@ async def request_reschedule(interaction: Interaction, match_id: int, neuer_zeit
     match = next((m for m in tournament.get("matches", []) if m.get("match_id") == match_id), None)
     if not match:
         await interaction.response.send_message("🚫 Match nicht gefunden.", ephemeral=True)
-        return
-    
-    # 1️⃣ Check: Zeitformat korrekt?
-    try:
-        new_dt
-    except ValueError:
-        await interaction.response.send_message(
-            "🚫 Ungültiges Datumsformat! Bitte benutze `TT.MM.JJJJ HH:MM`.",
-            ephemeral=True
-        )
         return
 
     # 2️⃣ Check: Neuer Zeitpunkt liegt in der Zukunft?
@@ -105,12 +93,6 @@ async def request_reschedule(interaction: Interaction, match_id: int, neuer_zeit
 
     if scheduled_dt - now <= timedelta(hours=1):
         await interaction.response.send_message("🚫 Du kannst Matches nur bis spätestens 1 Stunde vor Beginn verschieben.", ephemeral=True)
-        return
-
-    try:
-        new_dt = datetime.strptime(neuer_zeitpunkt, "%d.%m.%Y %H:%M")
-    except ValueError:
-        await interaction.response.send_message("🚫 Ungültiges Format! Nutze TT.MM.JJJJ HH:MM.", ephemeral=True)
         return
 
     # ➔ Wenn alles gut, Match-ID als "offen" markieren
@@ -209,17 +191,24 @@ async def neuer_zeitpunkt_autocomplete(interaction: Interaction, current: str):
     # Freie Slots herausfiltern
     free_slots = [slot for slot in all_slots if slot not in booked_slots]
 
+    # 🔥 Jetzt: Nur Slots, die nach JETZT liegen
+    free_slots = [
+        slot for slot in free_slots
+        if datetime.fromisoformat(slot) > datetime.now()
+    ]
+
     if current:
         free_slots = [slot for slot in free_slots if current in slot]
 
     choices = []
     for slot in free_slots[:25]:
         dt = datetime.fromisoformat(slot)
-        label = f"{dt.strftime('%A')} {dt.strftime('%d.%m.%Y %H:%M')} Uhr"  # was der Spieler sieht
-        value = dt.strftime('%d.%m.%Y %H:%M')  # was an den Bot geschickt wird
+        label = f"{dt.strftime('%A')} {dt.strftime('%d.%m.%Y %H:%M')} Uhr"  # Sichtbarer Text
+        value = dt.strftime('%d.%m.%Y %H:%M')  # Tatsächlich übergebener Wert
         choices.append(app_commands.Choice(name=label, value=value))
 
     return choices
+
 
 async def start_reschedule_timer(bot, match_id: int):
     """
