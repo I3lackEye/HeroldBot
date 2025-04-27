@@ -61,6 +61,7 @@ async def pending_match_autocomplete(interaction: Interaction, current: str):
     """
     Bietet alle aktuell offenen Reschedule-Match-IDs für Admins zur Auswahl an.
     """
+    tournament = load_tournament_data()
     choices = []
     for match_id in pending_reschedules:
         if current in str(match_id):
@@ -71,6 +72,7 @@ async def pending_match_autocomplete(interaction: Interaction, current: str):
                 )
             )
     return choices[:25]  # Discord erlaubt max. 25 Vorschläge
+
 # ----------------------------------------
 # Admin Slash-Commands
 # ----------------------------------------
