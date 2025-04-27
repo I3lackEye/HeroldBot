@@ -15,7 +15,7 @@ from .stats import autocomplete_players
 from .matchmaker import auto_match_solo, create_round_robin_schedule, generate_and_assign_slots, generate_schedule_overview, cleanup_orphan_teams, generate_weekend_slots
 from .embeds import send_match_schedule, load_embed_template, build_embed_from_template
 from modules.archive import archive_current_tournament
-from modules.reschedule import match_id_autocomplete
+from modules.shared_states import pending_reschedules
 
 
 
@@ -57,6 +57,20 @@ async def force_sign_out(interaction: Interaction, user_mention: str):
     else:
         await interaction.response.send_message(f"⚠ {user_name} ist weder in einem Team noch in der Solo-Liste registriert.", ephemeral=True)
 
+async def pending_match_autocomplete(interaction: Interaction, current: str):
+    """
+    Bietet alle aktuell offenen Reschedule-Match-IDs für Admins zur Auswahl an.
+    """
+    choices = []
+    for match_id in pending_reschedules:
+        if current in str(match_id):
+            choices.append(
+                app_commands.Choice(
+                    name=f"Match {match_id}",
+                    value=match_id
+                )
+            )
+    return choices[:25]  # Discord erlaubt max. 25 Vorschläge
 # ----------------------------------------
 # Admin Slash-Commands
 # ----------------------------------------
@@ -369,7 +383,7 @@ class AdminGroup(app_commands.Group):
 
     @app_commands.command(name="reset_reschedule", description="Setzt eine offene Reschedule-Anfrage manuell zurück.")
     @app_commands.describe(match_id="Match-ID auswählen")
-    @app_commands.autocomplete(match_id=match_id_autocomplete) 
+    @app_commands.autocomplete(match_id=pending_match_autocomplete) 
     async def reset_reschedule(self, interaction: Interaction, match_id: int):
         global pending_reschedules
         if not has_permission(interaction.user, "Moderator", "Admin"):
