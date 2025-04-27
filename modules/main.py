@@ -22,20 +22,7 @@ from modules.tournament import (
     list_matches
 
 )
-from .admin_tools import (
-    report_match,
-    force_sign_out,
-    admin_abmelden,
-    admin_add_win,
-    add_game_command,
-    remove_game_command,
-    award_overall_winner,
-    reload_commands,
-    close_registration,
-    generate_dummy_teams,
-    test_reminder,
-    archive_tournament
-)
+from .admin_tools import AdminGroup
 from .stats import (
     team_stats,
     leaderboard,
@@ -134,7 +121,6 @@ tree.add_command(update_availability)
 tree.add_command(sign_out)
 tree.add_command(list_matches)
 tree.add_command(request_reschedule)
-tree.add_command(test_reminder)
 tree.add_command(InfoGroup())
 
 # Statistikbefehle
@@ -144,22 +130,12 @@ tree.add_command(tournament_stats)
 tree.add_command(status)
 
 # Turnierbefehle
-tree.add_command(report_match)
 tree.add_command(match_history)
 tree.add_command(team_stats)
+tree.add_command(start_tournament)
 
 # Adminbefehle
-tree.add_command(admin_abmelden)
-tree.add_command(admin_add_win)
-tree.add_command(start_tournament)
-tree.add_command(end_tournament)
-tree.add_command(add_game_command)
-tree.add_command(remove_game_command)
-tree.add_command(award_overall_winner)
-tree.add_command(reload_commands)
-tree.add_command(close_registration)
-tree.add_command(generate_dummy_teams)
-tree.add_command(archive_tournament)
+tree.add_command(AdminGroup())
 
 # --------------------------------
 # Bot starten

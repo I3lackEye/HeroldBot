@@ -312,15 +312,30 @@ async def smart_send(interaction: Interaction, *, content: str = None, embed: Em
 def parse_availability(avail_str: str) -> tuple[time, time]:
     """
     Wandelt einen String wie '12:00-18:00' in zwei datetime.time Objekte um.
+    Überprüft, ob die Zeitspanne gültig ist (mindestens 1 Stunde Unterschied).
     """
     try:
         start_str, end_str = avail_str.split("-")
         start_time = datetime.strptime(start_str.strip(), "%H:%M").time()
         end_time = datetime.strptime(end_str.strip(), "%H:%M").time()
+
+        # Zusätzliche Logik: Start muss vor Ende liegen
+        start_dt = datetime.combine(datetime.today(), start_time)
+        end_dt = datetime.combine(datetime.today(), end_time)
+
+        if end_dt <= start_dt:
+            raise ValueError(f"Endzeit muss nach Startzeit liegen: '{avail_str}'")
+
+        # Mindestdauer: 1 Stunde
+        if (end_dt - start_dt) < timedelta(hours=1):
+            raise ValueError(f"Verfügbarkeit zu kurz: Mindestens 1 Stunde erforderlich – Eingabe: '{avail_str}'")
+
         return start_time, end_time
+
     except Exception as e:
-        logger.warning(f"[MATCHMAKER] Fehler beim Parsen der Verfügbarkeit '{avail_str}': {e}")
-        return None, None
+        logger.warning(f"[AVAILABILITY] Fehler beim Parsen der Verfügbarkeit '{avail_str}': {e}")
+        raise ValueError(f"Ungültiges Verfügbarkeitsformat: {avail_str}")
+
 
 def intersect_availability(avail1: str, avail2: str) -> Optional[str]:
     """
@@ -378,6 +393,7 @@ def get_team_open_matches(team_name: str) -> list:
     return open_matches
 
 async def autocomplete_players(interaction: Interaction, current: str):
+    logger.info(f"[AUTOCOMPLETE] Aufgerufen – Eingabe: {current}")
     global_data = load_global_data()
     player_stats = global_data.get("player_stats", {})
 

@@ -6,6 +6,7 @@ from discord import TextChannel
 # Lokale Module
 from .logger import logger
 from .dataStorage import load_tournament_data, save_tournament_data
+from modules.embeds import send_match_reminder
 
 
 async def match_reminder_loop(channel: TextChannel):
@@ -40,4 +41,4 @@ async def match_reminder_loop(channel: TextChannel):
 
         save_tournament_data(tournament)
 
-        await asyncio.sleep(60)  # jede Minute prüfen
+        await asyncio.sleep(300)  # alle fünf Minute prüfen

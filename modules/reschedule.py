@@ -163,8 +163,11 @@ async def match_id_autocomplete(interaction: Interaction, current: str):
 async def neuer_zeitpunkt_autocomplete(interaction: Interaction, current: str):
     tournament = load_tournament_data()
 
-    # Korrigiert: generate_weekend_slots erwartet nur das gesamte Tournament
-    all_slots = generate_weekend_slots(tournament)
+    try:
+        all_slots = generate_weekend_slots(tournament)
+    except ValueError:
+        # Falls noch keine Matches existieren ➔ einfach KEINE Vorschläge machen
+        return []
 
     # Schon belegte Slots raussuchen
     booked_slots = set()
@@ -175,16 +178,15 @@ async def neuer_zeitpunkt_autocomplete(interaction: Interaction, current: str):
     # Freie Slots herausfiltern
     free_slots = [slot for slot in all_slots if slot not in booked_slots]
 
-    # Optional: wenn der User tippt, Eingabe filtern
     if current:
         free_slots = [slot for slot in free_slots if current in slot]
 
-    # Wandle in Choice-Objekte um
     choices = []
-    for slot in free_slots[:25]:  # Maximal 25 Einträge
+    for slot in free_slots[:25]:
         dt = datetime.fromisoformat(slot)
         label = f"{dt.strftime('%A')} {dt.strftime('%d.%m.%Y %H:%M')} Uhr"
         value = dt.strftime('%d.%m.%Y %H:%M')
         choices.append(app_commands.Choice(name=label, value=value))
 
     return choices
+

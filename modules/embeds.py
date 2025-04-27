@@ -418,7 +418,6 @@ async def send_request_reschedule(destination: Union[discord.Member, discord.Tex
 
     await destination.send(embed=embed, view=view)
 
-
 async def send_wrong_channel(interaction: Interaction):
     template = load_embed_template("wrong_channel", category="default").get("WRONG_CHANNEL")
     if not template:
@@ -426,3 +425,4 @@ async def send_wrong_channel(interaction: Interaction):
         return
     embed = build_embed_from_template(template)
     await interaction.response.send_message(embed=embed, ephemeral=False)
+

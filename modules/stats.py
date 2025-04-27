@@ -377,7 +377,7 @@ async def status(interaction: Interaction):
     registration_end = tournament.get("registration_end")
     tournament_running = tournament.get("running", False)
     tournament_end = tournament.get("tournament_end")
-    poll_results = tournament.get("poll_results", {})
+    poll_results = tournament.get("poll_results") or {}
     chosen_game = poll_results.get("chosen_game", "Noch kein Spiel gewählt")
     matches = tournament.get("matches", [])
 

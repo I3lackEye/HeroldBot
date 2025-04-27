@@ -10,35 +10,6 @@ from modules.embeds import send_registration_confirmation, send_participants_ove
 
 
 # ----------------------------------------
-# Hilfsfunktion 
-# ----------------------------------------
-def generate_participants_list() -> str:
-    """
-    Erstellt die Beschreibung für den Teilnehmer-Embed.
-    """
-    tournament = load_tournament_data()
-    teams = tournament.get("teams", {})
-    solo = tournament.get("solo", [])
-
-    lines = []
-
-    if teams:
-        lines.append("**Teams:**")
-        for name, team_entry in teams.items():
-            members = ", ".join(team_entry.get("members", []))
-            lines.append(f"- {name}: {members}")
-
-    if solo:
-        lines.append("\n**Einzelspieler:**")
-        for solo_entry in solo:
-            lines.append(f"- {solo_entry.get('player')}")
-
-    if not lines:
-        return "Es sind noch keine Teilnehmer angemeldet."
-
-    return "\n".join(lines)
-
-# ----------------------------------------
 # Slash-Commands
 # ----------------------------------------
 
@@ -46,23 +17,18 @@ def generate_participants_list() -> str:
 @app_commands.describe(
     verfugbarkeit="Deine allgemeine Verfügbarkeit (z.B. 10:00-20:00)",
     team_name="Teamname (optional, wenn du selbst einen vergeben möchtest)",
-    team_random_name="Teamnamen automatisch generieren lassen?",
     mitspieler="Discord-Mitspieler, wenn du ein Team zusammen anmelden möchtest",
     samstag="Verfügbarkeit am Samstag (optional, z.B. 12:00-18:00)",
     sonntag="Verfügbarkeit am Sonntag (optional, z.B. 08:00-22:00)"
-)
+ )
 async def anmelden(
     interaction: Interaction,
     verfugbarkeit: str,
     team_name: Optional[str] = None,
-    team_random_name: Optional[bool] = False,
     mitspieler: Optional[discord.Member] = None,
     samstag: Optional[str] = None,
     sonntag: Optional[str] = None
-):
-    """
-    Meldet einen Spieler für das Turnier an (Solo, Teamgründung oder Teambeitritt).
-    """
+ ):
     tournament = load_tournament_data()
 
     if not tournament.get("registration_open", False):
@@ -93,11 +59,25 @@ async def anmelden(
             return
 
     # === TEAM-ANMELDUNG ===
-    if team_name or team_random_name:
+    if mitspieler:
         teams = tournament.setdefault("teams", {})
 
-        # Falls zufälliger Name gewünscht
-        if team_random_name:
+        if mitspieler.id == interaction.user.id:
+            await interaction.response.send_message("⚠️ Du kannst dich nicht selbst als Mitspieler angeben.", ephemeral=True)
+            return
+
+        for solo_entry in tournament.get("solo", []):
+            if solo_entry.get("player") == mitspieler.mention:
+                await interaction.response.send_message(f"🚫 {mitspieler.display_name} ist bereits als Einzelspieler angemeldet. Er muss sich erst abmelden, bevor er einem Team beitreten kann.", ephemeral=True)
+                return
+                
+        for team_data in teams.values():
+            if mitspieler.mention in team_data.get("members", []):
+                await interaction.response.send_message(f"⚠️ {mitspieler.display_name} ist bereits in einem anderen Team angemeldet.", ephemeral=True)
+                return
+
+        # Teamname generieren, falls nicht angegeben
+        if not team_name:
             team_name = generate_team_name()
             tries = 0
             while team_name in teams and tries < 5:
@@ -113,26 +93,11 @@ async def anmelden(
             await interaction.response.send_message(f"⚠️ Das Team **{team_name}** existiert bereits. Bitte wähle einen anderen Namen.", ephemeral=True)
             return
 
-        # Zusatzcheck: Mitspieler
-        mitspieler_mention = None
-        if mitspieler:
-            if mitspieler.id == interaction.user.id:
-                await interaction.response.send_message("⚠️ Du kannst dich nicht selbst als Mitspieler angeben.", ephemeral=True)
-                return
-            for team_data in teams.values():
-                if mitspieler.mention in team_data.get("members", []):
-                    await interaction.response.send_message(f"⚠️ {mitspieler.display_name} ist bereits in einem anderen Team angemeldet.", ephemeral=True)
-                    return
-            mitspieler_mention = mitspieler.mention
-
         # Team anlegen
         team_entry = {
-            "members": [user_mention],
-            "verfügbarkeit": verfugbarkeit,
+            "members": [interaction.user.mention, mitspieler.mention],
+            "verfügbarkeit": verfugbarkeit
         }
-        if mitspieler_mention:
-            team_entry["members"].append(mitspieler_mention)
-
         if samstag:
             team_entry["samstag"] = samstag
         if sonntag:
@@ -140,12 +105,11 @@ async def anmelden(
 
         teams[team_name] = team_entry
 
-        logger.info(f"[ANMELDUNG] {user_mention} hat Team {team_name} gegründet. Mitspieler: {mitspieler.display_name if mitspieler else 'keiner'}")
+        logger.info(f"[ANMELDUNG] {interaction.user.mention} hat Team {team_name} gegründet. Mitspieler: {mitspieler.display_name}. Verfügbarkeit: {verfugbarkeit} / Samstag: {samstag or 'n.a.'} / Sonntag: {sonntag or 'n.a.'}")
 
-        detail_text = f"Mitspieler: {mitspieler.display_name}" if mitspieler else "Du startest alleine."
         await send_registration_confirmation(interaction, {
             "TYPE": f"im neuen Team **{team_name}**",
-            "DETAILS": detail_text
+            "DETAILS": f"Mitspieler: {mitspieler.display_name}"
         })
 
     # === SOLO-ANMELDUNG ===
@@ -161,7 +125,7 @@ async def anmelden(
 
         tournament.setdefault("solo", []).append(solo_entry)
 
-        logger.info(f"[ANMELDUNG] {user_mention} hat sich als Solo-Spieler angemeldet.")
+        logger.info(f"[ANMELDUNG] {interaction.user.mention} hat sich als Solo-Spieler angemeldet. Verfügbarkeit: {verfugbarkeit} / Samstag: {samstag or 'n.a.'} / Sonntag: {sonntag or 'n.a.'}")
 
         await send_registration_confirmation(interaction, {
             "TYPE": "als Solo-Spieler",
@@ -175,7 +139,7 @@ async def anmelden(
     verfugbarkeit="Allgemeine Verfügbarkeit (z.B. 10:00-20:00)",
     samstag="Verfügbarkeit am Samstag (z.B. 12:00-18:00)",
     sonntag="Verfügbarkeit am Sonntag (z.B. 08:00-22:00)"
-)
+ )
 async def update_availability(
     interaction: Interaction,
     verfugbarkeit: Optional[str] = None,

@@ -5,12 +5,15 @@
       "Athletische", "Beglückende", "Elegante", "Fabelhafte", "Feurige", "Grandiose",
       "Mysteriöse", "Garstige", "Hinterhältige", "Gebrechliche", "Unwürdige", "Verdächtige",
       "Läppische", "Königliche", "Luftige", "Wässrige", "Erdige", "Göttliche", "Zauberhafte",
-      "Famose", "Grazile", "Anmutige", "Chaotische"
+      "Famose", "Grazile", "Anmutige", "Chaotische", "Liebreizende", "Hastige", "Hurtige",
+      "Aufmüpfige", "Unerschütterliche", "Bedürftige", "Schaurige", "Zahnlose", "Närrische",
+      "Solide", "Adelige", "Vorsichtige","Knochige", "Aufgedrehte"
     ],
     "substantive": [
       "Wölfe", "Drachen", "Falken", "Titanen", "Krieger", "Panther", "Schlangen", "Ninjas",
       "Löwen", "Bären", "Adler", "Haie", "Berserker", "Wächter", "Hobbits", "Goblins", "Ratten",
       "Hühner", "Flöten", "Feen", "Orks", "Elfen", "Vampire", "Lappen", "Seepferdchen", "Einhörner",
-      "Abenteurer", "Schurken", "Viper", "Marder"
+      "Abenteurer", "Schurken", "Viper", "Marder", "Basilisken", "Skelette", "Untote", "Schakale",
+      "Goten", "Wikinger", "Römer", "Gallier", "Phönixe", "Beeren"
     ]
   }

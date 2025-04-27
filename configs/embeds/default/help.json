@@ -1,21 +1,21 @@
 {
-    "HELP": {
-        "title": "🆘 HeroldBot Hilfe",
-        "description": "Hier findest du alle wichtigen Informationen zum Ablauf und den verfügbaren Befehlen.",
-        "fields": [
-          {
-            "name": "🚀 Turnierablauf",
-            "value": "1️⃣ Spiel wählen (Voting)\n2️⃣ Anmeldung öffnen\n3️⃣ Teams erstellen\n4️⃣ Matches spielen\n5️⃣ Sieger küren!"
-          },
-          {
-            "name": "📜 Wichtige Befehle",
-            "value": "`/anmelden` – Anmeldung fürs Turnier\n`/sign_out` – Vom Turnier abmelden\n`/stats` – Eigene Statistiken ansehen\n`/report_match` – Spielergebnis melden\n`/participants` – Aktuelle Teilnehmerliste"
-          },
-          {
-            "name": "📢 Hinweise",
-            "value": "⚠ Achte auf die Anmeldefrist!\n⚡ Sei pünktlich bei deinen Matches!\n💬 Fragen? ➔ Mods anschreiben!"
-          }
-        ],
-        "footer": "Viel Erfolg und viel Spaß – dein HeroldBot-Team!"
+  "HELP": {
+    "title": "🆘 HeroldBot Hilfe",
+    "description": "Hier findest du alle wichtigen Informationen zum Ablauf und den verfügbaren Befehlen.",
+    "fields": [
+      {
+        "name": "🚀 Turnierablauf",
+        "value": "1️⃣ **Voting-Phase:** Alle Teilnehmer stimmen über das Turnierspiel ab.\n2️⃣ **Anmeldephase:** Nutze `/anmelden`, um dich alleine oder mit einem Mitspieler zu registrieren.\n3️⃣ **Teambildung:** Einzelspieler werden automatisch zu Teams zusammengefügt.\n4️⃣ **Spielplan:** Die Matches werden geplant und auf Zeitslots verteilt.\n5️⃣ **Turnierphase:** Spiele deine Matches pünktlich und fair!\n6️⃣ **Abschluss:** Die Sieger und der MVP werden gekürt."
+      },
+      {
+        "name": "📜 Wichtige Befehle",
+        "value": "`/anmelden` – Für das Turnier registrieren (alleine oder im Team).\n`/sign_out` – Vom Turnier abmelden.\n`/info participants` – Aktuelle Liste aller angemeldeten Spieler.\n`/info match_schedule` – Deinen Spielplan ansehen.\n`/stats` – Persönliche Statistiken.\n`/leaderboard` – Bestenliste aller Spieler."
+      },
+      {
+        "name": "📢 Hinweise und Regeln",
+        "value": "⚠ **Verfügbarkeit:** Gib bei der Anmeldung deine Zeiten ehrlich an (mind. 1 Stunde verfügbar!).\n⚠ **Team-Anmeldung:** Nur anmelden, wenn dein Partner auch teilnehmen möchte.\n⚡ **Pünktlichkeit:** Sei zur angegebenen Matchzeit bereit!\n💬 **Fragen?** ➔ Mods anschreiben oder Support-Channel nutzen."
       }
+    ],
+    "footer": "Viel Erfolg und viel Spaß – dein HeroldBot-Team!"
+  }
 }

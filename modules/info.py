@@ -2,6 +2,8 @@
 from discord import app_commands, Interaction, Embed
 from discord.ext import commands
 import discord
+from datetime import datetime
+
 
 # Lokale Module
 from modules.dataStorage import load_tournament_data
@@ -58,6 +60,7 @@ class InfoGroup(app_commands.Group):
         """
         Listet alle aktuellen Teilnehmer (Teams und Einzelspieler), alphabetisch sortiert.
         """
+        INVISIBLE_SPACE = "\u2800" #damit ordentlich umgebrochen wird... verfluchtes Discord
         tournament = load_tournament_data()
 
         teams = tournament.get("teams", {})
@@ -71,12 +74,39 @@ class InfoGroup(app_commands.Group):
 
         team_lines = []
         for name, team_entry in sorted_teams:
-            members = ", ".join(team_entry.get("members", []))
-            team_lines.append(f"- {name}: {members}")
+            # Mitglieder alphabetisch sortieren
+            members = ", ".join(sorted(team_entry.get("members", [])))
+            availability = team_entry.get("verfügbarkeit", "Keine Angabe")
+            samstag = team_entry.get("samstag")
+            sonntag = team_entry.get("sonntag")
+
+            entry_text = f"- {name}: {members}\n{INVISIBLE_SPACE}🕒 Verfügbarkeit: **{availability}**"
+
+            if samstag:
+                entry_text += f"\n{INVISIBLE_SPACE}📅 Samstag: **{samstag}**"
+            if sonntag:
+                entry_text += f"\n{INVISIBLE_SPACE}📅 Sonntag: **{sonntag}**"
+
+            team_lines.append(entry_text)
 
         solo_lines = []
         for solo_entry in sorted_solo:
-            solo_lines.append(f"- {solo_entry.get('player')}")
+            player = solo_entry.get('player')
+            availability = solo_entry.get("verfügbarkeit", "Keine Angabe")
+            samstag = solo_entry.get("samstag")
+            sonntag = solo_entry.get("sonntag")
+
+            # Hauptzeile
+            entry_text = f"- {player}\n{INVISIBLE_SPACE}🕒 Verfügbarkeit: **{availability}**"
+
+            # Samstag und Sonntag auf neue, schön eingerückte Zeilen
+            if samstag:
+                entry_text += f"\n{INVISIBLE_SPACE}📅 Samstag: **{samstag}**"
+            if sonntag:
+                entry_text += f"\n{INVISIBLE_SPACE}📅 Sonntag: **{sonntag}**"
+
+            solo_lines.append(entry_text)
+
 
         # Text zusammensetzen
         full_text = ""
@@ -89,8 +119,16 @@ class InfoGroup(app_commands.Group):
 
         if not full_text:
             await interaction.response.send_message("❌ Es sind noch keine Teilnehmer angemeldet.", ephemeral=True)
-        else:
-            await send_participants_overview(interaction, full_text)
+            return
+
+        # 🕒 Jetzt dynamische aktuelle Zeit erzeugen
+        now = datetime.now().strftime("%d.%m.%Y, %H:%M Uhr")
+
+        # Platzhalter einfügen
+        full_text += f"\n\n*Letzte Aktualisierung: {now}*"
+
+        # ✅ Teilnehmerübersicht senden
+        await send_participants_overview(interaction, full_text)
 
     @app_commands.command(name="match_schedule", description="Zeigt den aktuellen Spielplan an.")
     async def match_schedule(self, interaction: Interaction):
@@ -111,6 +149,3 @@ class InfoGroup(app_commands.Group):
         """
         await send_help(interaction)
 
-# Registrierung im Bot
-async def setup(bot: commands.Bot):
-    bot.tree.add_command(InfoGroup())

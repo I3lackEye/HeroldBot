@@ -1,7 +1,7 @@
 {
     "PARTICIPANTS_OVERVIEW": {
       "title": "🏆 Teilnehmerübersicht",
-      "description": "Hier findest du alle aktuellen Teilnehmer des Turniers:\n\nPLACEHOLDER_PARTICIPANTS\n\n*Letzte Aktualisierung: Jetzt*",
+      "description": "Hier findest du alle aktuellen Teilnehmer des Turniers:\n\nPLACEHOLDER_PARTICIPANTS",
       "color": "#3498DB",
       "fields": []
     }
