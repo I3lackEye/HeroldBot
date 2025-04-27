@@ -5,6 +5,7 @@ import configparser
 import json
 import os
 import re
+from typing import List
 from discord import Embed, Interaction, TextChannel
 from datetime import datetime, timedelta
 from typing import Union
