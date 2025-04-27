@@ -36,6 +36,8 @@ def extract_ids(members):
 # ---------------------------------------
 
 @app_commands.command(name="request_reschedule", description="Fordere eine Neuansetzung für ein Match an.")
+@app_commands.describe(match_id="Match-ID auswählen")
+@app_commands.autocomplete(match_id=match_id_autocomplete)
 async def request_reschedule(interaction: Interaction, match_id: int, neuer_zeitpunkt: str):
     global pending_reschedules
     tournament = load_tournament_data()
@@ -156,12 +158,6 @@ async def request_reschedule(interaction: Interaction, match_id: int, neuer_zeit
 
     await interaction.response.send_message("✅ Deine Reschedule-Anfrage wurde erstellt!", ephemeral=True)
     logger.info(f"[RESCHEDULE] Anfrage von {team_name} für Match {match_id} erstellt.")
-
-
-
-
-
-
 
 # ---------------------------------------
 # Autocomplete für Match-ID
