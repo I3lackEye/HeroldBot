@@ -16,7 +16,7 @@ from .matchmaker import auto_match_solo, create_round_robin_schedule, generate_a
 from .embeds import send_match_schedule, load_embed_template, build_embed_from_template
 from modules.archive import archive_current_tournament
 from modules.shared_states import pending_reschedules
-from modules.tournament import end_tournament_procedurec
+from modules.tournament import end_tournament_procedure
 
 
 
