@@ -215,8 +215,8 @@ async def neuer_zeitpunkt_autocomplete(interaction: Interaction, current: str):
     choices = []
     for slot in free_slots[:25]:
         dt = datetime.fromisoformat(slot)
-        label = f"{dt.strftime('%A')} {dt.strftime('%d.%m.%Y %H:%M')} Uhr"
-        value = dt.strftime('%d.%m.%Y %H:%M')
+        label = f"{dt.strftime('%A')} {dt.strftime('%d.%m.%Y %H:%M')} Uhr"  # was der Spieler sieht
+        value = dt.strftime('%d.%m.%Y %H:%M')  # was an den Bot geschickt wird
         choices.append(app_commands.Choice(name=label, value=value))
 
     return choices
