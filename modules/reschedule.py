@@ -139,6 +139,8 @@ async def request_reschedule(interaction: Interaction, match_id: int, neuer_zeit
         await interaction.response.send_message("🚫 Reschedule-Channel nicht gefunden.", ephemeral=True)
         return
 
+    await interaction.followup.send("✅ Deine Reschedule-Anfrage wurde erstellt!", ephemeral=True)
+
     # ➔ DMs verschicken
     for member in valid_members:
         try:
@@ -152,8 +154,7 @@ async def request_reschedule(interaction: Interaction, match_id: int, neuer_zeit
             logger.error(f"[RESCHEDULE] Fehler beim DM-Versand: {e}")
 
     await send_request_reschedule(reschedule_channel, match_id, team1, team2, new_dt, [m.mention for m in valid_members])
-
-    await interaction.response.send_message("✅ Deine Reschedule-Anfrage wurde erstellt!", ephemeral=True)
+    await interaction.followup.send("✅ Deine Reschedule-Anfrage wurde erstellt!", ephemeral=True)
     logger.info(f"[RESCHEDULE] Anfrage von {team_name} für Match {match_id} gestartet.")
 
 # ---------------------------------------
