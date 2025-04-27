@@ -40,6 +40,7 @@ async def request_reschedule(interaction: Interaction, match_id: int, neuer_zeit
     global pending_reschedules
     tournament = load_tournament_data()
     user_id = str(interaction.user.id)
+    new_dt = datetime.strptime(neuer_zeitpunkt, "%d.%m.%Y %H:%M")
 
     # ➔ Prüfen: Gibt es schon eine aktive Anfrage für dieses Match?
     if match_id in pending_reschedules:
@@ -63,6 +64,39 @@ async def request_reschedule(interaction: Interaction, match_id: int, neuer_zeit
     if not match:
         await interaction.response.send_message("🚫 Match nicht gefunden.", ephemeral=True)
         return
+    
+    # 1️⃣ Check: Zeitformat korrekt?
+    try:
+        new_dt = datetime.strptime(neuer_zeitpunkt, "%d.%m.%Y %H:%M")
+    except ValueError:
+        await interaction.response.send_message(
+            "🚫 Ungültiges Datumsformat! Bitte benutze `TT.MM.JJJJ HH:MM`.",
+            ephemeral=True
+        )
+        return
+
+    # 2️⃣ Check: Neuer Zeitpunkt liegt in der Zukunft?
+    if new_dt <= datetime.now():
+        await interaction.response.send_message(
+            "🚫 Der neue Zeitpunkt muss in der Zukunft liegen!",
+            ephemeral=True
+        )
+        return
+
+    # 3️⃣ Check: Neuer Zeitpunkt ist ein erlaubter Slot?
+    available_slots = []
+    for match in tournament.get("matches", []):
+        scheduled = match.get("scheduled_time")
+        if scheduled:
+            available_slots.append(datetime.fromisoformat(scheduled))
+
+    # ➔ Slot muss in der Liste verfügbarer Zeiten sein
+    if new_dt not in available_slots:
+        await interaction.response.send_message(
+            "🚫 Der angegebene Zeitpunkt ist kein gültiger Slot. Bitte wähle eine erlaubte Zeit aus dem Spielplan!",
+            ephemeral=True
+        )
+        return
 
     # ➔ Check: Steht der Matchbeginn kurz bevor?
     scheduled_time_str = match.get("scheduled_time")
@@ -75,7 +109,7 @@ async def request_reschedule(interaction: Interaction, match_id: int, neuer_zeit
         return
 
     try:
-        parsed_datetime = datetime.strptime(neuer_zeitpunkt, "%d.%m.%Y %H:%M")
+        new_dt = datetime.strptime(neuer_zeitpunkt, "%d.%m.%Y %H:%M")
     except ValueError:
         await interaction.response.send_message("🚫 Ungültiges Format! Nutze TT.MM.JJJJ HH:MM.", ephemeral=True)
         return
@@ -110,7 +144,7 @@ async def request_reschedule(interaction: Interaction, match_id: int, neuer_zeit
                 await interaction.response.send_message("🚫 Ich habe keine Berechtigung, in den Reschedule-Channel zu schreiben!", ephemeral=True)
                 logger.warning("[RESCHEDULE] Fehlende Schreibrechte im Reschedule-Channel.")
                 return
-            await send_request_reschedule(member, match_id, team1, team2, parsed_datetime, [m.mention for m in valid_members])
+            await send_request_reschedule(member, match_id, team1, team2, new_dt, [m.mention for m in valid_members])
             logger.info(f"[RESCHEDULE] DM an {member.display_name} erfolgreich gesendet.")
         except discord.Forbidden:
             logger.warning(f"[RESCHEDULE] DM an {member.display_name} fehlgeschlagen. Sende stattdessen in den Reschedule-Channel.")
@@ -118,7 +152,7 @@ async def request_reschedule(interaction: Interaction, match_id: int, neuer_zeit
             logger.error(f"[RESCHEDULE] Unerwarteter Fehler beim DM-Versand an {member.display_name}: {e}")
 
 
-    await send_request_reschedule(reschedule_channel, match_id, team1, team2, parsed_datetime, [m.mention for m in valid_members])
+    await send_request_reschedule(reschedule_channel, match_id, team1, team2, new_dt, [m.mention for m in valid_members])
 
     await interaction.response.send_message("✅ Deine Reschedule-Anfrage wurde erstellt!", ephemeral=True)
     logger.info(f"[RESCHEDULE] Anfrage von {team_name} für Match {match_id} erstellt.")

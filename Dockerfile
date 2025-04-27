@@ -14,4 +14,4 @@ RUN pip install discord.py
 ENV TOKEN=""
 ENV DATABASE_PATH="anmeldung.json"
 
-CMD [ "python", "bot.py" ]
+CMD [ "python", "main.py" ]
