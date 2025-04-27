@@ -1,8 +1,9 @@
-from discord import ui, Interaction, Embed, Color
-from discord import ButtonStyle
-import discord
-from datetime import datetime, timedelta
+from discord import ui, ButtonStyle, Interaction, Member
 from typing import List
+from datetime import datetime
+import asyncio
+import logging
+
 
 # Lokale Module
 from modules.dataStorage import load_tournament_data, save_tournament_data
@@ -15,104 +16,69 @@ from modules.logger import logger
 # ---------------------------------------
 
 class RescheduleView(ui.View):
-    def __init__(self, match_id: int, team1: str, team2: str, new_datetime: datetime, players: List[discord.Member]):
+    def __init__(self, match_id: int, team1: str, team2: str, new_datetime: datetime, players: List[Member]):
         super().__init__(timeout=86400)  # 24 Stunden
-
         self.match_id = match_id
         self.team1 = team1
         self.team2 = team2
-        self.players = players  # <- Die übergebene Liste
         self.new_datetime = new_datetime
-
-        self.pending_players = set(players)  # Alle Mitglieder, die noch zustimmen müssen
+        self.players = players
         self.approved = set()
         self.message = None
 
-
     async def interaction_check(self, interaction: Interaction) -> bool:
-        if interaction.user.mention not in self.players:
-            await interaction.response.send_message("🚫 Du bist nicht berechtigt, diese Anfrage zu bearbeiten.", ephemeral=True)
-            return False
-        return True
+        """Nur erlaubte Spieler dürfen klicken."""
+        return interaction.user in self.players
 
     @ui.button(label="✅ Akzeptieren", style=ButtonStyle.success)
     async def accept(self, interaction: Interaction, button: ui.Button):
-        self.pending_players.discard(interaction.user)
-        self.approved.add(interaction.user.mention)
+        self.approved.add(interaction.user)
 
-        logger.info(f"[RESCHEDULE] {interaction.user.display_name} ({interaction.user.id}) hat Reschedule für Match {self.match_id} bestätigt.")
-
-        if self.pending_players:
-            logger.info(f"[RESCHEDULE] Noch ausstehend: {', '.join(m.mention for m in self.pending_players)}")
+        if self.message:
+            await interaction.response.defer()
         else:
-            logger.info("[RESCHEDULE] Alle Spieler haben bestätigt.")
+            await interaction.response.send_message("✅ Zustimmung gespeichert.", ephemeral=True)
 
-        await self.disable_buttons_for_user(interaction)
-        await interaction.response.send_message("✅ Zustimmung gespeichert.", ephemeral=True)
+        logger.info(f"[RESCHEDULE] {interaction.user.display_name} hat Reschedule für Match {self.match_id} bestätigt.")
 
-        if not self.pending_players:
+        if self.approved == set(self.players):
             await self.success(interaction)
 
     @ui.button(label="❌ Ablehnen", style=ButtonStyle.danger)
     async def decline(self, interaction: Interaction, button: ui.Button):
-        logger.info(f"[RESCHEDULE] {interaction.user.display_name} ({interaction.user.id}) hat Reschedule für Match {self.match_id} abgelehnt.")
-        self.declined.add(interaction.user.mention)
-        await self.disable_buttons_for_user(interaction)
-        await self.abort(interaction, reason="Ein Spieler hat abgelehnt.")
-    
-    async def disable_buttons_for_user(self, interaction: Interaction):
-        # Neue Mini-View nur für diesen User bauen
-        new_view = RescheduleView(
-            match_id=self.match_id,
-            team1=self.team1,
-            team2=self.team2,
-            players=self.players,
-            new_datetime=self.new_datetime
-        )
-        for item in new_view.children:
-            if isinstance(item, discord.ui.Button):
-                item.disabled = True  # Buttons deaktivieren
-
-        await interaction.message.edit(view=new_view)
-
-    async def on_timeout(self):
         if self.message:
-            await self.abort(None, reason="24h Frist überschritten.")
+            await interaction.response.defer()
+        else:
+            await interaction.response.send_message("❌ Ablehnung gespeichert.", ephemeral=True)
+
+        logger.warning(f"[RESCHEDULE] {interaction.user.display_name} hat Reschedule für Match {self.match_id} abgelehnt.")
+        await self.abort(interaction)
 
     async def success(self, interaction: Interaction):
+        """Wenn alle zugestimmt haben: Match verschieben."""
         tournament = load_tournament_data()
-        match = next((m for m in tournament.get("matches", []) if m.get("match_id") == self.match_id), None)
 
+        match = next((m for m in tournament.get("matches", []) if m.get("match_id") == self.match_id), None)
         if match:
-            logger.info(f"[RESCHEDULE] Vor Änderung: {match}")
             match["scheduled_time"] = self.new_datetime.isoformat()
             save_tournament_data(tournament)
-            logger.info(f"[RESCHEDULE] Nach Änderung gespeichert: {match}")
+            logger.info(f"[RESCHEDULE] Match {self.match_id} erfolgreich auf {self.new_datetime} verschoben.")
 
         pending_reschedules.discard(self.match_id)
 
-        embed = Embed(
-            title="🎉 Reschedule Erfolgreich!",
-            description=f"Match **{self.team1} vs {self.team2}** verschoben auf **{self.new_datetime}**.",
-            color=Color.green()
-        )
-        if self.message:
-            await self.message.edit(embed=embed, view=None)
+        await self.message.edit(content=f"✅ Alle Spieler haben zugestimmt! Match {self.match_id} verschoben auf {self.new_datetime.strftime('%d.%m.%Y %H:%M')}!", embed=None, view=None)
+        self.stop()
 
-    async def abort(self, interaction: Interaction, reason: str):
+    async def abort(self, interaction: Interaction):
+        """Wenn jemand ablehnt oder Timeout."""
         pending_reschedules.discard(self.match_id)
-        embed = Embed(
-            title="❌ Reschedule Abgebrochen",
-            description=reason,
-            color=Color.red()
-        )
-        if self.message:
-            await self.message.edit(embed=embed, view=None)
 
-        if interaction:
-            await interaction.response.send_message("🚫 Anfrage abgebrochen.", ephemeral=True)
+        await self.message.edit(content=f"❌ Reschedule-Anfrage für Match {self.match_id} abgebrochen.", embed=None, view=None)
+        self.stop()
 
     async def on_timeout(self):
-        # Wenn nach 24 Stunden niemand oder nicht alle bestätigt haben
+        """Timeout nach 24h."""
+        logger.warning(f"[RESCHEDULE] Timeout für Match {self.match_id}. Anfrage automatisch abgebrochen.")
         if self.message:
-            await self.abort(reason="⌛ Zeit abgelaufen. Die Anfrage wurde automatisch beendet.")
+            await self.message.edit(content=f"⌛ Reschedule-Anfrage für Match {self.match_id} ist abgelaufen.", embed=None, view=None)
+        pending_reschedules.discard(self.match_id)

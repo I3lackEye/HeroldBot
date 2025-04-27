@@ -387,10 +387,11 @@ async def send_participants_overview(interaction: Interaction, participants_text
     embed = build_embed_from_template(template, placeholders)
     await interaction.response.send_message(embed=embed, ephemeral=False)
 
+"""
 async def send_request_reschedule(destination: Union[discord.Member, discord.TextChannel], match_id: int, team1: str, team2: str, new_datetime: datetime, players_mentions: list[str]):
-    """
+    
     Sendet eine Reschedule-Anfrage als Embed + Buttons.
-    """
+    
     template = load_embed_template("reschedule", category="default").get("RESCHEDULE")
 
     if not template:
@@ -417,6 +418,30 @@ async def send_request_reschedule(destination: Union[discord.Member, discord.Tex
     )
 
     await destination.send(embed=embed, view=view)
+"""
+
+async def send_request_reschedule(destination: discord.TextChannel, match_id: int, team1: str, team2: str, new_datetime: datetime, valid_members: List[discord.Member]):
+    """
+    Sendet ein Reschedule-Embed in den Reschedule-Channel mit Buttons für die betroffenen Spieler.
+    """
+    mentions = " ".join(m.mention for m in valid_members)
+
+    embed = discord.Embed(
+        title="🕐 Anfrage zur Matchverschiebung",
+        description=(
+            f"**Match:** {team1} vs {team2}\n"
+            f"**Neuer Termin:** {new_datetime.strftime('%d.%m.%Y %H:%M')}\n\n"
+            f"{mentions}\n\n"
+            "Bitte stimmt ab: ✅ Akzeptieren oder ❌ Ablehnen.\n"
+            "*Deadline: 24h ab jetzt*"
+        ),
+        color=0x3498DB
+    )
+
+    view = RescheduleView(match_id, team1, team2, new_datetime, valid_members)
+
+    sent_message = await destination.send(content=mentions, embed=embed, view=view)
+    view.message = sent_message
 
 async def send_wrong_channel(interaction: Interaction):
     template = load_embed_template("wrong_channel", category="default").get("WRONG_CHANNEL")
