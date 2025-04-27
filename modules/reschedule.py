@@ -36,21 +36,18 @@ def extract_ids(members):
 # ---------------------------------------
 
 @app_commands.command(name="request_reschedule", description="Fordere eine Neuansetzung für ein Match an.")
-@app_commands.describe(match_id="Match-ID auswählen")
-@app_commands.autocomplete(match_id=match_id_autocomplete)
 async def request_reschedule(interaction: Interaction, match_id: int, neuer_zeitpunkt: str):
     global pending_reschedules
     tournament = load_tournament_data()
     user_id = str(interaction.user.id)
+    RESCHEDULE_TIMEOUT_HOURS = int(config.get("RESCHEDULE_TIMEOUT_HOURS", 24))
+    RESCHEDULE_CHANNEL_ID = int(config.get("CHANNELS", {}).get("RESCHEDULE_CHANNEL_ID", 0))
     new_dt = datetime.strptime(neuer_zeitpunkt, "%d.%m.%Y %H:%M")
 
     # ➔ Prüfen: Gibt es schon eine aktive Anfrage für dieses Match?
     if match_id in pending_reschedules:
         await interaction.response.send_message("🚫 Für dieses Match läuft bereits eine Reschedule-Anfrage!", ephemeral=True)
         return
-
-    # ➔ Wenn alles gut, Match-ID als "offen" markieren
-    pending_reschedules.add(match_id)
 
     team_name = get_player_team(user_id)
     if not team_name:
@@ -69,7 +66,7 @@ async def request_reschedule(interaction: Interaction, match_id: int, neuer_zeit
     
     # 1️⃣ Check: Zeitformat korrekt?
     try:
-        new_dt = datetime.strptime(neuer_zeitpunkt, "%d.%m.%Y %H:%M")
+        new_dt
     except ValueError:
         await interaction.response.send_message(
             "🚫 Ungültiges Datumsformat! Bitte benutze `TT.MM.JJJJ HH:MM`.",
@@ -115,6 +112,10 @@ async def request_reschedule(interaction: Interaction, match_id: int, neuer_zeit
     except ValueError:
         await interaction.response.send_message("🚫 Ungültiges Format! Nutze TT.MM.JJJJ HH:MM.", ephemeral=True)
         return
+
+    # ➔ Wenn alles gut, Match-ID als "offen" markieren
+    pending_reschedules.add(match_id)
+    interaction.client.loop.create_task(start_reschedule_timer(interaction.client, match_id))
 
     team1 = match["team1"]
     team2 = match["team2"]
@@ -220,3 +221,20 @@ async def neuer_zeitpunkt_autocomplete(interaction: Interaction, current: str):
 
     return choices
 
+async def start_reschedule_timer(bot, match_id: int):
+    """
+    Wartet eine bestimmte Zeit und entfernt dann die Reschedule-Anfrage automatisch.
+    Benachrichtigt optional den Reschedule-Channel.
+    """
+    await asyncio.sleep(RESCHEDULE_TIMEOUT_HOURS * 3600)  # Timeout warten
+
+    if match_id in pending_reschedules:
+        pending_reschedules.discard(match_id)
+        logger.info(f"[RESCHEDULE] Automatische Aufräumung: Match {match_id} wurde zurückgesetzt (Timeout nach {RESCHEDULE_TIMEOUT_HOURS} Stunden).")
+
+        # ➔ Nachricht im Reschedule-Channel schicken
+        reschedule_channel = bot.get_channel(RESCHEDULE_CHANNEL_ID)
+        if reschedule_channel:
+            await reschedule_channel.send(
+                f"❗ Die Reschedule-Anfrage für Match `{match_id}` wurde automatisch beendet, da keine Einigung innerhalb von {RESCHEDULE_TIMEOUT_HOURS} Stunden erzielt wurde."
+            )
