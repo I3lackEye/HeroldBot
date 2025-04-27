@@ -367,12 +367,12 @@ class AdminGroup(app_commands.Group):
         logger.info(f"[ARCHIVE] Turnier erfolgreich archiviert unter {file_path}")
 
     @app_commands.command(name="reset_reschedule", description="Setzt eine offene Reschedule-Anfrage manuell zurück.")
-    async def reset_reschedule(interaction: Interaction, match_id: int):
+    async def reset_reschedule(self, interaction: Interaction, match_id: int):
         global pending_reschedules
         if not has_permission(interaction.user, "Moderator", "Admin"):
             await interaction.response.send_message("🚫 Du hast keine Berechtigung für diesen Befehl.", ephemeral=True)
             return
-            
+
         if match_id in pending_reschedules:
             pending_reschedules.discard(match_id)
             await interaction.response.send_message(f"✅ Reschedule-Anfrage für Match {match_id} wurde zurückgesetzt.", ephemeral=True)

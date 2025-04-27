@@ -1,6 +1,6 @@
 {
-    "DATA_PATH": "data.json",
-    "TOURNAMENT_PATH": "tournament.json",
+    "DATA_PATH": "data/data.json",
+    "TOURNAMENT_PATH": "data/tournament.json",
     "ROLE_PERMISSIONS": {
       "Moderator": ["Moderator", "Lappen des Vertrauens"],
       "Admin": ["Administrator"]
