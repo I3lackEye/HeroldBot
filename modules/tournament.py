@@ -133,19 +133,24 @@ async def end_tournament_procedure(channel: discord.TextChannel, manual_trigger:
         return
 
     # Archivieren
-    archive_path = archive_current_tournament()
-    logger.info(f"[END] Turnier archiviert unter: {archive_path}")
+    try:
+        archive_path = archive_current_tournament()
+        logger.info(f"[END] Turnier archiviert unter: {archive_path}")
+    except Exception as e:
+        logger.error(f"[END] Fehler beim Archivieren: {e}")
 
     # Backup
     backup_current_state()
+    logger.info(f"[END] Backup erfolgreich")
 
     # Gewinner und Spiel holen
     winner_ids = get_winner_ids()
     chosen_game = get_current_chosen_game()
     mvp = get_mvp()
 
-    # 🆕 Teilnehmerstatistiken aktualisieren
-    await update_all_participants()
+    # Teilnehmerstatistiken aktualisieren
+    updated_count = await update_all_participants()
+    logger.info(f"[END] {updated_count} Teilnehmerstatistiken aktualisiert.")
 
     # Gewinner in Statistik eintragen
     if winner_ids and chosen_game != "Unbekannt":
@@ -163,7 +168,12 @@ async def end_tournament_procedure(channel: discord.TextChannel, manual_trigger:
 
     # System aufräumen
     reset_tournament()
-    delete_tournament_file()
+
+    try:
+        delete_tournament_file()
+        logger.info("[END] Turnierdatei erfolgreich gelöscht.")
+    except Exception as e:
+        logger.error(f"[END] Fehler beim Löschen der Turnierdatei: {e}")
 
     # Abschlussmeldung als Embed
     mvp_message = f"🏆 MVP des Turniers: **{mvp}**!" if mvp else "🏆 Kein MVP ermittelt."

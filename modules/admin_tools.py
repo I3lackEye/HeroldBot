@@ -16,6 +16,7 @@ from .matchmaker import auto_match_solo, create_round_robin_schedule, generate_a
 from .embeds import send_match_schedule, load_embed_template, build_embed_from_template
 from modules.archive import archive_current_tournament
 from modules.shared_states import pending_reschedules
+from modules.tournament import end_tournament_procedurec
 
 
 
@@ -120,11 +121,7 @@ class AdminGroup(app_commands.Group):
             await interaction.response.send_message("🚫 Du hast keine Berechtigung für diesen Befehl.", ephemeral=True)
             return
 
-        tournament = load_tournament_data()
-        tournament["running"] = False
-        save_tournament_data(tournament)
-        await interaction.response.send_message("✅ Das Turnier wurde beendet!", ephemeral=False)
-        logger.info("[ADMIN] Das Turnier wurde offiziell beendet.")
+        await end_tournament_procedure(interaction)
 
     @app_commands.command(name="add_game", description="Admin-Befehl: Fügt ein neues Spiel zur Spielauswahl hinzu.")
     @app_commands.describe(game="Name des Spiels, das hinzugefügt werden soll.")
@@ -407,6 +404,7 @@ class AdminGroup(app_commands.Group):
             await interaction.response.send_message(f"✅ Reschedule-Anfrage für Match {match_id} wurde zurückgesetzt.", ephemeral=True)
         else:
             await interaction.response.send_message(f"⚠️ Keine offene Anfrage für Match {match_id} gefunden.", ephemeral=True)
+
 # Registrierung im Bot
 async def setup(bot: commands.Bot):
     bot.tree.add_command(AdminGroup())
