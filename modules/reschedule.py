@@ -116,6 +116,9 @@ async def request_reschedule(interaction: Interaction, match_id: int, neuer_zeit
     pending_reschedules.add(match_id)
     interaction.client.loop.create_task(start_reschedule_timer(interaction.client, match_id))
 
+    # ➔ Interaction defer sofort!
+    await interaction.response.defer(ephemeral=True)
+
     # ➔ DMs verschicken und Channel informieren
     team1 = match["team1"]
     team2 = match["team2"]
@@ -136,26 +139,30 @@ async def request_reschedule(interaction: Interaction, match_id: int, neuer_zeit
 
     reschedule_channel = interaction.guild.get_channel(RESCHEDULE_CHANNEL_ID)
     if not reschedule_channel:
-        await interaction.response.send_message("🚫 Reschedule-Channel nicht gefunden.", ephemeral=True)
+        await interaction.followup.send("🚫 Reschedule-Channel nicht gefunden.", ephemeral=True)
         return
 
-    await interaction.followup.send("✅ Deine Reschedule-Anfrage wurde erstellt!", ephemeral=True)
+    if not reschedule_channel.permissions_for(interaction.guild.me).send_messages:
+        await interaction.followup.send("🚫 Ich habe keine Berechtigung, in den Reschedule-Channel zu schreiben!", ephemeral=True)
+        return
 
     # ➔ DMs verschicken
     for member in valid_members:
         try:
-            if not reschedule_channel.permissions_for(interaction.guild.me).send_messages:
-                await interaction.response.send_message("🚫 Ich habe keine Berechtigung, in den Reschedule-Channel zu schreiben!", ephemeral=True)
-                return
             await send_request_reschedule(member, match_id, team1, team2, new_dt, [m.mention for m in valid_members])
         except discord.Forbidden:
             logger.warning(f"[RESCHEDULE] DM an {member.display_name} fehlgeschlagen.")
         except Exception as e:
             logger.error(f"[RESCHEDULE] Fehler beim DM-Versand: {e}")
 
+    # ➔ Nachricht in Reschedule-Channel
     await send_request_reschedule(reschedule_channel, match_id, team1, team2, new_dt, [m.mention for m in valid_members])
-    await interaction.followup.send("✅ Deine Reschedule-Anfrage wurde erstellt!", ephemeral=True)
+
+    # ➔ Am Ende optional kleines Confirm-Followup
+    await interaction.followup.send("✅ Deine Reschedule-Anfrage wurde erstellt und die Beteiligten wurden benachrichtigt!", ephemeral=True)
+
     logger.info(f"[RESCHEDULE] Anfrage von {team_name} für Match {match_id} gestartet.")
+
 
 # ---------------------------------------
 # Autocomplete für Match-ID
