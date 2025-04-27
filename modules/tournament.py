@@ -182,38 +182,47 @@ async def close_registration_after_delay(delay_seconds: int, channel: discord.Te
     und startet das automatische Matchmaking & Cleanup.
     """
     await asyncio.sleep(delay_seconds)
-
     tournament = load_tournament_data()
+    
+    if not tournament.get("running", False) or not tournament.get("registration_open", False):
+        await interaction.response.send_message("⚠️ Die Anmeldung ist bereits geschlossen oder es läuft kein Turnier.", ephemeral=True)
+        return
+
+    # Anmeldung schließen
     tournament["registration_open"] = False
     save_tournament_data(tournament)
 
-    logger.info("[TOURNAMENT] Anmeldung automatisch geschlossen.")
-    await channel.send("🚫 **Die Anmeldephase ist jetzt geschlossen!**")
+    await smart_send(interaction, content="🚫 **Die Anmeldung wurde geschlossen.**")
+    logger.info("[TOURNAMENT] Anmeldung manuell geschlossen.")
 
-    # Starte automatisches Matchmaking
-    new_teams = auto_match_solo()
+    # Verwaiste Teams aufräumen
+    await cleanup_orphan_teams(interaction.channel)
+
+    # Solo-Spieler automatisch matchen
+    auto_match_solo()
+
+    # Matchplan erstellen
     create_round_robin_schedule()
 
-    # ➡️ Matches und Slots neu laden und zuweisen
-    matches = load_tournament_data().get("matches", [])
-    slots = generate_weekend_slots(load_tournament_data())
-    assign_matches_to_slots(matches, slots)
+    # Alle übrig gebliebenen Solo-Spieler entfernen
+    tournament = load_tournament_data()
+    tournament["solo"] = []
+    save_tournament_data(tournament)
 
-    save_tournament_data(load_tournament_data())
+    # Matches laden
+    tournament = load_tournament_data()
+    matches = tournament.get("matches", [])
 
-    # Ausgabe neu gebildeter Teams
-    if new_teams:
-        msg = "**🤝 Neue Teams aus der Solo-Anmeldung:**\n"
-        for team, members in new_teams.items():
-            msg += f"• **{team}**: {', '.join(members)}\n"
-        await channel.send(msg)
-    else:
-        await channel.send("⚠️ Es konnten keine neuen Teams gebildet werden.")
+    # Slots generieren und Matches verteilen
+    await generate_and_assign_slots()
 
-    # Aufräumen von unvollständigen Teams
-    await cleanup_orphan_teams(channel)
+    # Nach dem Verteilen neu laden
+    tournament = load_tournament_data()
+    matches = tournament.get("matches", [])
 
-    logger.info("[TOURNAMENT] Cleanup abgeschlossen.")
+    # Überblick posten
+    description_text = generate_schedule_overview(matches)
+    await send_match_schedule(interaction, description_text)
 
 async def close_tournament_after_delay(delay_seconds: int, channel: discord.TextChannel):
     await asyncio.sleep(delay_seconds)

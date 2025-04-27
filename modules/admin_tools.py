@@ -240,23 +240,28 @@ class AdminGroup(app_commands.Group):
             await interaction.response.send_message("⚠️ Die Anmeldung ist bereits geschlossen oder es läuft kein Turnier.", ephemeral=True)
             return
 
-        # Schritt 1: Anmeldung schließen
+        # Anmeldung schließen
         tournament["registration_open"] = False
         save_tournament_data(tournament)
 
         await smart_send(interaction, content="🚫 **Die Anmeldung wurde geschlossen.**")
         logger.info("[TOURNAMENT] Anmeldung manuell geschlossen.")
 
-        # Schritt 2: Verwaiste Teams aufräumen
+        # Verwaiste Teams aufräumen
         await cleanup_orphan_teams(interaction.channel)
 
-        # Schritt 3: Solo-Spieler automatisch matchen
+        # Solo-Spieler automatisch matchen
         auto_match_solo()
 
-        # Schritt 4: Matchplan erstellen
+        # Matchplan erstellen
         create_round_robin_schedule()
 
-        # Schritt 5: Matches laden
+        # Alle übrig gebliebenen Solo-Spieler entfernen
+        tournament = load_tournament_data()
+        tournament["solo"] = []
+        save_tournament_data(tournament)
+
+        # Matches laden
         tournament = load_tournament_data()
         matches = tournament.get("matches", [])
 
@@ -267,7 +272,7 @@ class AdminGroup(app_commands.Group):
         tournament = load_tournament_data()
         matches = tournament.get("matches", [])
 
-        # Schritt 6: Überblick posten
+        # Überblick posten
         description_text = generate_schedule_overview(matches)
         await send_match_schedule(interaction, description_text)
 
