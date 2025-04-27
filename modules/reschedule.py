@@ -257,6 +257,4 @@ async def start_reschedule_timer(bot, match_id: int):
         # ➔ Nachricht im Reschedule-Channel schicken
         reschedule_channel = bot.get_channel(RESCHEDULE_CHANNEL_ID)
         if reschedule_channel:
-            await reschedule_channel.send(
-                f"❗ Die Reschedule-Anfrage für Match `{match_id}` wurde automatisch beendet, da keine Einigung innerhalb von {RESCHEDULE_TIMEOUT_HOURS} Stunden erzielt wurde."
-            )
+            await reschedule_channel.send(f"❗ Die Reschedule-Anfrage für Match `{match_id}` wurde automatisch beendet, da keine Einigung innerhalb von {RESCHEDULE_TIMEOUT_HOURS} Stunden erzielt wurde.")

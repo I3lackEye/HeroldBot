@@ -22,6 +22,7 @@ class RescheduleView(ui.View):
         self.new_datetime = new_datetime
         self.approved = set()
         self.message = None  # wird nach dem Senden gesetzt!
+        self.pending_players = set(valid_members)  # Alle Mitglieder, die noch zustimmen müssen
 
     async def interaction_check(self, interaction: Interaction) -> bool:
         if interaction.user.mention not in self.players:
@@ -31,14 +32,20 @@ class RescheduleView(ui.View):
 
     @ui.button(label="✅ Akzeptieren", style=ButtonStyle.success)
     async def accept(self, interaction: Interaction, button: ui.Button):
-        remaining = set(self.players) - self.approved
-        logger.info(f"[RESCHEDULE] Noch ausstehend: {interaction.user.display_name} {', '.join(remaining)}")
-        logger.info(f"[RESCHEDULE] {interaction.user.display_name} ({interaction.user.id}) hat Reschedule für Match {self.match_id} bestätigt.")
+        self.pending_players.discard(interaction.user)
         self.approved.add(interaction.user.mention)
+
+        logger.info(f"[RESCHEDULE] {interaction.user.display_name} ({interaction.user.id}) hat Reschedule für Match {self.match_id} bestätigt.")
+
+        if self.pending_players:
+            logger.info(f"[RESCHEDULE] Noch ausstehend: {', '.join(m.mention for m in self.pending_players)}")
+        else:
+            logger.info("[RESCHEDULE] Alle Spieler haben bestätigt.")
+
         await self.disable_buttons_for_user(interaction)
         await interaction.response.send_message("✅ Zustimmung gespeichert.", ephemeral=True)
 
-        if set(self.players) == self.approved:
+        if not self.pending_players:
             await self.success(interaction)
 
     @ui.button(label="❌ Ablehnen", style=ButtonStyle.danger)
@@ -72,8 +79,10 @@ class RescheduleView(ui.View):
         match = next((m for m in tournament.get("matches", []) if m.get("match_id") == self.match_id), None)
 
         if match:
-            match["scheduled_time"] = self.new_datetime
+            logger.info(f"[RESCHEDULE] Vor Änderung: {match}")
+            match["scheduled_time"] = self.new_datetime.isoformat()
             save_tournament_data(tournament)
+            logger.info(f"[RESCHEDULE] Nach Änderung gespeichert: {match}")
 
         pending_reschedules.discard(self.match_id)
 
