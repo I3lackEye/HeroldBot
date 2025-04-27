@@ -36,14 +36,15 @@ class RescheduleView(ui.View):
 
     @ui.button(label="✅ Akzeptieren", style=ButtonStyle.success)
     async def accept(self, interaction: Interaction, button: ui.Button):
+        if interaction.user in self.approved:
+            await interaction.response.send_message("✅ Du hast bereits zugestimmt.", ephemeral=True)
+            return
+
         self.approved.add(interaction.user)
+        logger.info(f"[RESCHEDULE] {interaction.user.display_name} hat Reschedule für Match {self.match_id} bestätigt.")
 
         if self.message:
             await interaction.response.defer()
-        else:
-            await interaction.response.send_message("✅ Zustimmung gespeichert.", ephemeral=True)
-
-        logger.info(f"[RESCHEDULE] {interaction.user.display_name} hat Reschedule für Match {self.match_id} bestätigt.")
 
         if self.approved == set(self.players):
             await self.success(interaction)
@@ -57,7 +58,20 @@ class RescheduleView(ui.View):
 
         logger.warning(f"[RESCHEDULE] {interaction.user.display_name} hat Reschedule für Match {self.match_id} ABGELEHNT!")
         logger.warning(f"[RESCHEDULE] Anfrage für Match {self.match_id} wird abgebrochen.")
-        await self.abort(interaction)
+
+        pending_reschedules.discard(self.match_id)
+
+        if self.message:
+            await self.message.edit(
+                content=(
+                    f"❌ **{interaction.user.mention}** hat die Verschiebung für Match {self.match_id} abgelehnt.\n"
+                    f"➡️ Das Match bleibt beim ursprünglichen Termin."
+                ),
+                embed=None,
+                view=None
+            )
+
+        self.stop()
 
     async def success(self, interaction: Interaction):
         """Wenn alle zugestimmt haben: Match verschieben."""
