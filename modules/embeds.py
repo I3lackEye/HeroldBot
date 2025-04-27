@@ -388,39 +388,6 @@ async def send_participants_overview(interaction: Interaction, participants_text
     embed = build_embed_from_template(template, placeholders)
     await interaction.response.send_message(embed=embed, ephemeral=False)
 
-"""
-async def send_request_reschedule(destination: Union[discord.Member, discord.TextChannel], match_id: int, team1: str, team2: str, new_datetime: datetime, players_mentions: list[str]):
-    
-    Sendet eine Reschedule-Anfrage als Embed + Buttons.
-    
-    template = load_embed_template("reschedule", category="default").get("RESCHEDULE")
-
-    if not template:
-        logger.error("[EMBED] RESCHEDULE Template fehlt.")
-        return
-
-    # Platzhalter vorbereiten
-    placeholders = {
-        "MATCH_INFO": f"{team1} vs {team2}",
-        "NEW_SLOT": new_datetime.strftime("%d.%m.%Y %H:%M"),
-        "PLAYERS": "\n".join(m.mention for m in valid_members),
-        "DEADLINE": (datetime.utcnow() + timedelta(hours=24)).strftime("%d.%m.%Y %H:%M"),
-    }
-
-    # Baue Embed korrekt mit neuen Platzhaltern
-    embed = build_embed_from_template(template, placeholders)
-
-    view = RescheduleView(
-        match_id=match_id,
-        team1=team1,
-        team2=team2,
-        players=valid_members,
-        new_datetime=new_datetime 
-    )
-
-    await destination.send(embed=embed, view=view)
-"""
-
 async def send_request_reschedule(destination: discord.TextChannel, match_id: int, team1: str, team2: str, new_datetime: datetime, valid_members: List[discord.Member]):
     """
     Sendet ein Reschedule-Embed in den Reschedule-Channel mit Buttons für die betroffenen Spieler.
@@ -441,7 +408,7 @@ async def send_request_reschedule(destination: discord.TextChannel, match_id: in
 
     view = RescheduleView(match_id, team1, team2, new_datetime, valid_members)
 
-    sent_message = await destination.send(content=mentions, embed=embed, view=view)
+    sent_message = await destination.send(embed=embed, view=view)
     view.message = sent_message
 
 async def send_wrong_channel(interaction: Interaction):
