@@ -13,16 +13,19 @@ from modules.logger import logger
 # ---------------------------------------
 
 class RescheduleView(ui.View):
-    def __init__(self, match_id: int, team1: str, team2: str, players: list[str], new_datetime: str):
+    def __init__(self, match_id: int, team1: str, team2: str, new_datetime: datetime, players: List[discord.Member]):
         super().__init__(timeout=86400)  # 24 Stunden
+
         self.match_id = match_id
         self.team1 = team1
         self.team2 = team2
-        self.players = players
+        self.players = players  # <- Die übergebene Liste
         self.new_datetime = new_datetime
+
+        self.pending_players = set(players)  # Alle Mitglieder, die noch zustimmen müssen
         self.approved = set()
-        self.message = None  # wird nach dem Senden gesetzt!
-        self.pending_players = set(valid_members)  # Alle Mitglieder, die noch zustimmen müssen
+        self.message = None
+
 
     async def interaction_check(self, interaction: Interaction) -> bool:
         if interaction.user.mention not in self.players:

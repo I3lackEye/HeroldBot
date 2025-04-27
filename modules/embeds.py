@@ -397,12 +397,12 @@ async def send_request_reschedule(destination: Union[discord.Member, discord.Tex
         logger.error("[EMBED] RESCHEDULE Template fehlt.")
         return
 
-    # ➔ Hier neue Platzhalter einfügen:
+    # Platzhalter vorbereiten
     placeholders = {
         "MATCH_INFO": f"{team1} vs {team2}",
         "NEW_SLOT": new_datetime.strftime("%d.%m.%Y %H:%M"),
-        "PLAYERS": "\n".join(players_mentions),
-        "DEADLINE": (datetime.utcnow() + timedelta(hours=24)).strftime("%d.%m.%Y %H:%M")
+        "PLAYERS": "\n".join(m.mention for m in valid_members),
+        "DEADLINE": (datetime.utcnow() + timedelta(hours=24)).strftime("%d.%m.%Y %H:%M"),
     }
 
     # Baue Embed korrekt mit neuen Platzhaltern
@@ -412,8 +412,8 @@ async def send_request_reschedule(destination: Union[discord.Member, discord.Tex
         match_id=match_id,
         team1=team1,
         team2=team2,
-        players=players_mentions,
-        new_datetime=new_datetime.strftime("%Y-%m-%dT%H:%M:%S")
+        players=valid_members,
+        new_datetime=new_datetime 
     )
 
     await destination.send(embed=embed, view=view)
