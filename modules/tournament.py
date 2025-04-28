@@ -66,7 +66,7 @@ async def start_tournament(interaction: Interaction, registration_hours: Optiona
     
     # Jetzt Timer starten
     asyncio.create_task(auto_end_poll(interaction.client, interaction.channel, registration_hours * 3600))
-    
+
     logger.info("[TOURNAMENT] Umfrage gestartet. Automatischer Poll-Ende-Timer läuft.")
 
 @app_commands.command(name="list_matches", description="Zeigt alle geplanten Matches oder die eines bestimmten Teams.")
@@ -189,6 +189,11 @@ async def update_champion_role(guild: discord.Guild, new_champion_id: int, role_
     champion_role = discord.utils.get(guild.roles, name=role_name)
     if not champion_role:
         logger.error(f"[CHAMPION] Rolle '{role_name}' nicht gefunden!")
+        return
+
+    # Check: Hat der neue Champion die Rolle schon?
+    if champion_role in new_champion.roles:
+        logger.info(f"[CHAMPION] Neuer Champion {new_champion.display_name} hat die Rolle bereits – keine Änderungen notwendig.")
         return
 
     # Alten Champion finden und Rolle entfernen
