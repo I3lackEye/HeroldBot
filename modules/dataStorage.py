@@ -192,10 +192,10 @@ def reset_tournament():
         "poll_results": {}
     }
 
-    with open("tournament.json", "w", encoding="utf-8") as f:
+    with open(TOURNAMENT_FILE_PATH, "w", encoding="utf-8") as f:
         json.dump(empty_tournament, f, indent=4, ensure_ascii=False)
 
-    print("[RESET] Turnierdaten wurden erfolgreich zurückgesetzt.")
+    logger.info(f"[RESET] Turnierdaten wurden erfolgreich zurückgesetzt.")
 
 def add_game(game_title: str):
     """
@@ -264,6 +264,6 @@ def delete_tournament_file():
     """
     try:
         os.remove("data/tournament.json")
-        print("[RESET] tournament.json erfolgreich gelöscht.")
+        logger.info(f"[RESET] tournament.json erfolgreich gelöscht.")
     except FileNotFoundError:
-        print("[RESET] tournament.json war nicht vorhanden.")
+        logger.info(f"[RESET] tournament.json war nicht vorhanden.")

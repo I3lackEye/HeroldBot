@@ -8,6 +8,7 @@ from dotenv import load_dotenv
 
 
 # Lokale Module
+from modules import poll
 from modules.dataStorage import load_global_data, load_tournament_data, load_config, validate_channels
 from modules.logger import logger
 from modules.reminder import match_reminder_loop
@@ -18,7 +19,6 @@ from modules.tournament import (
     start_tournament,
     close_registration_after_delay,
     close_tournament_after_delay,
-    end_tournament,
     list_matches
 
 )

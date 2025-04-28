@@ -1,102 +1,123 @@
-# scripts/poll.py
-
+# new_poll.py
+import discord
 import asyncio
 import random
-from datetime import datetime, timedelta
-import discord
-from discord import ButtonStyle, Interaction, TextChannel
-from discord.ui import View, Button
+from discord.ext import commands
+from modules.dataStorage import load_tournament_data, save_tournament_data
+from modules.logger import logger
+from modules.embeds import send_poll_results, send_registration_open
+from modules.tournament import auto_end_poll
 
+# Globale Variablen
+poll_message_id = None
+poll_channel_id = None
+poll_votes = {}  # user_id -> emoji
+poll_options = {}  # emoji -> spielname
 
-# Lokale Module
-from .dataStorage import load_tournament_data, save_tournament_data, load_global_data
-from .logger import logger
-from .embeds import send_registration_open, send_poll_results, send_tournament_announcement
-from .utils import has_permission
+emoji_list = ["🇦", "🇧", "🇨", "🇩", "🇪", "🇫", "🇬", "🇭", "🇮", "🇯"]
 
-class PollView(View):
-    def __init__(self, options: list, registration_period: int = 604800):
-        super().__init__(timeout=None)
-        self.votes = {}
-        self.message = None
-        self.options = [option for option in options if option.strip()]  # Leere Optionen entfernen
-        self.results = {i: 0 for i in range(len(self.options))}
-        self.registration_period = registration_period
+async def start_poll(channel: discord.TextChannel, options: list[str], registration_hours: int = 72):
+    global poll_message_id, poll_channel_id, poll_votes, poll_options
 
-        for i, option in enumerate(self.options):
-            button = Button(label=option, custom_id=f"poll_{i}", style=ButtonStyle.primary)
-            button.callback = self.make_callback(i, option)
-            self.add_item(button)
+    description = ""
+    poll_options = {}
 
-        end_button = Button(label="🛑 Poll beenden", style=ButtonStyle.danger, custom_id="end_poll")
-        end_button.callback = self.end_poll
-        self.add_item(end_button)
+    for idx, option in enumerate(options):
+        if idx >= len(emoji_list):
+            break  # Nur so viele Emojis wie verfügbar
+        emoji = emoji_list[idx]
+        description += f"{emoji} {option}\n"
+        poll_options[emoji] = option
 
-    def make_callback(self, index: int, option: str):
-        async def callback(interaction: Interaction):
-            user_id = interaction.user.id
+    embed = discord.Embed(
+        title="🎮 Abstimmung: Welches Spiel soll gespielt werden?",
+        description=description,
+        color=discord.Color.blue()
+    )
 
-            # Alte Stimme entfernen
-            previous_vote = self.votes.get(user_id)
-            if previous_vote is not None:
-                self.results[previous_vote] -= 1
+    message = await channel.send(embed=embed)
 
-            # Neue Stimme setzen
-            self.votes[user_id] = index
-            self.results[index] += 1
+    for emoji in poll_options.keys():
+        await message.add_reaction(emoji)
 
-            await interaction.response.send_message(f"✅ Deine Stimme für **{option}** wurde gespeichert!", ephemeral=True)
-        return callback
+    poll_message_id = message.id
+    poll_channel_id = message.channel.id
+    poll_votes = {}
+    logger.info(f"[POLL] Neue Abstimmung gestartet mit {len(options)} Optionen.")
 
-    async def end_poll(self, interaction: Interaction):
-        if not has_permission(interaction.user, "Moderator", "Admin"):
-            await interaction.response.send_message("🚫 Du hast keine Berechtigung, die Umfrage zu beenden.", ephemeral=True)
-            return
+async def end_poll(bot: discord.Client, channel: discord.TextChannel):
+    global poll_message_id, poll_options
 
-        tournament = load_tournament_data()
+    if not poll_message_id:
+        await channel.send("❌ Keine aktive Umfrage gefunden.")
+        return
 
-        if tournament.get("registration_open", False):
-            await interaction.response.send_message("⚠️ Die Umfrage wurde bereits beendet und die Anmeldung ist offen.", ephemeral=True)
-            return
+    try:
+        message = await channel.fetch_message(poll_message_id)
+    except Exception as e:
+        logger.error(f"[POLL] Fehler beim Holen der Umfrage-Nachricht: {e}")
+        await channel.send("❌ Fehler beim Holen der Umfrage-Nachricht.")
+        return
 
-        # Ergebnisse auswerten
-        poll_result_mapping = {self.options[i]: count for i, count in self.results.items()}
-        sorted_games = sorted(poll_result_mapping.items(), key=lambda kv: kv[1], reverse=True)
+    real_votes = {}
 
-        if not sorted_games or sorted_games[0][1] == 0:
-            chosen_game = "Keine Stimmen abgegeben"
-        else:
-            max_votes = sorted_games[0][1]
-            top_games = [game for game, votes in sorted_games if votes == max_votes]
-            chosen_game = random.choice(top_games)
+    for reaction in message.reactions:
+        if str(reaction.emoji) in poll_options:
+            async for user in reaction.users():
+                if not user.bot:
+                    game = poll_options[str(reaction.emoji)]
+                    real_votes[game] = real_votes.get(game, 0) + 1
 
-            if len(top_games) > 1:
-                logger.info(f"[POLL] Gleichstand bei {max_votes} Stimmen. Zufällig gewählt: {chosen_game}")
-            else:
-                logger.info(f"[POLL] Spiel gewählt: {chosen_game} ({max_votes} Stimmen)")
+    if not real_votes:
+        chosen_game = "Keine Stimmen abgegeben"
+    else:
+        sorted_votes = sorted(real_votes.items(), key=lambda kv: kv[1], reverse=True)
+        max_votes = sorted_votes[0][1]
+        top_options = [option for option, votes in sorted_votes if votes == max_votes]
+        chosen_game = top_options[0]  # Falls Gleichstand: einfach erstes nehmen (könnte man randomisieren)
 
-        # Update der Tournament-Daten
-        tournament["poll_results"] = poll_result_mapping
-        tournament["poll_results"]["chosen_game"] = chosen_game
-        tournament["registration_open"] = True
-        save_tournament_data(tournament)
+    # Speichern ins Turnier
+    tournament = load_tournament_data()
+    tournament["poll_results"] = real_votes
+    tournament["poll_results"]["chosen_game"] = chosen_game
+    tournament["registration_open"] = True
+    save_tournament_data(tournament)
 
-        # Logger mit richtiger Zeit
-        registration_end_str = tournament.get("registration_end")
-        if registration_end_str:
-            registration_end = datetime.fromisoformat(registration_end_str)
-        else:
-            registration_end = datetime.now() + timedelta(hours=48)  # Fallback
+    # Poll-Embed posten
+    placeholders = {"chosen_game": chosen_game}
+    await send_poll_results(channel, placeholders, real_votes)
 
-        logger.info(f"[POLL] Poll beendet – Registrierung offen bis {registration_end.strftime('%d.%m.%Y %H:%M')}.")
+    # Anmeldung öffnen
+    reg_end = tournament.get("registration_end")
+    if reg_end:
+        formatted_end = reg_end.replace("T", " ")[:16]
+    else:
+        formatted_end = "Unbekannt"
 
-        # 🆕 Neuer Schritt: Poll-Ergebnisse schön per Embed schicken
-        placeholders = {
-            "chosen_game": chosen_game
-        }
-        await send_poll_results(interaction.channel, placeholders, poll_result_mapping)
+    await send_registration_open(channel, {"endtime": formatted_end})
 
-        # 🆕 Anmeldung öffnen
-        formatted_end = registration_end.strftime("%d.%m.%Y %H:%M")
-        await send_registration_open(interaction.channel, {"endtime": formatted_end})
+    logger.info(f"[POLL] Umfrage beendet. Gewähltes Spiel: {chosen_game}")
 
+    # Reset
+    poll_message_id = None
+    poll_options = {}
+
+# Event Handler
+async def on_raw_reaction_add(payload: discord.RawReactionActionEvent):
+    global poll_message_id, poll_votes, poll_options
+
+    if payload.user_id == payload.client.user.id:
+        return  # eigene Reaktionen ignorieren
+
+    if payload.message_id != poll_message_id:
+        return
+
+    emoji = str(payload.emoji)
+
+    if emoji not in poll_options:
+        return  # Keine gültige Option
+
+    # Stimme speichern
+    poll_votes[payload.user_id] = emoji
+
+    logger.info(f"[POLL] Stimme registriert: User {payload.user_id} für {emoji}.")

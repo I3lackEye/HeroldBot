@@ -336,7 +336,6 @@ def parse_availability(avail_str: str) -> tuple[time, time]:
         logger.warning(f"[AVAILABILITY] Fehler beim Parsen der Verfügbarkeit '{avail_str}': {e}")
         raise ValueError(f"Ungültiges Verfügbarkeitsformat: {avail_str}")
 
-
 def intersect_availability(avail1: str, avail2: str) -> Optional[str]:
     """
     Berechnet die Schnittmenge von zwei Zeiträumen im Format 'HH:MM-HH:MM'.

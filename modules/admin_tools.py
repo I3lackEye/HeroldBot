@@ -8,6 +8,7 @@ from random import randint, choice
 
 
 # Lokale Module
+from modules.poll import end_poll
 from .dataStorage import load_global_data, save_global_data, load_tournament_data, save_tournament_data, load_config, add_game, remove_game
 from .utils import has_permission, generate_team_name, smart_send, generate_random_availability, parse_availability, game_autocomplete, autocomplete_teams, autocomplete_players
 from .logger import logger
@@ -121,7 +122,11 @@ class AdminGroup(app_commands.Group):
             await interaction.response.send_message("🚫 Du hast keine Berechtigung für diesen Befehl.", ephemeral=True)
             return
 
-        await end_tournament_procedure(interaction)
+        await interaction.response.defer(ephemeral=True)
+
+        await interaction.followup.send("🏁 Turnierende wird vorbereitet... dies kann ein paar Sekunden dauern!", ephemeral=True)
+
+        await end_tournament_procedure(interaction.channel, manual_trigger=True)
 
     @app_commands.command(name="add_game", description="Admin-Befehl: Fügt ein neues Spiel zur Spielauswahl hinzu.")
     @app_commands.describe(game="Name des Spiels, das hinzugefügt werden soll.")
@@ -404,6 +409,19 @@ class AdminGroup(app_commands.Group):
             await interaction.response.send_message(f"✅ Reschedule-Anfrage für Match {match_id} wurde zurückgesetzt.", ephemeral=True)
         else:
             await interaction.response.send_message(f"⚠️ Keine offene Anfrage für Match {match_id} gefunden.", ephemeral=True)
+
+    @app_commands.command(name="end_poll", description="Beendet die aktuelle Spielumfrage und startet die Anmeldung.")
+    async def end_poll_command(self, interaction: discord.Interaction):
+        if not has_permission(interaction.user, "Moderator", "Admin"):
+            await interaction.response.send_message("🚫 Du hast keine Berechtigung dafür.", ephemeral=True)
+            return
+
+        await interaction.response.defer(ephemeral=True)  # Sofort defer!
+
+        await end_poll(interaction.client, interaction.channel)
+
+        await interaction.followup.send("✅ Umfrage wurde beendet und Anmeldung geöffnet.", ephemeral=True)  # Danach sauber followup!
+
 
 # Registrierung im Bot
 async def setup(bot: commands.Bot):

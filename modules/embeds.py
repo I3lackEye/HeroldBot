@@ -9,6 +9,7 @@ from typing import List
 from discord import Embed, Interaction, TextChannel
 from datetime import datetime, timedelta
 from typing import Union
+from typing import Optional
 
 # Lokale Module
 from .utils import load_config, smart_send
@@ -111,7 +112,7 @@ async def send_tournament_announcement(channel: TextChannel, placeholders: dict)
     embed = build_embed_from_template(template, placeholders)
     await channel.send(embed=embed)
 
-async def send_tournament_end_announcement(channel: discord.TextChannel, mvp_message: str, winner_ids: list[str]):
+async def send_tournament_end_announcement(channel: discord.TextChannel, mvp_message: str, winner_ids: list[str], new_champion_id: Optional[int] = None):
     """
     Sendet ein Abschluss-Embed für das Turnier basierend auf tournament_end.json.
     """
@@ -128,24 +129,30 @@ async def send_tournament_end_announcement(channel: discord.TextChannel, mvp_mes
         return
 
     poll_results = tournament.get("poll_results") or {}
-    if not isinstance(poll_results, dict):
-        poll_results = {}
-
     chosen_game = poll_results.get("chosen_game", "Unbekannt")
 
-    # Gewinner richtig verarbeiten
+    # Gewinner verarbeiten
     if winner_ids:
         winners_mentions = ", ".join(f"<@{winner_id}>" for winner_id in winner_ids)
     else:
         winners_mentions = "Keine Gewinner ermittelt."
 
-    placeholders = {
-        "MVP_MESSAGE": mvp_message,
-        "WINNERS": winners_mentions,
-        "CHOSEN_GAME": chosen_game
-    }
+    # Champion vorbereiten
+    champion_mention = "Kein Champion"  # Standardwert
+    new_champion = channel.guild.get_member(new_champion_id)
+    if new_champion:
+        champion_mention = new_champion.mention
 
-    embed = build_embed_from_template(template, placeholders)
+    # Jetzt den Text richtig ersetzen
+    description_text = template.get("description", "")
+    description_text = description_text.replace("{MVP_MESSAGE}", mvp_message)
+    description_text = description_text.replace("{WINNERS}", winners_mentions)
+    description_text = description_text.replace("{CHOSEN_GAME}", chosen_game)
+    description_text = description_text.replace("{NEW_CHAMPION}", champion_mention)
+
+    # Jetzt Embed bauen
+    embed = build_embed_from_template(template, placeholders=None)
+    embed.description = description_text
 
     await channel.send(embed=embed)
 
@@ -249,6 +256,26 @@ async def send_match_schedule(interaction: Interaction, description_text: str):
                 await smart_send(interaction, embed=embed)  # erstes Mal (z.B. ephemeral etc.)
             else:
                 await interaction.channel.send(embed=embed)  # danach einfach in den Channel
+
+async def send_match_schedule_for_channel(channel: discord.TextChannel, description_text: str):
+    template = load_embed_template("match_schedule", category="default").get("MATCH_SCHEDULE")
+    if not template:
+        logger.error("[EMBED] MATCH_SCHEDULE Template fehlt.")
+        return
+
+    # Wenn Text <= 4096 Zeichen passt er direkt rein
+    if len(description_text) <= 4096:
+        embed = build_embed_from_template(template, placeholders=None)
+        embed.description = description_text  # Beschreibung dynamisch überschreiben
+        await channel.send(embed=embed)
+    else:
+        # Text aufteilen in 4096er-Blöcke
+        chunks = [description_text[i:i+4096] for i in range(0, len(description_text), 4096)]
+
+        for chunk in chunks:
+            embed = build_embed_from_template(template, placeholders=None)
+            embed.description = chunk
+            await channel.send(embed=embed)
 
 async def send_poll_results(channel: TextChannel, placeholders: dict, poll_results: dict):
     template = load_embed_template("poll", category="default").get("POLL_RESULT")
