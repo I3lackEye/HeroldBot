@@ -3,6 +3,9 @@ import discord
 import asyncio
 import random
 from discord.ext import commands
+from datetime import datetime, timedelta
+
+# Lokale Modules
 from modules.dataStorage import load_tournament_data, save_tournament_data
 from modules.logger import logger
 from modules.embeds import send_poll_results, send_registration_open
@@ -28,6 +31,13 @@ async def start_poll(channel: discord.TextChannel, options: list[str], registrat
         emoji = emoji_list[idx]
         description += f"{emoji} {option}\n"
         poll_options[emoji] = option
+
+    # Ablaufzeit berechnen
+    poll_end_time = datetime.utcnow() + timedelta(hours=registration_hours)
+    poll_end_str = poll_end_time.strftime("%d.%m.%Y %H:%M Uhr")
+
+    # Beschreibung mit Ablaufzeit ergänzen
+    description += f"\n\n⏳ **Abstimmung endet am:** {poll_end_str}"
 
     embed = discord.Embed(
         title="🎮 Abstimmung: Welches Spiel soll gespielt werden?",
