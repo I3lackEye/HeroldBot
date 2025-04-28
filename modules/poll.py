@@ -6,7 +6,7 @@ from discord.ext import commands
 from modules.dataStorage import load_tournament_data, save_tournament_data
 from modules.logger import logger
 from modules.embeds import send_poll_results, send_registration_open
-from modules.tournament import auto_end_poll
+from modules.tournament import auto_end_poll, close_registration_after_delay
 
 # Globale Variablen
 poll_message_id = None
@@ -101,6 +101,18 @@ async def end_poll(bot: discord.Client, channel: discord.TextChannel):
     # Reset
     poll_message_id = None
     poll_options = {}
+
+    tournament = load_tournament_data()
+    registration_end_str = tournament.get("registration_end")
+    if registration_end_str:
+        registration_end = datetime.fromisoformat(registration_end_str)
+        now = datetime.utcnow()
+        delay_seconds = max(0, int((registration_end - now).total_seconds()))
+
+        asyncio.create_task(close_registration_after_delay(delay_seconds, channel))
+        logger.info(f"[POLL] Anmeldung wird automatisch geschlossen in {delay_seconds // 3600} Stunden.")
+    else:
+        logger.warning("[POLL] Kein registration_end gefunden – Anmeldung wird NICHT automatisch geschlossen.")
 
 # Event Handler
 async def on_raw_reaction_add(payload: discord.RawReactionActionEvent):

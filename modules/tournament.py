@@ -66,10 +66,7 @@ async def start_tournament(interaction: Interaction, registration_hours: Optiona
     
     # Jetzt Timer starten
     asyncio.create_task(auto_end_poll(interaction.client, interaction.channel, registration_hours * 3600))
-
-    # Timer für automatische Schließung der Anmeldung
-    asyncio.create_task(close_registration_after_delay(registration_hours * 3600, interaction.channel))
-
+    
     logger.info("[TOURNAMENT] Umfrage gestartet. Automatischer Poll-Ende-Timer läuft.")
 
 @app_commands.command(name="list_matches", description="Zeigt alle geplanten Matches oder die eines bestimmten Teams.")
