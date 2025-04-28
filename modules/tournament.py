@@ -184,11 +184,16 @@ async def update_champion_role(guild: discord.Guild, new_champion_id: int, role_
     - Entzieht die Rolle allen bisherigen Trägern
     - Verleiht die Rolle dem neuen Champion
     """
-
-    # Rolle suchen
+     # Rolle suchen
     champion_role = discord.utils.get(guild.roles, name=role_name)
     if not champion_role:
         logger.error(f"[CHAMPION] Rolle '{role_name}' nicht gefunden!")
+        return
+
+    # Neuen Champion zuweisen
+    new_champion = guild.get_member(new_champion_id)
+    if not new_champion:
+        logger.error(f"[CHAMPION] Neuer Champion (User ID {new_champion_id}) nicht gefunden!")
         return
 
     # Check: Hat der neue Champion die Rolle schon?
@@ -205,12 +210,7 @@ async def update_champion_role(guild: discord.Guild, new_champion_id: int, role_
             except Exception as e:
                 logger.error(f"[CHAMPION] Fehler beim Entfernen der Champion-Rolle von {member.display_name}: {e}")
 
-    # Neuen Champion zuweisen
-    new_champion = guild.get_member(new_champion_id)
-    if not new_champion:
-        logger.error(f"[CHAMPION] Neuer Champion (User ID {new_champion_id}) nicht gefunden!")
-        return
-
+     # Rolle dem neuen Champion geben
     try:
         await new_champion.add_roles(champion_role, reason="Turniersieg MVP.")
         logger.info(f"[CHAMPION] Champion-Rolle vergeben an {new_champion.display_name}")
