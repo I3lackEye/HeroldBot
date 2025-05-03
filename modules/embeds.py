@@ -102,7 +102,7 @@ async def send_registration_confirmation(interaction: Interaction, placeholders:
         return
 
     embed = build_embed_from_template(template, placeholders)
-    await interaction.response.send_message(embed=embed, ephemeral=True)
+    await interaction.response.send_message(embed=embed, ephemeral=False)
 
 async def send_tournament_announcement(channel: TextChannel, placeholders: dict):
     template = load_embed_template("tournament_start", category="default").get("TOURNAMENT_ANNOUNCEMENT")

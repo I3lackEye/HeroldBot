@@ -24,3 +24,7 @@
 ### Evtl alle Permissions, Channelchecks in Funktionen
 - Zentraler Platz für Änderungen
     - Unterschiedliche Funktionen für unterschiedliche Channel/Permissions?
+
+### Wenn Spiele gleich auf sind
+- Stechen (neue abstimmung)
+- Evtl nur eine Stimme

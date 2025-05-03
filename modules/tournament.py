@@ -22,12 +22,17 @@ from modules.archive import archive_current_tournament, update_tournament_histor
 # 🎯 Start Turnier Command
 # ---------------------------------------
 
-@app_commands.command(name="start_tournament", description="Startet ein neues Turnier (Admin).")
 @app_commands.describe(
     registration_hours="Wie viele Stunden soll die Anmeldung offen bleiben? (Standard: 72)",
-    tournament_weeks="Wie viele Wochen soll das Turnier laufen? (Standard: 1)"
+    tournament_weeks="Wie viele Wochen soll das Turnier laufen? (Standard: 1)",
+    poll_duration_hours="Wie viele Stunden soll die Umfrage laufen? (optional, Standard: 48)"
 )
-async def start_tournament(interaction: Interaction, registration_hours: Optional[int] = 72, tournament_weeks: Optional[int] = 1):
+async def start_tournament(
+    interaction: Interaction,
+    registration_hours: Optional[int] = 72,
+    tournament_weeks: Optional[int] = 1,
+    poll_duration_hours: Optional[int] = None
+):
     if not has_permission(interaction.user, "Moderator", "Admin"):
         await interaction.response.send_message("🚫 Du hast keine Berechtigung für diesen Befehl.", ephemeral=True)
         return
@@ -62,7 +67,7 @@ async def start_tournament(interaction: Interaction, registration_hours: Optiona
     # ➔ Umfrage starten
     from modules.dataStorage import load_games  # Lokal importieren, damit oben sauber bleibt
     poll_options = load_games()
-    await poll.start_poll(interaction.channel, poll_options)
+    await poll.start_poll(interaction.channel, poll_options, registration_hours if poll_duration_hours is None else poll_duration_hours)
     
     # Jetzt Timer starten
     asyncio.create_task(auto_end_poll(interaction.client, interaction.channel, registration_hours * 3600))

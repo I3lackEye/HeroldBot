@@ -20,7 +20,7 @@ poll_options = {}  # emoji -> spielname
 
 emoji_list = ["🇦", "🇧", "🇨", "🇩", "🇪", "🇫", "🇬", "🇭", "🇮", "🇯"]
 
-async def start_poll(channel: discord.TextChannel, options: list[str], registration_hours: int = 72):
+async def start_poll(channel: discord.TextChannel, options: list[str], registration_hours: int = 72, poll_duration_hours: int = 48):
     global poll_message_id, poll_channel_id, poll_votes, poll_options
 
     description = ""

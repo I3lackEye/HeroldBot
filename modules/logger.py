@@ -44,3 +44,4 @@ def setup_logger(log_folder="logs", level=logging.INFO):
 
 # Direkt einmal initialisieren
 logger = setup_logger()
+logging.getLogger("discord.gateway").setLevel(logging.WARNING)
