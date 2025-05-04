@@ -21,7 +21,7 @@ from modules.archive import archive_current_tournament, update_tournament_histor
 # ---------------------------------------
 # 🎯 Start Turnier Command
 # ---------------------------------------
-
+@app_commands.command(name="start_tournament", description="Starte ein neues Turnier.")
 @app_commands.describe(
     registration_hours="Wie viele Stunden soll die Anmeldung offen bleiben? (Standard: 72)",
     tournament_weeks="Wie viele Wochen soll das Turnier laufen? (Standard: 1)",

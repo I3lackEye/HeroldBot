@@ -1,12 +1,14 @@
 import os
 import json
 import logging
-from .logger import logger
 from dotenv import load_dotenv
 from typing import Optional
 from datetime import datetime
 import discord
 import shutil
+
+# lokale Modules
+from modules.logger import logger
 
 
 # Lade .env files
