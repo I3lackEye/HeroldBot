@@ -547,6 +547,82 @@ class AdminGroup(app_commands.Group):
         # Anmeldungsschluss simulieren
         asyncio.create_task(close_registration_after_delay(delay_seconds=20, channel=interaction.channel))
 
+    @app_commands.command(name="diagnose_all", description="Führt eine vollständige Diagnose aller Konfigurationen, Channels & Templates durch.")
+    async def diagnose_all(self, interaction: Interaction):
+        if not has_permission(interaction.user, "Moderator", "Admin"):
+            await interaction.response.send_message("🚫 Keine Berechtigung.", ephemeral=True)
+            return
+
+        from modules.dataStorage import load_config, load_games
+        from modules.embeds import load_embed_template
+        config = load_config()
+
+        report = []
+
+        # Games
+        games = load_games()
+        report.append(f"🎮 Spiele geladen: {len(games)} {'✅' if games else '❌ KEINE SPIELE'}")
+
+        # Channels
+        channels = config.get("CHANNELS", {})
+        for key, id_str in channels.items():
+            try:
+                cid = int(id_str)
+                channel = interaction.client.get_channel(cid)
+                if not channel:
+                    report.append(f"❌ Channel {key}: Nicht gefunden (ID: {id_str})")
+                    continue
+                perms = channel.permissions_for(channel.guild.me)
+                if not perms.send_messages:
+                    report.append(f"⚠️ Channel {key} (#{channel.name}): Keine Schreibrechte")
+                else:
+                    report.append(f"✅ Channel {key} (#{channel.name}): OK")
+            except Exception as e:
+                report.append(f"❌ Channel {key}: Fehler – {e}")
+
+        # Templates
+        templates = ["tournament_start", "poll", "registration", "close", "tournament_end"]
+        for tpl in templates:
+            content = load_embed_template(tpl, category="default")
+            status = "✅" if content else "❌"
+            report.append(f"{status} Template: `{tpl}`")
+
+        # Rückgabe
+        text = "\n".join(report)
+        await interaction.response.send_message(f"🩺 **Diagnosebericht:**\n```{text}```", ephemeral=True)
+
+    @app_commands.command(name="export_data", description="Exportiert alle aktuellen Turnierdaten als ZIP-Datei (per DM).")
+    async def export_data(self, interaction: Interaction):
+        if not has_permission(interaction.user, "Moderator", "Admin"):
+            await interaction.response.send_message("🚫 Keine Berechtigung.", ephemeral=True)
+            return
+
+        import zipfile, os
+        from datetime import datetime
+
+        export_dir = "exports"
+        os.makedirs(export_dir, exist_ok=True)
+
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        zip_name = f"tournament_export_{timestamp}.zip"
+        zip_path = os.path.join(export_dir, zip_name)
+
+        with zipfile.ZipFile(zip_path, 'w') as zipf:
+            for f in ["data/data.json", "data/tournament.json"]:
+                if os.path.exists(f):
+                    zipf.write(f)
+
+        file = discord.File(zip_path)
+
+        # ✅ Versuch, per DM zu senden
+        try:
+            await interaction.user.send(content="📦 Hier ist dein Turnier-Export:", file=file)
+            await interaction.response.send_message("✅ ZIP-Datei wurde dir per DM geschickt.", ephemeral=True)
+        except discord.Forbidden:
+            await interaction.response.send_message("⚠️ Konnte dir keine DM schicken. Stelle sicher, dass DMs vom Server erlaubt sind.", ephemeral=True)
+
+
+
 # Registrierung im Bot
 async def setup(bot: commands.Bot):
     bot.tree.add_command(AdminGroup())
