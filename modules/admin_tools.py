@@ -1,4 +1,5 @@
 import discord
+import asyncio
 from discord import app_commands, Interaction
 from discord.ext import commands
 from typing import Optional
