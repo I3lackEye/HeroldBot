@@ -422,6 +422,114 @@ class AdminGroup(app_commands.Group):
 
         await interaction.followup.send("✅ Umfrage wurde beendet und Anmeldung geöffnet.", ephemeral=True)  # Danach sauber followup!
 
+    @app_commands.command(name="health_check", description="Admin-Check: Prüft wichtige Zustände des Systems.")
+    async def health_check_command(self, interaction: Interaction):
+        if not has_permission(interaction.user, "Moderator", "Admin"):
+            await interaction.response.send_message("🚫 Du hast keine Berechtigung für diesen Befehl.", ephemeral=True)
+            return
+
+        tournament = load_tournament_data()
+        embed = discord.Embed(title="🩺 System Health Check", color=discord.Color.green())
+
+        # 1. Turnierstatus
+        running = tournament.get("running", False)
+        embed.add_field(name="Turnier läuft", value="✅ Ja" if running else "❌ Nein", inline=True)
+
+        # 2. Poll aktiv?
+        from modules.poll import poll_message_id, poll_channel_id
+        embed.add_field(name="Aktive Umfrage", value=f"✅ Ja (ID: {poll_message_id})" if poll_message_id else "❌ Nein", inline=True)
+
+        # 3. Anmeldung offen
+        reg_open = tournament.get("registration_open", False)
+        reg_end = tournament.get("registration_end")
+        if reg_end:
+            try:
+                dt = datetime.fromisoformat(reg_end)
+                remaining = dt - datetime.utcnow()
+                reg_info = f"✅ Offen (noch {remaining.days}d {remaining.seconds//3600}h)"
+            except Exception:
+                reg_info = "⚠️ Ungültiges Datumsformat"
+        else:
+            reg_info = "❌ Nicht gesetzt"
+
+        embed.add_field(name="Anmeldung", value=reg_info, inline=False)
+
+        # 4. Matches
+        matches = tournament.get("matches", [])
+        embed.add_field(name="Geplante Matches", value=str(len(matches)), inline=True)
+
+        # 5. Teilnehmer
+        embed.add_field(name="Teams", value=str(len(tournament.get("teams", {}))), inline=True)
+        embed.add_field(name="Solo-Spieler", value=str(len(tournament.get("solo", []))), inline=True)
+
+        # Antwort
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+    @app_commands.command(name="simulate_poll_end", description="Simuliert das automatische Ende der Umfrage nach kurzer Zeit (Testzwecke).")
+    async def simulate_poll_end(self, interaction: Interaction):
+        if not has_permission(interaction.user, "Moderator", "Admin"):
+            await interaction.response.send_message("🚫 Du hast keine Berechtigung dafür.", ephemeral=True)
+            return
+
+        await interaction.response.send_message("⏳ Simuliere Poll-Ende in 10 Sekunden...", ephemeral=True)
+
+        from modules.tournament import auto_end_poll
+
+        # Aktuellen Channel + Client übergeben
+        asyncio.create_task(auto_end_poll(interaction.client, interaction.channel, delay_seconds=10))
+
+    @app_commands.command(name="simulate_registration_close", description="Simuliert automatisches Schließen der Anmeldung in 10 Sekunden.")
+    async def simulate_registration_close(self, interaction: Interaction):
+        if not has_permission(interaction.user, "Moderator", "Admin"):
+            await interaction.response.send_message("🚫 Du hast keine Berechtigung dafür.", ephemeral=True)
+            return
+
+        await interaction.response.send_message("⏳ Anmeldung wird in 10 Sekunden automatisch geschlossen (Testlauf)...", ephemeral=True)
+
+        from modules.tournament import close_registration_after_delay
+
+        asyncio.create_task(close_registration_after_delay(delay_seconds=10, channel=interaction.channel))
+
+    @app_commands.command(name="simulate_full_flow", description="Startet ein Turnier mit Testtimern und simuliert Poll-Ende & Anmeldeschluss.")
+    async def simulate_full_flow(self, interaction: Interaction):
+        if not has_permission(interaction.user, "Moderator", "Admin"):
+            await interaction.response.send_message("🚫 Du hast keine Berechtigung dafür.", ephemeral=True)
+            return
+
+        await interaction.response.defer(ephemeral=True)
+        await interaction.followup.send("🎬 Starte vollständigen Testlauf: Poll ➝ Anmeldung ➝ Spielplan.", ephemeral=True)
+
+        from modules.tournament import start_tournament, auto_end_poll, close_registration_after_delay
+        from modules.dataStorage import load_games
+
+        # Dummy Poll-Optionen laden
+        poll_options = load_games()
+        if not poll_options:
+            await interaction.followup.send("⚠️ Keine Spiele gefunden! Bitte fülle `games.json` zuerst.", ephemeral=True)
+            return
+
+        # Test-Turnierdaten setzen
+        tournament_data = {
+            "registration_open": False,
+            "running": True,
+            "teams": {},
+            "solo": [],
+            "registration_end": (datetime.utcnow() + timedelta(seconds=20)).isoformat(),
+            "tournament_end": (datetime.utcnow() + timedelta(days=7)).isoformat(),
+            "matches": []
+        }
+        from modules.dataStorage import save_tournament_data
+        save_tournament_data(tournament_data)
+
+        # Umfrage starten
+        await interaction.channel.send("🗳️ **Testumfrage wird gestartet...**")
+        await poll.start_poll(interaction.channel, poll_options, registration_hours=20, poll_duration_hours=10)
+
+        # Poll-Ende simulieren
+        asyncio.create_task(auto_end_poll(interaction.client, interaction.channel, delay_seconds=10))
+
+        # Anmeldungsschluss simulieren
+        asyncio.create_task(close_registration_after_delay(delay_seconds=20, channel=interaction.channel))
 
 # Registrierung im Bot
 async def setup(bot: commands.Bot):

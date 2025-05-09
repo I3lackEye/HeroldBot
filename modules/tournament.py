@@ -70,7 +70,9 @@ async def start_tournament(
     await poll.start_poll(interaction.channel, poll_options, registration_hours if poll_duration_hours is None else poll_duration_hours)
     
     # Jetzt Timer starten
-    asyncio.create_task(auto_end_poll(interaction.client, interaction.channel, registration_hours * 3600))
+    duration = poll_duration_hours if poll_duration_hours is not None else 48
+    asyncio.create_task(auto_end_poll(interaction.client, interaction.channel, duration * 3600))
+
 
     logger.info("[TOURNAMENT] Umfrage gestartet. Automatischer Poll-Ende-Timer läuft.")
 
