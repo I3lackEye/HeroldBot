@@ -19,7 +19,7 @@ from .matchmaker import auto_match_solo, create_round_robin_schedule, generate_a
 from .embeds import send_match_schedule, load_embed_template, build_embed_from_template
 from modules.archive import archive_current_tournament
 from modules.shared_states import pending_reschedules
-from modules.tournament import end_tournament_procedure
+from modules.tournament import end_tournament_procedure, auto_end_poll, close_registration_after_delay
 
 
 
@@ -500,11 +500,6 @@ class AdminGroup(app_commands.Group):
 
         await interaction.response.defer(ephemeral=True)
         await interaction.followup.send("🎬 Starte vollständigen Testlauf: Poll ➝ Anmeldung ➝ Matchplan.", ephemeral=True)
-
-        from modules.tournament import auto_end_poll, close_registration_after_delay
-        from modules.dataStorage import load_games, save_tournament_data
-        from modules import poll
-        from modules.matchmaker import generate_random_availability
 
         # Dummy Poll-Optionen laden
         poll_options = load_games()
