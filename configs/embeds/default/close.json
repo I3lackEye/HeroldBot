@@ -1,0 +1,8 @@
+{
+    "REGISTRATION_CLOSED_ANNOUNCEMENT": {
+      "title": "🚫 Anmeldung geschlossen",
+      "description": "Die Anmeldephase für das Turnier ist beendet.\n\nAlle registrierten Teams und Spieler wurden gespeichert. Der Spielplan wird nun vorbereitet!",
+      "color": "#e74c3c",
+      "footer": "Keine Nachmeldungen mehr möglich."
+    }
+  }

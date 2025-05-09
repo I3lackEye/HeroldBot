@@ -14,7 +14,7 @@ from .logger import logger
 from .matchmaker import auto_match_solo, create_round_robin_schedule, generate_schedule_overview, assign_matches_to_slots, cleanup_orphan_teams, generate_and_assign_slots
 from .utils import has_permission, update_player_stats, get_player_team, autocomplete_teams, get_current_chosen_game, smart_send, update_all_participants, all_matches_completed
 from .dataStorage import load_tournament_data, save_tournament_data, backup_current_state, reset_tournament, delete_tournament_file
-from .embeds import send_tournament_announcement, send_list_matches, load_embed_template, build_embed_from_template, send_tournament_end_announcement, send_match_schedule_for_channel  
+from .embeds import send_tournament_announcement, send_list_matches, load_embed_template, build_embed_from_template, send_tournament_end_announcement, send_match_schedule_for_channel, send_registration_closed  
 from .stats import autocomplete_players, autocomplete_teams, get_mvp, update_player_stats, get_winner_ids, get_winner_team
 from modules.archive import archive_current_tournament, update_tournament_history
 
@@ -256,7 +256,7 @@ async def close_registration_after_delay(delay_seconds: int, channel: discord.Te
         # Jetzt erst schließen
         tournament["registration_open"] = False
         save_tournament_data(tournament)
-        await channel.send(content="🚫 **Die Anmeldung wurde geschlossen.**")
+        await send_registration_closed(channel)
         logger.info("[TOURNAMENT] Anmeldung automatisch geschlossen.")
 
     # Verwaiste Teams aufräumen

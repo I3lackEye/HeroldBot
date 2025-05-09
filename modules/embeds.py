@@ -446,3 +446,11 @@ async def send_wrong_channel(interaction: Interaction):
     embed = build_embed_from_template(template)
     await interaction.response.send_message(embed=embed, ephemeral=False)
 
+async def send_registration_closed(channel: discord.TextChannel):
+    template = load_embed_template("close", category="default").get("REGISTRATION_CLOSED_ANNOUNCEMENT")
+    if not template:
+        logger.error("[EMBED] REGISTRATION_CLOSED_ANNOUNCEMENT Template fehlt.")
+        return
+
+    embed = build_embed_from_template(template)
+    await channel.send(embed=embed)
