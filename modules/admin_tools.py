@@ -8,6 +8,7 @@ from random import randint, choice
 
 
 # Lokale Module
+from modules import poll
 from modules.poll import end_poll
 from .dataStorage import load_global_data, save_global_data, load_tournament_data, save_tournament_data, load_config, add_game, remove_game
 from .utils import has_permission, generate_team_name, smart_send, generate_random_availability, parse_availability, game_autocomplete, autocomplete_teams, autocomplete_players
