@@ -2,7 +2,7 @@ import discord
 from discord import app_commands, Interaction
 from discord.ext import commands
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, timedelta
 import random
 from random import randint, choice
 
