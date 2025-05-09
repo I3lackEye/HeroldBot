@@ -15,7 +15,7 @@ from .dataStorage import load_global_data, save_global_data, load_tournament_dat
 from .utils import has_permission, generate_team_name, smart_send, generate_random_availability, parse_availability, game_autocomplete, autocomplete_teams, autocomplete_players
 from .logger import logger
 from .stats import autocomplete_players
-from .matchmaker import auto_match_solo, create_round_robin_schedule, generate_and_assign_slots, generate_schedule_overview, cleanup_orphan_teams, generate_weekend_slots, generate_random_availability
+from .matchmaker import auto_match_solo, create_round_robin_schedule, generate_and_assign_slots, generate_schedule_overview, cleanup_orphan_teams, generate_weekend_slots
 from .embeds import send_match_schedule, load_embed_template, build_embed_from_template
 from modules.archive import archive_current_tournament
 from modules.shared_states import pending_reschedules
