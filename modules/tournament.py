@@ -11,7 +11,7 @@ from discord import app_commands
 from modules import poll
 from .dataStorage import load_global_data, load_games
 from .logger import logger
-from .matchmaker import auto_match_solo, create_round_robin_schedule, generate_schedule_overview, assign_matches_to_slots, cleanup_orphan_teams
+from .matchmaker import auto_match_solo, create_round_robin_schedule, generate_schedule_overview, assign_matches_to_slots, cleanup_orphan_teams, generate_and_assign_slots
 from .utils import has_permission, update_player_stats, get_player_team, autocomplete_teams, get_current_chosen_game, smart_send, update_all_participants, all_matches_completed
 from .dataStorage import load_tournament_data, save_tournament_data, backup_current_state, reset_tournament, delete_tournament_file
 from .embeds import send_tournament_announcement, send_list_matches, load_embed_template, build_embed_from_template, send_tournament_end_announcement, send_match_schedule_for_channel  
@@ -237,7 +237,7 @@ async def close_registration_after_delay(delay_seconds: int, channel: discord.Te
     tournament = load_tournament_data()
     
     if not tournament.get("running", False) or not tournament.get("registration_open", False):
-        await channel.send(f"⚠️ Die Anmeldung ist bereits geschlossen oder es läuft kein Turnier.", ephemeral=True)
+        await channel.send(f"⚠️ Die Anmeldung ist bereits geschlossen oder es läuft kein Turnier.")
         return
 
     # Anmeldung schließen
