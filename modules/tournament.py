@@ -236,16 +236,18 @@ async def close_registration_after_delay(delay_seconds: int, channel: discord.Te
     await asyncio.sleep(delay_seconds)
     tournament = load_tournament_data()
     
-    if not tournament.get("running", False) or not tournament.get("registration_open", False):
-        await channel.send(f"⚠️ Die Anmeldung ist bereits geschlossen oder es läuft kein Turnier.")
+    if not tournament.get("running", False):
+        await channel.send(f"⚠️ Es läuft kein Turnier – Registrierung wird nicht geschlossen.")
         return
 
-    # Anmeldung schließen
-    tournament["registration_open"] = False
-    save_tournament_data(tournament)
-
-    await channel.send(content="🚫 **Die Anmeldung wurde geschlossen.**")
-    logger.info("[TOURNAMENT] Anmeldung manuell geschlossen.")
+    if not tournament.get("registration_open", False):
+        logger.warning("[CLOSE] Anmeldung war bereits geschlossen, fahre aber mit Matchplanung fort.")
+    else:
+        # Jetzt erst schließen
+        tournament["registration_open"] = False
+        save_tournament_data(tournament)
+        await channel.send(content="🚫 **Die Anmeldung wurde geschlossen.**")
+        logger.info("[TOURNAMENT] Anmeldung automatisch geschlossen.")
 
     # Verwaiste Teams aufräumen
     await cleanup_orphan_teams(channel)

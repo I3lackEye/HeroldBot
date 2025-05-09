@@ -15,7 +15,7 @@ from .dataStorage import load_global_data, save_global_data, load_tournament_dat
 from .utils import has_permission, generate_team_name, smart_send, generate_random_availability, parse_availability, game_autocomplete, autocomplete_teams, autocomplete_players
 from .logger import logger
 from .stats import autocomplete_players
-from .matchmaker import auto_match_solo, create_round_robin_schedule, generate_and_assign_slots, generate_schedule_overview, cleanup_orphan_teams, generate_weekend_slots
+from .matchmaker import auto_match_solo, create_round_robin_schedule, generate_and_assign_slots, generate_schedule_overview, cleanup_orphan_teams, generate_weekend_slots, generate_random_availability
 from .embeds import send_match_schedule, load_embed_template, build_embed_from_template
 from modules.archive import archive_current_tournament
 from modules.shared_states import pending_reschedules
@@ -492,17 +492,19 @@ class AdminGroup(app_commands.Group):
 
         asyncio.create_task(close_registration_after_delay(delay_seconds=10, channel=interaction.channel))
 
-    @app_commands.command(name="simulate_full_flow", description="Startet ein Turnier mit Testtimern und simuliert Poll-Ende & Anmeldeschluss.")
+    @app_commands.command(name="simulate_full_flow", description="Startet ein Testturnier inkl. Dummies, Poll und automatischem Ablauf.")
     async def simulate_full_flow(self, interaction: Interaction):
         if not has_permission(interaction.user, "Moderator", "Admin"):
             await interaction.response.send_message("🚫 Du hast keine Berechtigung dafür.", ephemeral=True)
             return
 
         await interaction.response.defer(ephemeral=True)
-        await interaction.followup.send("🎬 Starte vollständigen Testlauf: Poll ➝ Anmeldung ➝ Spielplan.", ephemeral=True)
+        await interaction.followup.send("🎬 Starte vollständigen Testlauf: Poll ➝ Anmeldung ➝ Matchplan.", ephemeral=True)
 
-        from modules.tournament import start_tournament, auto_end_poll, close_registration_after_delay
-        from modules.dataStorage import load_games
+        from modules.tournament import auto_end_poll, close_registration_after_delay
+        from modules.dataStorage import load_games, save_tournament_data
+        from modules import poll
+        from modules.matchmaker import generate_random_availability
 
         # Dummy Poll-Optionen laden
         poll_options = load_games()
@@ -510,20 +512,37 @@ class AdminGroup(app_commands.Group):
             await interaction.followup.send("⚠️ Keine Spiele gefunden! Bitte fülle `games.json` zuerst.", ephemeral=True)
             return
 
-        # Test-Turnierdaten setzen
+        # Turnierdaten vorbereiten
+        now = datetime.utcnow()
         tournament_data = {
             "registration_open": False,
             "running": True,
-            "teams": {},
             "solo": [],
-            "registration_end": (datetime.utcnow() + timedelta(seconds=20)).isoformat(),
-            "tournament_end": (datetime.utcnow() + timedelta(days=7)).isoformat(),
-            "matches": []
+            "registration_end": (now + timedelta(seconds=20)).isoformat(),
+            "tournament_end": (now + timedelta(days=7)).isoformat(),
+            "matches": [],
+            "poll_results": {}
         }
-        from modules.dataStorage import save_tournament_data
+
+        # Dummy-Spieler und Teams hinzufügen
+        teams = {}
+        for i in range(2):  # Zwei Dummy-Teams
+            team_name = f"TestTeam_{i+1}"
+            member1 = f"<@{1111110000000000 + i*2}>"  # Dummy Mentions
+            member2 = f"<@{1111110000000001 + i*2}>"
+            availability, special = generate_random_availability()
+
+            team_entry = {
+                "members": [member1, member2],
+                "verfügbarkeit": availability
+            }
+            team_entry.update(special)
+            teams[team_name] = team_entry
+
+        tournament_data["teams"] = teams
         save_tournament_data(tournament_data)
 
-        # Umfrage starten
+        # Poll starten
         await interaction.channel.send("🗳️ **Testumfrage wird gestartet...**")
         await poll.start_poll(interaction.channel, poll_options, registration_hours=20, poll_duration_hours=10)
 
