@@ -236,8 +236,14 @@ async def close_registration_after_delay(delay_seconds: int, channel: discord.Te
     Schließt die Anmeldung nach einer Verzögerung automatisch
     und startet das automatische Matchmaking & Cleanup.
     """
+    tournament = load_tournament_data() # always first
+    global _registration_closed
     await asyncio.sleep(delay_seconds)
-    tournament = load_tournament_data()
+
+    if _registration_closed:
+        logger.warning("[REGISTRATION] Ablauf bereits abgeschlossen – Doppelvermeidung aktiv.")
+        return
+    _registration_closed = True
     
     if not tournament.get("running", False):
         await channel.send(f"⚠️ Es läuft kein Turnier – Registrierung wird nicht geschlossen.")
@@ -280,15 +286,3 @@ async def close_registration_after_delay(delay_seconds: int, channel: discord.Te
     # Überblick posten
     description_text = generate_schedule_overview(matches)
     await send_match_schedule_for_channel(channel, description_text)
-
-async def close_registration_after_delay(delay_seconds: int, channel: discord.TextChannel):
-    global _registration_closed
-    await asyncio.sleep(delay_seconds)
-
-    if _registration_closed:
-        logger.warning("[REGISTRATION] Ablauf bereits abgeschlossen – Doppelvermeidung aktiv.")
-        return
-    _registration_closed = True
-
-
-
