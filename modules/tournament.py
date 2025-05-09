@@ -18,6 +18,9 @@ from .embeds import send_tournament_announcement, send_list_matches, load_embed_
 from .stats import autocomplete_players, autocomplete_teams, get_mvp, update_player_stats, get_winner_ids, get_winner_team
 from modules.archive import archive_current_tournament, update_tournament_history
 
+# Global Var
+_registration_closed = False 
+
 # ---------------------------------------
 # 🎯 Start Turnier Command
 # ---------------------------------------
@@ -278,11 +281,14 @@ async def close_registration_after_delay(delay_seconds: int, channel: discord.Te
     description_text = generate_schedule_overview(matches)
     await send_match_schedule_for_channel(channel, description_text)
 
-async def close_tournament_after_delay(delay_seconds: int, channel: discord.TextChannel):
+async def close_registration_after_delay(delay_seconds: int, channel: discord.TextChannel):
+    global _registration_closed
     await asyncio.sleep(delay_seconds)
 
-    await end_tournament_procedure(channel)
-
+    if _registration_closed:
+        logger.warning("[REGISTRATION] Ablauf bereits abgeschlossen – Doppelvermeidung aktiv.")
+        return
+    _registration_closed = True
 
 
 
