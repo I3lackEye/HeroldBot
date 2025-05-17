@@ -1,47 +1,25 @@
+# modules/main.py
+
+import asyncio
 import discord
 import json
 import os
+
 from discord import app_commands
 from discord.ext import commands
-from discord.ext import tasks
 from dotenv import load_dotenv
 
-
 # Lokale Module
-from modules import poll
-from modules.dataStorage import load_global_data, load_tournament_data, load_config, validate_channels
+from modules import poll, tournament
+from modules.dataStorage import load_global_data, load_tournament_data, load_config, validate_channels, validate_permissions
 from modules.logger import logger
+from modules.task_manager import add_task, cancel_all_tasks
 from modules.reminder import match_reminder_loop
-from modules.reschedule import request_reschedule
-from modules.info import InfoGroup
-from modules.players import anmelden, update_availability, sign_out
-from modules.tournament import (
-    start_tournament,
-    close_registration_after_delay,
-    close_tournament_after_delay,
-    list_matches
 
-)
-from .admin_tools import AdminGroup
-from .stats import (
-    team_stats,
-    leaderboard,
-    stats,
-    tournament_stats,
-    match_history,
-    status
-)
-
-# Globale Variable für Task-Handling
-reminder_task = None  
-
-# Lade Umgebungsvariablen
 load_dotenv()
-
-# Debug-Modus lesen
+TOKEN = os.getenv("DISCORD_TOKEN")
 DEBUG_MODE = os.getenv("DEBUG") == "1"
 
-# Debug Ausgabe 
 def debug_dump_configs():
     """
     Gibt bei aktivem DEBUG-Modus die Konfigurationsdateien ins Log aus.
@@ -82,63 +60,103 @@ intents.message_content = True
 intents.members = True
 
 bot = commands.Bot(command_prefix="!", intents=intents)
-tree = bot.tree
+
+EXTENSIONS = [
+    "modules.players",
+    "modules.tournament",
+    "modules.info",
+    "modules.admin_tools",
+    "modules.dev_tools",
+    "modules.stats"
+]
+
+intents = discord.Intents.default()
+intents.message_content = True
+intents.members = True
+
+bot = commands.Bot(command_prefix="!", intents=intents)
+
+# ========== EVENTS ==========
 
 @bot.event
 async def on_ready():
-    global reminder_task
-
-    logger.info(f"[SYSTEM] Bot ist eingeloggt als {bot.user}")
+    # --- Startup-Checks ---
+    tournament._registration_closed = False
+    logger.info("[STARTUP] Flags: Aufgeräumt")
+    
     try:
-        synced = await tree.sync()
-        debug_dump_configs()
-        logger.info(f"[SYSTEM] {len(synced)} Slash-Commands synchronisiert.")
+        cancel_all_tasks()
+        logger.info("[STARTUP] Tasks: Canceled")
     except Exception as e:
-        logger.error(f"[SYSTEM] Fehler beim Synchronisieren der Commands: {e}")
+        logger.warning(f"[STARTUP] Keine Tasks oder Fehler beim Cancelen: {e}")
+
+    required_files = [
+        "data/data.json",
+        "data/tournament.json",
+        "configs/config.json"
+    ]
+    for f in required_files:
+        if not os.path.exists(f):
+            logger.error(f"[STARTUP] Notwendige Datei fehlt: {f}")
+        else:
+            try:
+                with open(f, encoding="utf-8") as file:
+                    json.load(file)
+                logger.info(f"[STARTUP] Datei OK: {f}")
+            except Exception as e:
+                logger.error(f"[STARTUP] Datei beschädigt: {f} – {e}")
+
+    for folder in ["logs", "backups", "archive", "data"]:
+        if not os.path.exists(folder):
+            os.makedirs(folder)
+            logger.info(f"[STARTUP] Verzeichnis angelegt: {folder}")
+        else:
+            logger.info(f"[STARTUP] Verzeichnis vorhanden: {folder}")
+    
+    #Check Channels
+    await validate_channels(bot) 
+    #Check Permissions
+    for guild in bot.guilds:
+        await validate_permissions(guild)
+
+    config = load_config()
+    if not config.get("CHANNELS", {}):
+        logger.error("[STARTUP] Keine CHANNELS in der Config!")
 
     # Reminder-Task starten
-    if reminder_task is None or reminder_task.done():
-        config = load_config()
+    try:
         reminder_channel_id = int(config.get("CHANNELS", {}).get("REMINDER", 0))
         channel = bot.get_channel(reminder_channel_id)
-        
         if channel:
-            reminder_task = bot.loop.create_task(match_reminder_loop(channel))
-            logger.info(f"[SYSTEM] Match-Reminder gestartet im Channel {channel.name}.")
+            add_task("reminder", asyncio.create_task(match_reminder_loop(channel)))
+            logger.info(f"[STARTUP] Match-Reminder gestartet im Channel {channel.name}.")
         else:
-            logger.error("[SYSTEM] Reminder-Channel nicht gefunden oder ungültige ID!")
-    else:
-        logger.warning("[SYSTEM] Reminder-Task läuft bereits.")
-    # Channel-Checker starten
-    await validate_channels(bot)
-# --------------------------------
-# Slash-Commands Registrieren
-# --------------------------------
+            logger.error("[STARTUP] Reminder-Channel nicht gefunden oder ungültige ID!")
+    except Exception as e:
+        logger.error(f"[STARTUP] Fehler beim Starten des Reminder-Tasks: {e}")
 
-# Spielerbefehle
-tree.add_command(anmelden)
-tree.add_command(update_availability)
-tree.add_command(sign_out)
-tree.add_command(list_matches)
-tree.add_command(request_reschedule)
-tree.add_command(InfoGroup())
+    try:
+        synced = await bot.tree.sync()
+        debug_dump_configs()
+        logger.info(f"[STARTUP] {len(synced)} Slash-Commands synchronisiert.")
+    except Exception as e:
+        logger.error(f"[STARTUP] Fehler beim Synchronisieren der Commands: {e}")
 
-# Statistikbefehle
-tree.add_command(leaderboard)
-tree.add_command(stats)
-tree.add_command(tournament_stats)
-tree.add_command(status)
+    logger.info("[STARTUP] STARTUP Checks abgeschlossen. Bot ist bereit.")
 
-# Turnierbefehle
-tree.add_command(match_history)
-tree.add_command(team_stats)
-tree.add_command(start_tournament)
+# ========== EXTENSIONS LADEN & BOT STARTEN ==========
 
-# Adminbefehle
-tree.add_command(AdminGroup())
+async def main():
+    # Extensions/Cogs laden
+    for ext in EXTENSIONS:
+        try:
+            await bot.load_extension(ext)
+            logger.info(f"[SYSTEM] Extension geladen: {ext}")
+        except Exception as e:
+            logger.error(f"[SYSTEM] Fehler beim Laden der Extension {ext}: {e}")
 
-# --------------------------------
-# Bot starten
-# --------------------------------
+    # Bot starten (blockiert bis zum Ende)
+    await bot.start(TOKEN)
 
-bot.run(TOKEN)
+if __name__ == "__main__":
+    asyncio.run(main())

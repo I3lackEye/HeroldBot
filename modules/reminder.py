@@ -1,11 +1,12 @@
-# reminder.py
+# modules/reminder.py
+
 import asyncio
 from datetime import datetime, timedelta
 from discord import TextChannel
 
 # Lokale Module
-from .logger import logger
-from .dataStorage import load_tournament_data, save_tournament_data
+from modules.logger import logger
+from modules.dataStorage import load_tournament_data, save_tournament_data
 from modules.embeds import send_match_reminder
 
 
@@ -20,7 +21,7 @@ async def match_reminder_loop(channel: TextChannel):
         tournament = load_tournament_data()
         matches = tournament.get("matches", [])
 
-        now = datetime.utcnow()
+        now = now = datetime.now(timezone.utc)
 
         for match in matches:
             scheduled_time_str = match.get("scheduled_time")
@@ -30,7 +31,7 @@ async def match_reminder_loop(channel: TextChannel):
                 continue
 
             try:
-                scheduled_time = datetime.strptime(scheduled_time_str, "%Y-%m-%dT%H:%M:%S")
+                scheduled_time = datetime.strptime(scheduled_time_str, "%Y-%m-%dT%H:%M:%S").replace(tzinfo=timezone.utc)
             except ValueError:
                 continue  # Falls Format mal abweicht
 

@@ -1,19 +1,20 @@
-# scripts/embeds.py
+# modules/embeds.py
 
 import discord
-import configparser
 import json
 import os
 import re
+
 from typing import List
 from discord import Embed, Interaction, TextChannel
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 from typing import Union
 from typing import Optional
 
 # Lokale Module
-from .utils import load_config, smart_send
-from .logger import logger
+from modules.utils import load_config, smart_send
+from modules.logger import logger
 from modules.dataStorage import load_tournament_data
 from views.reschedule_view import RescheduleView
 
@@ -84,11 +85,6 @@ async def send_registration_open(channel: TextChannel, placeholders: dict):
         return
     embed = build_embed_from_template(template, placeholders)
     await channel.send(embed=embed)
-
-async def send_registration_closed(channel: discord.TextChannel):
-    template = load_embed_template("close", category="default").get("REGISTRATION_CLOSED_ANNOUNCEMENT")
-    embed = create_embed_from_config("REGISTRATION_CLOSED_ANNOUNCEMENT")
-    await interaction.response.send_message(embed=embed, ephemeral=False)
 
 async def send_registration_confirmation(interaction: Interaction, placeholders: dict):
     """
@@ -342,11 +338,17 @@ async def send_list_matches(interaction: Interaction, matches: list):
 
         if scheduled_time:
             try:
-                scheduled_time = datetime.fromisoformat(scheduled_time).strftime("%d.%m.%Y %H:%M")
+                dt = datetime.fromisoformat(scheduled_time)
+                # Wenn keine Zeitzone gesetzt, als UTC interpretieren:
+                if dt.tzinfo is None:
+                    dt = dt.replace(tzinfo=ZoneInfo("UTC"))
+                # Nach Europe/Berlin umwandeln:
+                dt_berlin = dt.astimezone(ZoneInfo("Europe/Berlin"))
+                scheduled_time_str = dt_berlin.strftime("%d.%m.%Y %H:%M")
             except Exception:
-                scheduled_time = "❗ Ungültige Zeit"
+                scheduled_time_str = "❗ Ungültige Zeit"
         else:
-            scheduled_time = "⏳ Noch nicht geplant"
+            scheduled_time_str = "⏳ Noch nicht geplant"
 
         status = match.get("status", "offen").capitalize()
 

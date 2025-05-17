@@ -1,4 +1,5 @@
-# utils.py
+# modules/utils.py
+
 import discord
 import re
 import logging
@@ -14,34 +15,39 @@ from typing import Optional
 from discord.app_commands import Choice
 
 # Lokale Module
-from .logger import logger
-from .dataStorage import load_config, load_global_data, save_global_data, load_tournament_data, load_games, load_names
+from modules.logger import logger
+from modules.dataStorage import load_config, load_global_data, save_global_data, load_tournament_data, load_games, load_names
 
 # Konfiguration laden
 config = load_config()
 
-
 def has_permission(member: discord.Member, *required_permissions: str) -> bool:
     """
     Überprüft, ob der Member mindestens eine der in der Konfiguration
-    unter den übergebenen Berechtigungen angegebenen Rollen besitzt.
-    
-    Beispiel: has_permission(member, "Moderator", "Admin")
-    
-    :param member: Der Discord Member, der den Befehl ausführt.
-    :param required_permissions: Ein oder mehrere Schlüssel aus ROLE_PERMISSIONS.
-    :return: True, wenn der Member mindestens eine entsprechende Rolle besitzt, sonst False.
+    unter den übergebenen Berechtigungen angegebenen Rollen besitzt ODER als User-ID in der Permission-Liste steht.
     """
     allowed_roles = []
+    allowed_ids = set()
     role_permissions = config.get("ROLE_PERMISSIONS", {})
     for permission in required_permissions:
-        allowed_roles.extend(role_permissions.get(permission, []))
-    
+        for entry in role_permissions.get(permission, []):
+            if entry.isdigit() and len(entry) > 10:
+                allowed_ids.add(int(entry))
+            else:
+                allowed_roles.append(entry)
+
     # Alle Rollennamen des Members abrufen:
     member_role_names = [role.name for role in member.roles]
-    
-    # Prüfe, ob eine der erlaubten Rollen in den Member-Rollen enthalten ist:
-    return any(role in member_role_names for role in allowed_roles)
+
+    # Prüfe auf Rollenname
+    if any(role in member_role_names for role in allowed_roles):
+        return True
+
+    # Prüfe auf User-ID
+    if getattr(member, "id", None) in allowed_ids:
+        return True
+
+    return False
 
 def validate_string(input_str: str, max_length: int = None) -> (bool, str):
     """
@@ -70,6 +76,33 @@ def validate_string(input_str: str, max_length: int = None) -> (bool, str):
         return False, f"Die Eingabe enthält ungültige Zeichen: {invalid_unique}. Erlaubt sind nur Buchstaben, Zahlen, Leerzeichen, '_' und '-'."
     
     return True, ""
+
+def validate_time_range(time_str):
+    """
+    Prüft, ob ein String im Format HH:MM-HH:MM eine echte Uhrzeitspanne ist.
+    """
+    if not re.match(r"^\d{2}:\d{2}-\d{2}:\d{2}$", time_str):
+        return False, "Ungültiges Zeitformat (z.B. 12:00-18:00)"
+    start_str, end_str = time_str.split('-')
+    try:
+        start = datetime.strptime(start_str, "%H:%M")
+        end = datetime.strptime(end_str, "%H:%M")
+        if start >= end:
+            return False, "Die Startzeit muss vor der Endzeit liegen."
+        # Normalerweise sollte strptime die Zeitbereiche schon abdecken. Better safe than sorry!
+    except ValueError:
+        return False, "Ungültige Uhrzeit."
+    return True, ""
+
+def validate_date(date_str):
+    """
+    Prüft, ob ein String ein echtes Datum im Format YYYY-MM-DD ist.
+    """
+    try:
+        datetime.strptime(date_str, "%Y-%m-%d")
+        return True, ""
+    except ValueError:
+        return False, f"Ungültiges Datum: {date_str} (Format: YYYY-MM-DD)"
 
 def get_tournament_status() -> str:
     """
@@ -155,15 +188,6 @@ def update_player_stats(winner_mentions: list[str]) -> None:
     global_data["player_stats"] = player_stats
     save_global_data(global_data)
     logger.info("Spielerstatistiken aktualisiert.")
-
-async def game_autocomplete(interaction: Interaction, current: str):
-    games = load_games()
-
-    return [
-        app_commands.Choice(name=game, value=game)
-        for game in games
-        if current.lower() in game.lower()
-    ][:25]  # Discord API erlaubt max 25 Ergebnisse
 
 def add_manual_win(user_id: int):
     """
@@ -435,6 +459,15 @@ async def autocomplete_teams(interaction: Interaction, current: str):
 
     return suggestions
 
+async def game_autocomplete(interaction: Interaction, current: str):
+    games = load_games()
+
+    return [
+        app_commands.Choice(name=game, value=game)
+        for game in games
+        if current.lower() in game.lower()
+    ][:25]  # Discord API erlaubt max 25 Ergebnisse
+
 def all_matches_completed() -> bool:
     tournament = load_tournament_data()
     matches = tournament.get("matches", [])
@@ -495,6 +528,14 @@ async def update_all_participants():
     save_global_data(global_data)
     logger.info("[STATS] Participation-Zahlen für alle Teilnehmer aktualisiert.")
 
+def cancel_all_tasks():
+    for name, task in list(running_tasks.items()):
+        if not task.done():
+            task.cancel()
+        running_tasks.pop(name, None)
+
+def add_task(name, task):
+    running_tasks[name] = task
 
 # Hilfsfunktion für den dummy gen
 def generate_random_availability() -> tuple[str, dict[str, str]]:

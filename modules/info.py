@@ -1,9 +1,10 @@
-# info.py
+# modules/info.py
+
+import discord
+
+from datetime import datetime
 from discord import app_commands, Interaction, Embed
 from discord.ext import commands
-import discord
-from datetime import datetime
-
 
 # Lokale Module
 from modules.dataStorage import load_tournament_data
@@ -149,3 +150,10 @@ class InfoGroup(app_commands.Group):
         """
         await send_help(interaction)
 
+class InfoCog(commands.Cog):
+    def __init__(self, bot):
+        self.bot = bot
+        self.bot.tree.add_command(InfoGroup())
+    
+async def setup(bot):
+    await bot.add_cog(InfoCog(bot))

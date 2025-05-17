@@ -1,6 +1,8 @@
-# logger.py
-import logging
+# modules/logger.py
+
 import os
+import logging
+
 from datetime import datetime
 
 def setup_logger(log_folder="logs", level=logging.INFO):
@@ -17,7 +19,7 @@ def setup_logger(log_folder="logs", level=logging.INFO):
     log_file = os.path.join(log_folder, f"bot_{now}.log")
     
     # Logger konfigurieren
-    logger = logging.getLogger("HeroldBot")
+    logger = logging.getLogger(__name__)
     logger.setLevel(level)
     
     # Bestehende Handler entfernen, um Duplikate zu vermeiden

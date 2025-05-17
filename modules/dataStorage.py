@@ -1,3 +1,5 @@
+# modules/datastorage.py
+
 import os
 import json
 import logging
@@ -22,10 +24,10 @@ def load_config(config_path="../configs/config.json"):
             config = json.load(config_file)
         return config
     except FileNotFoundError:
-        print(f"Config file '{config_path}' not found.")
+        logger.error(f"Config file '{config_path}' not found.")
         return {}
     except json.JSONDecodeError as e:
-        print(f"Error parsing config file: {e}")
+        logger.error(f"Error parsing config file: {e}")
         return {}
 
 def load_games() -> list:
@@ -118,6 +120,31 @@ async def validate_channels(bot: discord.Client):
 
     logger.info("[CHANNEL CHECKER] Channel-Validierung abgeschlossen.")
 
+async def validate_permissions(guild: discord.Guild):
+    """
+    Prüft, ob alle in der Config angegebenen Rollen auf dem Server existieren.
+    Gibt Warnungen für fehlende Rollen aus.
+    """
+    from modules.dataStorage import load_config
+    from modules.logger import logger
+
+    config = load_config()
+    role_permissions = config.get("ROLE_PERMISSIONS", {})
+    logger.info(f"[PERMISSION CHECKER] Starte Rechte-Validierung für Server '{guild.name}'...")
+
+    for permission_group, entries in role_permissions.items():
+        logger.info(f"[PERMISSION CHECKER] Gruppe '{permission_group}': Erlaubte Rollen/IDs: {entries}")
+        for entry in entries:
+            if entry.isdigit() and len(entry) > 10:
+                logger.info(f"[PERMISSION CHECKER] User-ID '{entry}' als Dev/Permission erkannt (keine Rollenprüfung notwendig).")
+            else:
+                role = discord.utils.get(guild.roles, name=entry)
+                if role:
+                    logger.info(f"[PERMISSION CHECKER] Rolle '{entry}' gefunden (ID: {role.id})")
+                else:
+                    logger.warning(f"[PERMISSION CHECKER] ⚠️ Rolle '{entry}' NICHT im Server '{guild.name}' gefunden!")
+    logger.info("[PERMISSION CHECKER] Permission-Validierung abgeschlossen.")
+
 def init_file(file_path, default_content):
     if not os.path.exists(file_path):
         with open(file_path, "w", encoding="utf-8") as f:
@@ -133,11 +160,11 @@ def load_global_data():
             with open(DATA_FILE_PATH, "r", encoding="utf-8") as file:
                 data = json.load(file)
                 if not isinstance(data, dict):
-                    print("⚠ Global data file format ist nicht korrekt!")
+                    logger.error("⚠ Global data file format ist nicht korrekt!")
                     return {}
                 return data
         except json.JSONDecodeError:
-            print("⚠ Global data file ist beschädigt. Leere Daten werden zurückgegeben.")
+            logger.error("⚠ Global data file ist beschädigt. Leere Daten werden zurückgegeben.")
             return {}
     return {}
 
@@ -164,7 +191,7 @@ def load_tournament_data():
             with open(TOURNAMENT_FILE_PATH, "r", encoding="utf-8") as file:
                 tournament = json.load(file)
                 if not isinstance(tournament, dict):
-                    print("⚠ Tournament file format ist nicht korrekt!")
+                    logger.error("⚠ Tournament file format ist nicht korrekt!")
                     return DEFAULT_TOURNAMENT_DATA.copy()
                 # Fehlende Schlüssel ergänzen
                 for key, value in DEFAULT_TOURNAMENT_DATA.items():
@@ -172,7 +199,7 @@ def load_tournament_data():
                         tournament[key] = value
                 return tournament
         except json.JSONDecodeError:
-            print("⚠ Tournament file ist beschädigt. Standard-Daten werden zurückgegeben.")
+            logger.error("⚠ Tournament file ist beschädigt. Standard-Daten werden zurückgegeben.")
             return DEFAULT_TOURNAMENT_DATA.copy()
     return DEFAULT_TOURNAMENT_DATA.copy()
 
@@ -256,9 +283,9 @@ def backup_current_state():
     for source_file, backup_name in files_to_backup.items():
         if os.path.exists(source_file):
             shutil.copy(source_file, os.path.join(backup_folder, backup_name))
-            print(f"[BACKUP] Gesichert: {source_file}")
+            logger.info(f"[BACKUP] Gesichert: {source_file}")
         else:
-            print(f"[BACKUP] Achtung: {source_file} nicht gefunden – wird übersprungen.")
+            logger.info(f"[BACKUP] Achtung: {source_file} nicht gefunden – wird übersprungen.")
 
 def delete_tournament_file():
     """

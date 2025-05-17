@@ -3,7 +3,8 @@
     "TOURNAMENT_PATH": "data/tournament.json",
     "ROLE_PERMISSIONS": {
       "Moderator": ["Moderator", "Lappen des Vertrauens"],
-      "Admin": ["Administrator"]
+      "Admin": [],
+      "Dev": ["157268596190478336"]
     },
     "WINNER_ROLE_ID": ["1357777322509603046"],
     "CHANNELS": {
@@ -13,5 +14,6 @@
     },
     "DEBUG": 1,
     "STR_MAX_LENGTH": 50,
-    "RESCHEDULE_TIMEOUT_HOURS": 24
+    "RESCHEDULE_TIMEOUT_HOURS": 24,
+    "TIMEZONE": "Europe/Berlin"
 }

@@ -1,11 +1,15 @@
-from discord import app_commands, Interaction, ButtonStyle, Embed
-from discord.ext import commands
-from discord.ui import View, Button
+# modules/reschedule.py
+
 import discord
-from datetime import datetime, timedelta
 import logging
 import re
 import asyncio
+
+from discord import app_commands, Interaction, ButtonStyle, Embed
+from discord.ext import commands
+from discord.ui import View, Button
+from datetime import datetime, timedelta
+
 
 # Lokale modules
 from modules.dataStorage import load_tournament_data, save_tournament_data, load_config
@@ -35,9 +39,7 @@ def extract_ids(members):
 # ---------------------------------------
 # Command: /request_reschedule
 # ---------------------------------------
-
-@app_commands.command(name="request_reschedule", description="Fordere eine Neuansetzung für ein Match an.")
-async def request_reschedule(interaction: Interaction, match_id: int, neuer_zeitpunkt: str):
+async def handle_request_reschedule(interaction: Interaction, match_id: int, neuer_zeitpunkt: str):
     global pending_reschedules
     tournament = load_tournament_data()
     user_id = str(interaction.user.id)
@@ -66,7 +68,7 @@ async def request_reschedule(interaction: Interaction, match_id: int, neuer_zeit
 
     # 2️⃣ Neuer Zeitpunkt prüfen
     try:
-        new_dt = datetime.strptime(neuer_zeitpunkt, "%d.%m.%Y %H:%M")
+        new_dt = datetime.strptime(neuer_zeitpunkt, "%d.%m.%Y %H:%M").replace(tzinfo=ZoneInfo("Europe/Berlin"))
     except ValueError:
         await interaction.response.send_message(
             "🚫 Ungültiges Datumsformat! Bitte benutze `TT.MM.JJJJ HH:MM`.",
@@ -74,7 +76,7 @@ async def request_reschedule(interaction: Interaction, match_id: int, neuer_zeit
         )
         return
 
-    if new_dt <= datetime.now():
+    if new_dt <= datetime.now(ZoneInfo("Europe/Berlin")):
         await interaction.response.send_message(
             "🚫 Der neue Zeitpunkt muss in der Zukunft liegen!",
             ephemeral=True
@@ -84,7 +86,7 @@ async def request_reschedule(interaction: Interaction, match_id: int, neuer_zeit
     all_slots = generate_weekend_slots(tournament)
     booked_slots = set(m["scheduled_time"] for m in tournament.get("matches", []) if m.get("scheduled_time"))
     free_slots = [slot for slot in all_slots if slot not in booked_slots]
-    future_slots = [datetime.fromisoformat(slot) for slot in free_slots if datetime.fromisoformat(slot) > datetime.now()]
+    future_slots = [datetime.fromisoformat(slot).astimezone(ZoneInfo("Europe/Berlin")) for slot in free_slots if datetime.fromisoformat(slot).astimezone(ZoneInfo("Europe/Berlin")) > datetime.now(ZoneInfo("Europe/Berlin"))]
 
     if new_dt not in future_slots:
         await interaction.response.send_message(
@@ -159,8 +161,6 @@ async def request_reschedule(interaction: Interaction, match_id: int, neuer_zeit
 # ---------------------------------------
 # Autocomplete für Match-ID
 # ---------------------------------------
-
-@request_reschedule.autocomplete("match_id")
 async def match_id_autocomplete(interaction: Interaction, current: str):
     tournament = load_tournament_data()
     user_id = str(interaction.user.id)
@@ -186,7 +186,6 @@ async def match_id_autocomplete(interaction: Interaction, current: str):
 # Helper: Autocomplete für neue Terminwahl
 # ---------------------------------------
 
-@request_reschedule.autocomplete("neuer_zeitpunkt")
 async def neuer_zeitpunkt_autocomplete(interaction: Interaction, current: str):
     tournament = load_tournament_data()
 
@@ -222,7 +221,6 @@ async def neuer_zeitpunkt_autocomplete(interaction: Interaction, current: str):
         choices.append(app_commands.Choice(name=label, value=value))
 
     return choices
-
 
 async def start_reschedule_timer(bot, match_id: int):
     """
