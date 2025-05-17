@@ -4,7 +4,7 @@
     "ROLE_PERMISSIONS": {
       "Moderator": ["Moderator", "Lappen des Vertrauens"],
       "Admin": [],
-      "Dev": ["157268596190478336"]
+      "Dev": ["157268596190478336", "708022521781289001"]
     },
     "WINNER_ROLE_ID": ["1357777322509603046"],
     "CHANNELS": {
