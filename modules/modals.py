@@ -126,7 +126,7 @@ class TeamFullJoinModal(Modal):
             await interaction.response.send_message(f"❌ Fehler bei Sonntag: {err}", ephemeral=True)
             return
 
-        # Blockierte Tage validieren (jedes einzelne Datum)
+        # Blockierte Tage validieren (jedes einzelne Datum) Super krasse anpassung an einen ultra unspezifischen kommentar
         for d in unavailable_list:
             valid, err = validate_date(d)
             if not valid:
