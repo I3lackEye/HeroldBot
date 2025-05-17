@@ -565,3 +565,4 @@ def generate_random_availability() -> tuple[str, dict[str, str]]:
     return allgemeine_verfugbarkeit, special
 
 
+#witziger kommentar
