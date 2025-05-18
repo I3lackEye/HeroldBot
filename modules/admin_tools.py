@@ -27,7 +27,6 @@ from modules.tournament import end_tournament_procedure, auto_end_poll, close_re
 # ----------------------------------------
 # Admin-Helper functions
 # ----------------------------------------
-
 async def force_sign_out(interaction: Interaction, user_mention: str):
     tournament = load_tournament_data()
     updated = False
@@ -83,11 +82,10 @@ async def pending_match_autocomplete(interaction: Interaction, current: str):
 
     return choices[:25]  # Maximal 25 Einträge zurückgeben
 
+
 # ----------------------------------------
 # Slash Functions
 # ----------------------------------------
-
-
 class AdminGroup(app_commands.Group):
     def __init__(self):
         super().__init__(name="admin", description="Admin- und Mod-Befehle")
@@ -356,6 +354,9 @@ class AdminGroup(app_commands.Group):
             await interaction.response.send_message("⚠️ Konnte dir keine DM schicken. Stelle sicher, dass DMs vom Server erlaubt sind.", ephemeral=True)
 
 
+# ----------------------------------------
+# Hook for Cog
+# ----------------------------------------
 class AdminCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot

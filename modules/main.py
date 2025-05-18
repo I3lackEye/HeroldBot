@@ -70,12 +70,6 @@ EXTENSIONS = [
     "modules.stats"
 ]
 
-intents = discord.Intents.default()
-intents.message_content = True
-intents.members = True
-
-bot = commands.Bot(command_prefix="!", intents=intents)
-
 # ========== EVENTS ==========
 
 @bot.event
@@ -92,8 +86,8 @@ async def on_ready():
 
     required_files = [
         "data/data.json",
-        "data/tournament.json",
-        "configs/config.json"
+        "configs/config.json",
+        "configs/names_de.json"
     ]
     for f in required_files:
         if not os.path.exists(f):

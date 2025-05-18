@@ -1,6 +1,7 @@
 # matchmaker.py
 import random
 import logging
+
 from math import ceil
 from itertools import combinations
 from collections import defaultdict
@@ -10,10 +11,11 @@ from discord import TextChannel
 
 
 # Lokale Module
-from .dataStorage import load_tournament_data, save_tournament_data
-from .logger import logger
-from .utils import generate_team_name
-from .embeds import send_cleanup_summary
+from modules.dataStorage import load_tournament_data, save_tournament_data
+from modules.logger import logger
+from modules.utils import generate_team_name
+from modules.embeds import send_cleanup_summary
+
 
 
 def auto_match_solo():
@@ -135,11 +137,11 @@ def generate_schedule_overview(matches: list) -> str:
             schedule_by_day[day].append((dt, match))  # Speichere datetime + Match
 
     description = ""
-    for day, matches_list in sorted(schedule_by_day.items()):
+    for day, matches_list in sorted(schedule_by_day.items(), key=lambda x: datetime.strptime(x[0].split()[0], "%d.%m.%Y")):
         description += f"📅 {day}\n"
 
         # Sortiere die Matches an diesem Tag nach Uhrzeit
-        matches_list.sort(key=lambda x: x[0])
+        matches_list.sort(key=lambda x: x[0])  # x[0] ist die datetime
 
         for dt, match in matches_list:
             team1 = match.get("team1", "Unbekannt")
@@ -208,6 +210,13 @@ def parse_start_hour(availability_str: str) -> int:
         logger.warning(f"[SLOT-PLANUNG] Fehler beim Parsen der Verfügbarkeit: {availability_str}")
         return 10  # Falls etwas schiefgeht, Standardwert 10 Uhr
 
+def team_available_on_slot(team_data, slot_datetime):
+    """
+    Prüft, ob das Team am Slot-Datum spielen darf (Blacklisted Dates).
+    """
+    unavailable = set(team_data.get("unavailable_dates", []))
+    slot_date_str = slot_datetime.strftime("%Y-%m-%d")
+    return slot_date_str not in unavailable
 
 # ------------------
 # Dynamische Slot-Generierung
@@ -272,7 +281,7 @@ def generate_weekend_slots(tournament: dict) -> list:
     slot_interval = 2
 
     required_slots_per_day = ceil(total_matches / total_days)
-    max_slots_per_day = 6
+    max_slots_per_day = 3 # How many matches per day!
     slots_per_day = min(required_slots_per_day, max_slots_per_day)
 
     for day in weekend_days:
@@ -290,22 +299,16 @@ def generate_weekend_slots(tournament: dict) -> list:
 
     return slots
 
-
 # ------------------
 # Matches zu Slots zuweisen
 # ------------------ 
-def assign_matches_to_slots(matches: list, slots: list):
-    """
-    Weist Matches den Slots zu, unter Beachtung:
-    - Keine Überschneidungen (ein Slot = ein Match)
-    - Teams spielen nicht mehrfach hintereinander
-    - Teams spielen möglichst nicht mehrmals am gleichen Tag
-    """
+def assign_matches_to_slots(matches: list, slots: list, tournament: dict):
     logger.info(f"[MATCHMAKER] Starte Slot-Zuweisung für {len(matches)} Matches auf {len(slots)} Slots.")
-    
     scheduled_slots = set()
     team_last_slot = {}
     team_matches_per_day = {}
+
+    teams = tournament.get("teams", {})
 
     for match in matches:
         team1 = match["team1"]
@@ -313,15 +316,33 @@ def assign_matches_to_slots(matches: list, slots: list):
         assigned = False
 
         for slot in slots:
-            slot_date = slot.split("T")[0]
+            slot_datetime = datetime.fromisoformat(slot)
+            slot_date = slot_datetime.strftime("%Y-%m-%d")
 
-            if slot in scheduled_slots:
+            # Blacklist: Dürfen beide Teams?
+            if not team_available_on_slot(teams[team1], slot_datetime):
+                continue
+            if not team_available_on_slot(teams[team2], slot_datetime):
                 continue
 
+            # Team darf nicht zweimal hintereinander (vergleiche letzten Slot)
+            if team_last_slot.get(team1) == slot or team_last_slot.get(team2) == slot:
+                continue
+
+            # Optional: Max. 1 Match pro Tag für ein Team
             if team_matches_per_day.get((team1, slot_date)) or team_matches_per_day.get((team2, slot_date)):
                 continue
 
-            if team_last_slot.get(team1) == slot or team_last_slot.get(team2) == slot:
+            # Optional: Pause zwischen Spielen
+            if (
+                team_last_slot.get(team1)
+                and (slot_datetime - datetime.fromisoformat(team_last_slot[team1])).total_seconds() < 30 * 60
+            ):
+                continue
+            if (
+                team_last_slot.get(team2)
+                and (slot_datetime - datetime.fromisoformat(team_last_slot[team2])).total_seconds() < 30 * 60
+            ):
                 continue
 
             match["scheduled_time"] = slot

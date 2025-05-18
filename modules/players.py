@@ -10,7 +10,7 @@ from modules.utils import has_permission, parse_availability, validate_string, i
 from modules.logger import logger
 from modules.embeds import send_registration_confirmation, send_participants_overview, send_wrong_channel
 from modules.reschedule import handle_request_reschedule, match_id_autocomplete, neuer_zeitpunkt_autocomplete
-from views.join_view import AnmeldungChoiceView
+from modules.modals import TeamFullJoinModal
 
 
 # ----------------------------------------
@@ -313,8 +313,8 @@ class PlayerGroup(app_commands.Group):
 
     @app_commands.command(name="join", description="Melde dich solo oder als Team zum Turnier an")
     async def join(self, interaction: Interaction):
-        view = AnmeldungChoiceView()
-        await interaction.response.send_message("Wähle deine Anmeldeart:", view=view, ephemeral=True)
+        modal = TeamFullJoinModal()
+        await interaction.response.send_modal(modal)
     """
     @app_commands.command(name="join", description="Melde dich solo oder als Team zum Turnier an")
     async def join(self, interaction: Interaction):

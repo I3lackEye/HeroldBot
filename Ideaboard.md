@@ -36,6 +36,8 @@
 ### Anmeldelogik
  - Bei Anmeldung mit Samstag und Sonntag wir kein "Anmeldung Erfolgreich ausgegeben"
  ![alt text](image.png) als beispiel wie es aussehen sollte
+auf jeden fall auf timezone achten
+
 
 ### Spielplan übersicht 
 - Spielplan 

@@ -2,10 +2,10 @@
 
 import discord
 
-from discord.ui import Modal, TextInput, View, Select
 from discord import Interaction
+from discord.ui import Modal, TextInput, View, Select
 
-
+# Lokale Modules
 from modules.dataStorage import load_tournament_data, save_tournament_data
 from modules.utils import validate_string, generate_team_name, validate_time_range, validate_date
 
@@ -93,104 +93,67 @@ class TeamFullJoinModal(Modal):
             await interaction.response.send_message(f"❌ Teamname ungültig: {err}", ephemeral=True)
             return
 
-        # Mitspieler validieren
-        is_valid, err = validate_string(mitspieler_name, max_length=32)
-        if not is_valid:
-            await interaction.response.send_message(f"❌ Mitspieler ungültig: {err}", ephemeral=True)
-            return
-
-        # Mitspieler finden
-        mitspieler = None
-        for m in interaction.guild.members:
-            if m.display_name.lower() == mitspieler_name.lower() or m.name.lower() == mitspieler_name.lower():
-                mitspieler = m
-                break
-        if not mitspieler:
-            await interaction.response.send_message(
-                "❌ Mitspieler nicht gefunden! Bitte exakt den Namen angeben.", ephemeral=True
-            )
-            return
-
-        # Verfügbarkeit validieren (simple Regex oder strikte Zeitprüfung)
-        # Verfügbarkeit Samstag validieren
-        samstag = self.samstag_zeit.value.strip()
+        # Zeiten validieren
         valid, err = validate_time_range(samstag)
         if not valid:
             await interaction.response.send_message(f"❌ Fehler bei Samstag: {err}", ephemeral=True)
             return
-
-        # Verfügbarkeit Sonntag validieren
-        sonntag = self.sonntag_zeit.value.strip()
         valid, err = validate_time_range(sonntag)
         if not valid:
             await interaction.response.send_message(f"❌ Fehler bei Sonntag: {err}", ephemeral=True)
             return
 
-        # Blockierte Tage validieren (jedes einzelne Datum) Super krasse anpassung an einen ultra unspezifischen kommentar
+        # Blockierte Tage validieren
         for d in unavailable_list:
             valid, err = validate_date(d)
             if not valid:
                 await interaction.response.send_message(f"❌ {err}", ephemeral=True)
                 return
 
-        # Daten speichern
         tournament = load_tournament_data()
-        teams = tournament.setdefault("teams", {})
-        teams[team_name] = {
-            "members": [interaction.user.mention, mitspieler.mention],
-            "verfügbarkeit": {"samstag": samstag, "sonntag": sonntag},
-            "unavailable_dates": unavailable_list
-        }
-        save_tournament_data(tournament)
+        if mitspieler_name:
+            # Mitspieler suchen
+            mitspieler = None
+            for m in interaction.guild.members:
+                if m.display_name.lower() == mitspieler_name.lower() or m.name.lower() == mitspieler_name.lower():
+                    mitspieler = m
+                    break
+            if not mitspieler:
+                await interaction.response.send_message("❌ Mitspieler nicht gefunden! Bitte exakt den Namen angeben.", ephemeral=True)
+                return
 
-        await interaction.response.send_message(
-            f"✅ Anmeldung gespeichert für **{team_name}**!\n"
-            f"Mitspieler: {mitspieler.mention}\n"
-            f"Samstag: {samstag}\nSonntag: {sonntag}\n"
-            f"Blockierte Tage: {', '.join(unavailable_list) if unavailable_list else 'Keine'}",
-            ephemeral=True
-        )
-
-class SoloJoinModal(Modal, title="Solo-Anmeldung"):
-    nickname = TextInput(label="Dein Name (optional)", required=False, max_length=32)
-    samstag_zeit = TextInput(label="Verfügbarkeit Samstag (HH:MM-HH:MM)", required=True, placeholder="12:00-20:00", max_length=11)
-    sonntag_zeit = TextInput(label="Verfügbarkeit Sonntag (HH:MM-HH:MM)", required=True, placeholder="14:00-22:00", max_length=11)
-    unavailable_dates = TextInput(
-        label="Nicht verfügbare Daten (YYYY-MM-DD, Komma oder neue Zeile)", 
-        required=False, 
-        style=2,
-        placeholder="2025-05-25, 2025-06-02",
-        max_length=200
-    )
-
-    async def on_submit(self, interaction: Interaction):
-        nickname = self.nickname.value.strip() or interaction.user.display_name
-        samstag = self.samstag_zeit.value.strip()
-        sonntag = self.sonntag_zeit.value.strip()
-        unavailable = self.unavailable_dates.value.strip().replace('\n', ',').replace(' ', '')
-
-        unavailable_list = [d for d in unavailable.split(',') if d] if unavailable else []
-
-        tournament = load_tournament_data()
-        solo_list = tournament.setdefault("solo", [])
-        if any(entry.get("player") == interaction.user.mention for entry in solo_list):
-            await interaction.response.send_message("❗ Du bist bereits angemeldet.", ephemeral=True)
-            return
-        solo_entry = {
-            "player": interaction.user.mention,
-            "nickname": nickname,
-            "verfügbarkeit": {
-                "samstag": samstag,
-                "sonntag": sonntag
-            },
-            "unavailable_dates": unavailable_list
-        }
-        solo_list.append(solo_entry)
-        save_tournament_data(tournament)
-
-        await interaction.response.send_message(
-            f"✅ Solo-Anmeldung gespeichert!\n"
-            f"Samstag: {samstag}\nSonntag: {sonntag}\n"
-            f"Nicht verfügbare Daten: {', '.join(unavailable_list) if unavailable_list else 'Keine'}",
-            ephemeral=True
-        )
+            # TEAM-Anmeldung
+            teams = tournament.setdefault("teams", {})
+            teams[team_name] = {
+                "members": [interaction.user.mention, mitspieler.mention],
+                "verfügbarkeit": {"samstag": samstag, "sonntag": sonntag},
+                "unavailable_dates": unavailable_list
+            }
+            save_tournament_data(tournament)
+            await interaction.response.send_message(
+                f"✅ Team-Anmeldung gespeichert für **{team_name}**!\n"
+                f"Mitspieler: {mitspieler.mention}\n"
+                f"Samstag: {samstag}\nSonntag: {sonntag}\n"
+                f"Blockierte Tage: {', '.join(unavailable_list) if unavailable_list else 'Keine'}",
+                ephemeral=True
+            )
+        else:
+            # SOLO-Anmeldung
+            solo_list = tournament.setdefault("solo", [])
+            # Prüfe, ob der User schon Solo ist!
+            if any(entry.get("player") == interaction.user.mention for entry in solo_list):
+                await interaction.response.send_message("❗ Du bist bereits als Solo-Spieler angemeldet.", ephemeral=True)
+                return
+            solo_entry = {
+                "player": interaction.user.mention,
+                "verfügbarkeit": {"samstag": samstag, "sonntag": sonntag},
+                "unavailable_dates": unavailable_list
+            }
+            solo_list.append(solo_entry)
+            save_tournament_data(tournament)
+            await interaction.response.send_message(
+                f"✅ Solo-Anmeldung gespeichert!\n"
+                f"Samstag: {samstag}\nSonntag: {sonntag}\n"
+                f"Blockierte Tage: {', '.join(unavailable_list) if unavailable_list else 'Keine'}",
+                ephemeral=True
+            )
