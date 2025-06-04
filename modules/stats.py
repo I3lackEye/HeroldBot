@@ -404,3 +404,10 @@ class StatsGroup(app_commands.Group):
         }
 
         await send_status(interaction, placeholders)
+
+class StatsCog(commands.Cog):
+    def __init__(self, bot):
+        self.bot = bot
+        self.bot.tree.add_command(StatsGroup())
+async def setup(bot):
+    await bot.add_cog(StatsCog(bot))
