@@ -174,7 +174,7 @@ async def send_status(interaction: Interaction, placeholders: dict):
         logger.error("[EMBED] STATUS Template fehlt.")
         return
     embed = build_embed_from_template(template, placeholders)
-    await channel.send(embed=embed)
+    await smart_send(interaction, embed=embed)
 
 async def send_match_schedule(interaction: Interaction, description_text: str):
     template = load_embed_template("match_schedule", category="default").get("MATCH_SCHEDULE")

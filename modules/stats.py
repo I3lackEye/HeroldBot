@@ -323,4 +323,4 @@ async def status(interaction: Interaction):
         "PLACEHOLDER_MATCHES": str(len(matches))
     }
 
-    await send_status_embed(interaction, placeholders)
+    await send_status(interaction, placeholders)
