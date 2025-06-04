@@ -227,7 +227,8 @@ async def send_status(interaction: Interaction, placeholders: dict):
         return
 
     embed = build_embed_from_template(template, placeholders)
-    await interaction.response.send_message(embed=embed, ephemeral=True)
+    await smart_send(interaction, embed=embed)
+
 
 async def send_match_schedule(interaction: Interaction, description_text: str):
     template = load_embed_template("match_schedule", category="default").get("MATCH_SCHEDULE")
