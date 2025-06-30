@@ -12,7 +12,7 @@ from discord.ext import commands
 
 # Hilfsmodule importieren
 from modules.dataStorage import (load_tournament_data, save_tournament_data, load_config, load_games)
-from modules.utils import (has_permission, generate_random_availability, smart_send)
+from modules.utils import (has_permission, generate_random_availability, smart_send, generate_team_name)
 from modules.logger import logger
 from modules.embeds import load_embed_template, build_embed_from_template
 from modules import poll
@@ -52,7 +52,7 @@ class DevGroup(app_commands.Group):
         # Teams erzeugen
         teams = tournament.setdefault("teams", {})
         for i in range(num_teams):
-            team_name = f"DummyTeam_{i+1}"
+            team_name = generate_team_name()
             member1 = f"TeamMember_{i+1}_1"
             member2 = f"TeamMember_{i+1}_2"
             availability, special = generate_random_availability()
