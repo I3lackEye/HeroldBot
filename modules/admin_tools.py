@@ -38,11 +38,10 @@ from modules.utils import (
     smart_send,
 )
 
+
 # ----------------------------------------
 # Admin-Helper functions
 # ----------------------------------------
-
-
 async def force_sign_out(interaction: Interaction, user_mention: str):
     tournament = load_tournament_data()
     updated = False
