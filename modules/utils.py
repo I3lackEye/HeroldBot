@@ -2,24 +2,27 @@
 
 import discord
 import re
-import logging
 import random
 import time
 
-from collections import Counter
-from random import randint, choice
 from discord import app_commands, Interaction, Embed
 from datetime import datetime, timedelta
-from typing import List
 from typing import Optional
-from discord.app_commands import Choice
 
 # Lokale Module
 from modules.logger import logger
-from modules.dataStorage import load_config, load_global_data, save_global_data, load_tournament_data, load_games, load_names
+from modules.dataStorage import (
+    load_config,
+    load_global_data,
+    save_global_data,
+    load_tournament_data,
+    load_games,
+    load_names,
+)
 
 # Konfiguration laden
 config = load_config()
+
 
 def has_permission(member: discord.Member, *required_permissions: str) -> bool:
     """
@@ -49,12 +52,13 @@ def has_permission(member: discord.Member, *required_permissions: str) -> bool:
 
     return False
 
+
 def validate_string(input_str: str, max_length: int = None) -> (bool, str):
     """
     Überprüft, ob der Eingabestring ausschließlich aus alphanumerischen Zeichen,
     dem Unterstrich '_', dem Bindestrich '-' und Leerzeichen besteht und optional,
     ob er höchstens max_length Zeichen lang ist.
-    
+
     :param input_str: Der zu überprüfende String.
     :param max_length: Die maximale erlaubte Länge. Falls None, wird der Wert aus der Konfiguration (STR_MAX_LENGTH) oder 50 verwendet.
     :return: Ein Tupel (is_valid, error_message). is_valid ist True, wenn alle Prüfungen bestanden wurden,
@@ -63,19 +67,25 @@ def validate_string(input_str: str, max_length: int = None) -> (bool, str):
     # Falls kein max_length übergeben wurde, nutze den Wert aus der Konfiguration oder 50 als Fallback.
     if max_length is None:
         max_length = config.get("STR_MAX_LENGTH", 50)
-    
+
     # Prüfe die Länge
     if len(input_str) > max_length:
         return False, f"Die Eingabe darf höchstens {max_length} Zeichen lang sein."
-    
+
     # Erlaubte Zeichen: alphanumerisch, '_' , '-' und Leerzeichen
-    allowed_special = ['_', '-', ' ']
-    invalid_chars = [char for char in input_str if not (char.isalnum() or char in allowed_special)]
+    allowed_special = ["_", "-", " "]
+    invalid_chars = [
+        char for char in input_str if not (char.isalnum() or char in allowed_special)
+    ]
     if invalid_chars:
         invalid_unique = ", ".join(sorted(set(invalid_chars)))
-        return False, f"Die Eingabe enthält ungültige Zeichen: {invalid_unique}. Erlaubt sind nur Buchstaben, Zahlen, Leerzeichen, '_' und '-'."
-    
+        return (
+            False,
+            f"Die Eingabe enthält ungültige Zeichen: {invalid_unique}. Erlaubt sind nur Buchstaben, Zahlen, Leerzeichen, '_' und '-'.",
+        )
+
     return True, ""
+
 
 def validate_time_range(time_str):
     """
@@ -83,7 +93,7 @@ def validate_time_range(time_str):
     """
     if not re.match(r"^\d{2}:\d{2}-\d{2}:\d{2}$", time_str):
         return False, "Ungültiges Zeitformat (z.B. 12:00-18:00)"
-    start_str, end_str = time_str.split('-')
+    start_str, end_str = time_str.split("-")
     try:
         start = datetime.strptime(start_str, "%H:%M")
         end = datetime.strptime(end_str, "%H:%M")
@@ -93,6 +103,7 @@ def validate_time_range(time_str):
     except ValueError:
         return False, "Ungültige Uhrzeit."
     return True, ""
+
 
 def validate_date(date_str):
     """
@@ -104,13 +115,14 @@ def validate_date(date_str):
     except ValueError:
         return False, f"Ungültiges Datum: {date_str} (Format: YYYY-MM-DD)"
 
+
 def get_tournament_status() -> str:
     """
     Baut den Status des Turniers als formatierten String zusammen.
     Enthalten sind: ob das Turnier läuft, ob Anmeldungen offen sind,
     welches Spiel (aus poll_results) gewählt wurde, Anzahl Teams und Solo-Spieler,
     sowie ggf. Informationen zum Spielplan.
-    
+
     :return: String, der den aktuellen Turnierstatus beschreibt.
     """
     tournament = load_tournament_data()
@@ -152,6 +164,7 @@ def get_tournament_status() -> str:
 
     return status_message
 
+
 def update_player_stats(winner_mentions: list[str]) -> None:
     """
     Aktualisiert in global_data unter "player_stats" den Sieg-Zähler für die angegebenen Spieler.
@@ -176,7 +189,7 @@ def update_player_stats(winner_mentions: list[str]) -> None:
                 "participations": 0,
                 "mention": f"<@{user_id}>",
                 "display_name": f"User {user_id}",
-                "game_stats": {}
+                "game_stats": {},
             }
 
         # Statistiken aktualisieren
@@ -188,6 +201,7 @@ def update_player_stats(winner_mentions: list[str]) -> None:
     global_data["player_stats"] = player_stats
     save_global_data(global_data)
     logger.info("Spielerstatistiken aktualisiert.")
+
 
 def add_manual_win(user_id: int):
     """
@@ -205,6 +219,7 @@ def add_manual_win(user_id: int):
 
     save_global_data(data)
     logger.info(f"[DEBUG] Manuell 1 Sieg an {stats['name']} vergeben.")
+
 
 def register_participation(members: list):  # Übergib list[discord.Member]
     """
@@ -228,6 +243,7 @@ def register_participation(members: list):  # Übergib list[discord.Member]
     save_global_data(data)
     logger.info(f"[STATS] Teilnahmezähler für {len(members)} Spieler aktualisiert.")
 
+
 def get_all_registered_user_ids(tournament: dict) -> list[int]:
     """
     Extrahiert alle Discord-User-IDs (int) aus solo-Spielern & Teams.
@@ -249,6 +265,7 @@ def get_all_registered_user_ids(tournament: dict) -> list[int]:
 
     return ids
 
+
 def update_favorite_game(user_ids: list[int], game: str):
     """
     Zählt das angegebene Spiel im Spielerprofil hoch.
@@ -268,14 +285,19 @@ def update_favorite_game(user_ids: list[int], game: str):
         stats.setdefault("mention", f"<@{uid}>")
         stats.setdefault("display_name", f"Spieler {uid_str}")
 
-        logger.info(f"[STATS] Spielpräferenz aktualisiert: {game} für {stats['mention']} → {game_stats[game]}x")
+        logger.info(
+            f"[STATS] Spielpräferenz aktualisiert: {game} für {stats['mention']} → {game_stats[game]}x"
+        )
 
         player_stats[uid_str] = stats
 
     save_global_data(data)
     logger.info(f"[STATS] Spielstatistik aktualisiert für {len(user_ids)} Spieler.")
 
-def finalize_tournament(winning_team: str, winners: list[int], game: str, points: int = 1):
+
+def finalize_tournament(
+    winning_team: str, winners: list[int], game: str, points: int = 1
+):
     """
     Aktualisiert die globalen Statistiken mit Siegerinfos & Spiel.
     :param winning_team: Name des Siegerteams
@@ -290,7 +312,7 @@ def finalize_tournament(winning_team: str, winners: list[int], game: str, points
         "winning_team": winning_team,
         "points": points,
         "game": game,
-        "ended_at": datetime.now().isoformat()
+        "ended_at": datetime.now().isoformat(),
     }
 
     # Stats erhöhen
@@ -301,19 +323,24 @@ def finalize_tournament(winning_team: str, winners: list[int], game: str, points
         stats["mention"] = f"<@{uid}>"
         stats.setdefault("display_name", f"Spieler {uid_str}")
         data["player_stats"][uid_str] = stats
-        logger.info(f"[STATS] Turniersieg für {stats['mention']} → {stats['wins']} Siege")
+        logger.info(
+            f"[STATS] Turniersieg für {stats['mention']} → {stats['wins']} Siege"
+        )
 
         # Spiel hochzählen
         game_stats = stats.setdefault("game_stats", {})
         game_stats[game] = game_stats.get(game, 0) + 1
 
     save_global_data(data)
-    logger.info(f"[TOURNAMENT] Abschluss gespeichert für Team '{winning_team}' mit Spiel: {game}")
+    logger.info(
+        f"[TOURNAMENT] Abschluss gespeichert für Team '{winning_team}' mit Spiel: {game}"
+    )
+
 
 def generate_team_name() -> str:
     """
     Erzeugt einen zufälligen Teamnamen aus einer Adjektiv- und einer Substantivliste.
-    
+
     :return: Der generierte Teamname als String.
     """
     names = load_names()
@@ -321,17 +348,29 @@ def generate_team_name() -> str:
     substantiv = random.choice(names["substantive"])
     return f"{adjektiv} {substantiv}"
 
-async def smart_send(interaction: Interaction, *, content: str = None, embed: Embed = None, ephemeral: bool = False):
+
+async def smart_send(
+    interaction: Interaction,
+    *,
+    content: str = None,
+    embed: Embed = None,
+    ephemeral: bool = False,
+):
     """
     Sendet eine Nachricht über interaction.response.send_message,
     oder über interaction.followup.send, falls bereits geantwortet wurde.
     """
     try:
-        await interaction.response.send_message(content=content, embed=embed, ephemeral=ephemeral)
+        await interaction.response.send_message(
+            content=content, embed=embed, ephemeral=ephemeral
+        )
     except discord.InteractionResponded:
-        await interaction.followup.send(content=content, embed=embed, ephemeral=ephemeral)
+        await interaction.followup.send(
+            content=content, embed=embed, ephemeral=ephemeral
+        )
 
     # Hilfsfunktion für zufällige Verfügbarkeiten
+
 
 def parse_availability(avail_str: str) -> tuple[time, time]:
     """
@@ -352,13 +391,18 @@ def parse_availability(avail_str: str) -> tuple[time, time]:
 
         # Mindestdauer: 1 Stunde
         if (end_dt - start_dt) < timedelta(hours=1):
-            raise ValueError(f"Verfügbarkeit zu kurz: Mindestens 1 Stunde erforderlich – Eingabe: '{avail_str}'")
+            raise ValueError(
+                f"Verfügbarkeit zu kurz: Mindestens 1 Stunde erforderlich – Eingabe: '{avail_str}'"
+            )
 
         return start_time, end_time
 
     except Exception as e:
-        logger.warning(f"[AVAILABILITY] Fehler beim Parsen der Verfügbarkeit '{avail_str}': {e}")
+        logger.warning(
+            f"[AVAILABILITY] Fehler beim Parsen der Verfügbarkeit '{avail_str}': {e}"
+        )
         raise ValueError(f"Ungültiges Verfügbarkeitsformat: {avail_str}")
+
 
 def intersect_availability(avail1: str, avail2: str) -> Optional[str]:
     """
@@ -384,10 +428,11 @@ def intersect_availability(avail1: str, avail2: str) -> Optional[str]:
     except Exception:
         return None
 
+
 def get_player_team(user_mention_or_id: str) -> Optional[str]:
     """
     Findet das Team eines Spielers anhand seiner ID oder Mention.
-    
+
     :param user_mention_or_id: String (Mention z.B. "<@123456789>" oder ID "123456789")
     :return: Teamname oder None
     """
@@ -399,10 +444,11 @@ def get_player_team(user_mention_or_id: str) -> Optional[str]:
                 return team_name
     return None
 
+
 def get_team_open_matches(team_name: str) -> list:
     """
     Gibt alle offenen Matches eines Teams zurück.
-    
+
     :param team_name: Der Name des Teams
     :return: Liste von Match-Objekten
     """
@@ -410,10 +456,13 @@ def get_team_open_matches(team_name: str) -> list:
     open_matches = []
 
     for match in tournament.get("matches", []):
-        if match.get("status") != "erledigt" and (match.get("team1") == team_name or match.get("team2") == team_name):
+        if match.get("status") != "erledigt" and (
+            match.get("team1") == team_name or match.get("team2") == team_name
+        ):
             open_matches.append(match)
 
     return open_matches
+
 
 async def autocomplete_players(interaction: Interaction, current: str):
     logger.info(f"[AUTOCOMPLETE] Aufgerufen – Eingabe: {current}")
@@ -426,12 +475,17 @@ async def autocomplete_players(interaction: Interaction, current: str):
         if member:
             display_name = member.display_name
         else:
-            display_name = stats.get("display_name") or stats.get("name") or f"Unbekannt ({user_id})"
-        
+            display_name = (
+                stats.get("display_name")
+                or stats.get("name")
+                or f"Unbekannt ({user_id})"
+            )
+
         if current.lower() in display_name.lower():
             choices.append(app_commands.Choice(name=display_name, value=user_id))
 
     return choices[:25]
+
 
 async def autocomplete_teams(interaction: Interaction, current: str):
     logger.info(f"[AUTOCOMPLETE] Aufgerufen – Eingabe: {current}")
@@ -459,6 +513,7 @@ async def autocomplete_teams(interaction: Interaction, current: str):
 
     return suggestions
 
+
 async def game_autocomplete(interaction: Interaction, current: str):
     games = load_games()
 
@@ -466,13 +521,17 @@ async def game_autocomplete(interaction: Interaction, current: str):
         app_commands.Choice(name=game, value=game)
         for game in games
         if current.lower() in game.lower()
-    ][:25]  # Discord API erlaubt max 25 Ergebnisse
+    ][
+        :25
+    ]  # Discord API erlaubt max 25 Ergebnisse
+
 
 def all_matches_completed() -> bool:
     tournament = load_tournament_data()
     matches = tournament.get("matches", [])
 
     return all(match.get("status") == "completed" for match in matches)
+
 
 def get_current_chosen_game() -> str:
     """
@@ -483,6 +542,7 @@ def get_current_chosen_game() -> str:
 
     chosen_game = poll_results.get("chosen_game", "Unbekannt")
     return chosen_game
+
 
 async def update_all_participants():
     """
@@ -504,7 +564,7 @@ async def update_all_participants():
                     "participations": 0,
                     "mention": f"<@{user_id}>",
                     "display_name": f"User {user_id}",
-                    "game_stats": {}
+                    "game_stats": {},
                 }
             stats["participations"] += 1
             player_stats[user_id] = stats
@@ -519,7 +579,7 @@ async def update_all_participants():
                 "participations": 0,
                 "mention": f"<@{user_id}>",
                 "display_name": f"User {user_id}",
-                "game_stats": {}
+                "game_stats": {},
             }
         stats["participations"] += 1
         player_stats[user_id] = stats
@@ -528,14 +588,6 @@ async def update_all_participants():
     save_global_data(global_data)
     logger.info("[STATS] Participation-Zahlen für alle Teilnehmer aktualisiert.")
 
-def cancel_all_tasks():
-    for name, task in list(running_tasks.items()):
-        if not task.done():
-            task.cancel()
-        running_tasks.pop(name, None)
-
-def add_task(name, task):
-    running_tasks[name] = task
 
 # Hilfsfunktion für den dummy gen
 def generate_random_availability() -> tuple[str, dict[str, str]]:
@@ -545,7 +597,7 @@ def generate_random_availability() -> tuple[str, dict[str, str]]:
     - Samstag/Sonntag: extra spezielle Zeiten (optional)
     """
     start_hour = random.randint(8, 14)  # zwischen 08:00 und 14:00 starten
-    duration = random.randint(6, 10)     # Verfügbarkeit 6 bis 10 Stunden
+    duration = random.randint(6, 10)  # Verfügbarkeit 6 bis 10 Stunden
     end_hour = min(start_hour + duration, 23)
 
     allgemeine_verfugbarkeit = f"{start_hour:02d}:00-{end_hour:02d}:00"

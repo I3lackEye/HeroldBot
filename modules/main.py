@@ -11,7 +11,13 @@ from dotenv import load_dotenv
 
 # Lokale Module
 from modules import poll, tournament
-from modules.dataStorage import load_global_data, load_tournament_data, load_config, validate_channels, validate_permissions
+from modules.dataStorage import (
+    load_global_data,
+    load_tournament_data,
+    load_config,
+    validate_channels,
+    validate_permissions,
+)
 from modules.logger import logger
 from modules.task_manager import add_task, cancel_all_tasks
 from modules.reminder import match_reminder_loop
@@ -19,6 +25,7 @@ from modules.reminder import match_reminder_loop
 load_dotenv()
 TOKEN = os.getenv("DISCORD_TOKEN")
 DEBUG_MODE = os.getenv("DEBUG") == "1"
+
 
 def debug_dump_configs():
     """
@@ -53,6 +60,7 @@ def debug_dump_configs():
 
     logger.info("[DEBUG] Dump der Dateien abgeschlossen.")
 
+
 TOKEN = os.getenv("DISCORD_TOKEN")
 
 intents = discord.Intents.default()
@@ -67,28 +75,25 @@ EXTENSIONS = [
     "modules.info",
     "modules.admin_tools",
     "modules.dev_tools",
-    "modules.stats"
+    "modules.stats",
 ]
 
 # ========== EVENTS ==========
+
 
 @bot.event
 async def on_ready():
     # --- Startup-Checks ---
     tournament._registration_closed = False
     logger.info("[STARTUP] Flags: Aufgeräumt")
-    
+
     try:
         cancel_all_tasks()
         logger.info("[STARTUP] Tasks: Canceled")
     except Exception as e:
         logger.warning(f"[STARTUP] Keine Tasks oder Fehler beim Cancelen: {e}")
 
-    required_files = [
-        "data/data.json",
-        "configs/config.json",
-        "configs/names_de.json"
-    ]
+    required_files = ["data/data.json", "configs/config.json", "configs/names_de.json"]
     for f in required_files:
         if not os.path.exists(f):
             logger.error(f"[STARTUP] Notwendige Datei fehlt: {f}")
@@ -106,10 +111,10 @@ async def on_ready():
             logger.info(f"[STARTUP] Verzeichnis angelegt: {folder}")
         else:
             logger.info(f"[STARTUP] Verzeichnis vorhanden: {folder}")
-    
-    #Check Channels
-    await validate_channels(bot) 
-    #Check Permissions
+
+    # Check Channels
+    await validate_channels(bot)
+    # Check Permissions
     for guild in bot.guilds:
         await validate_permissions(guild)
 
@@ -123,7 +128,9 @@ async def on_ready():
         channel = bot.get_channel(reminder_channel_id)
         if channel:
             add_task("reminder", asyncio.create_task(match_reminder_loop(channel)))
-            logger.info(f"[STARTUP] Match-Reminder gestartet im Channel {channel.name}.")
+            logger.info(
+                f"[STARTUP] Match-Reminder gestartet im Channel {channel.name}."
+            )
         else:
             logger.error("[STARTUP] Reminder-Channel nicht gefunden oder ungültige ID!")
     except Exception as e:
@@ -138,7 +145,9 @@ async def on_ready():
 
     logger.info("[STARTUP] STARTUP Checks abgeschlossen. Bot ist bereit.")
 
+
 # ========== EXTENSIONS LADEN & BOT STARTEN ==========
+
 
 async def main():
     # Extensions/Cogs laden
@@ -151,6 +160,7 @@ async def main():
 
     # Bot starten (blockiert bis zum Ende)
     await bot.start(TOKEN)
+
 
 if __name__ == "__main__":
     asyncio.run(main())

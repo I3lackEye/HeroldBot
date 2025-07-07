@@ -21,7 +21,13 @@ poll_options = {}  # emoji -> spielname
 
 emoji_list = ["🇦", "🇧", "🇨", "🇩", "🇪", "🇫", "🇬", "🇭", "🇮", "🇯"]
 
-async def start_poll(channel: discord.TextChannel, options: list[str], registration_hours: int = 72, poll_duration_hours: int = 48):
+
+async def start_poll(
+    channel: discord.TextChannel,
+    options: list[str],
+    registration_hours: int = 72,
+    poll_duration_hours: int = 48,
+):
     global poll_message_id, poll_channel_id, poll_votes, poll_options
 
     description = ""
@@ -35,13 +41,15 @@ async def start_poll(channel: discord.TextChannel, options: list[str], registrat
         poll_options[emoji] = option
 
     # Ablaufzeit berechnen
-    poll_end_time = datetime.now(ZoneInfo("Europe/Berlin")) + timedelta(hours=registration_hours)
+    poll_end_time = datetime.now(ZoneInfo("Europe/Berlin")) + timedelta(
+        hours=registration_hours
+    )
     poll_end_str = poll_end_time.strftime("%d.%m.%Y %H:%M Uhr")
 
     embed = discord.Embed(
         title="🎮 Abstimmung: Welches Spiel soll gespielt werden?",
         description=description,
-        color=discord.Color.blue()
+        color=discord.Color.blue(),
     )
 
     embed.set_footer(text=f"⏳ Abstimmung endet am: {poll_end_str}")
@@ -55,6 +63,7 @@ async def start_poll(channel: discord.TextChannel, options: list[str], registrat
     poll_channel_id = message.channel.id
     poll_votes = {}
     logger.info(f"[POLL] Neue Abstimmung gestartet mit {len(options)} Optionen.")
+
 
 async def end_poll(bot: discord.Client, channel: discord.TextChannel):
     global poll_message_id, poll_options
@@ -85,7 +94,9 @@ async def end_poll(bot: discord.Client, channel: discord.TextChannel):
         sorted_votes = sorted(real_votes.items(), key=lambda kv: kv[1], reverse=True)
         max_votes = sorted_votes[0][1]
         top_options = [option for option, votes in sorted_votes if votes == max_votes]
-        chosen_game = top_options[0]  # Falls Gleichstand: einfach erstes nehmen (könnte man randomisieren)
+        chosen_game = top_options[
+            0
+        ]  # Falls Gleichstand: einfach erstes nehmen (könnte man randomisieren)
 
     # Speichern ins Turnier
     tournament = load_tournament_data()
@@ -120,10 +131,18 @@ async def end_poll(bot: discord.Client, channel: discord.TextChannel):
         now = datetime.now(ZoneInfo("UTC"))
         delay_seconds = max(0, int((registration_end - now).total_seconds()))
 
-        add_task("close_registration", asyncio.create_task(close_registration_after_delay(delay_seconds, channel)))
-        logger.info(f"[POLL] Anmeldung wird automatisch geschlossen in {delay_seconds // 3600} Stunden.")
+        add_task(
+            "close_registration",
+            asyncio.create_task(close_registration_after_delay(delay_seconds, channel)),
+        )
+        logger.info(
+            f"[POLL] Anmeldung wird automatisch geschlossen in {delay_seconds // 3600} Stunden."
+        )
     else:
-        logger.warning("[POLL] Kein registration_end gefunden – Anmeldung wird NICHT automatisch geschlossen.")
+        logger.warning(
+            "[POLL] Kein registration_end gefunden – Anmeldung wird NICHT automatisch geschlossen."
+        )
+
 
 # Event Handler
 async def on_raw_reaction_add(payload: discord.RawReactionActionEvent):

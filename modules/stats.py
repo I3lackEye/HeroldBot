@@ -20,6 +20,7 @@ from modules.embeds import send_tournament_stats, send_status
 # Hilfsfunktionen
 # ----------------------------------------
 
+
 def get_leaderboard() -> str:
     """
     Gibt eine formatierte Bestenliste zurück, basierend auf den Siegen der Spieler.
@@ -30,7 +31,9 @@ def get_leaderboard() -> str:
     if not player_stats:
         return "Keine Statistiken verfügbar."
 
-    sorted_players = sorted(player_stats.items(), key=lambda item: item[1].get("wins", 0), reverse=True)
+    sorted_players = sorted(
+        player_stats.items(), key=lambda item: item[1].get("wins", 0), reverse=True
+    )
 
     lines = []
     for idx, (user_id, data) in enumerate(sorted_players, start=1):
@@ -41,11 +44,9 @@ def get_leaderboard() -> str:
     leaderboard = "\n".join(lines)
     return leaderboard
 
+
 def build_stats_embed(user, stats: dict) -> Embed:
-    embed = Embed(
-        title=f"📊 Statistiken für {user.display_name}",
-        color=0x3498DB
-    )
+    embed = Embed(title=f"📊 Statistiken für {user.display_name}", color=0x3498DB)
 
     wins = stats.get("wins", 0)
     participations = stats.get("participations", 0)
@@ -65,6 +66,7 @@ def build_stats_embed(user, stats: dict) -> Embed:
 
     return embed
 
+
 def get_tournament_summary() -> str:
     """
     Gibt eine kleine Zusammenfassung aller Statistiken aus (Spieler, Siege, Winrate).
@@ -76,7 +78,9 @@ def get_tournament_summary() -> str:
     total_wins = sum(player.get("wins", 0) for player in player_stats.values())
 
     if player_stats:
-        best_player_id, best_player_data = max(player_stats.items(), key=lambda item: item[1].get("wins", 0))
+        best_player_id, best_player_data = max(
+            player_stats.items(), key=lambda item: item[1].get("wins", 0)
+        )
         best_name = best_player_data.get("name", f"<@{best_player_id}>")
         best_wins = best_player_data.get("wins", 0)
     else:
@@ -91,6 +95,7 @@ def get_tournament_summary() -> str:
     )
 
     return output
+
 
 def update_global_game_stats(game_name: str):
     """
@@ -109,7 +114,10 @@ def update_global_game_stats(game_name: str):
     global_data["game_stats"][game_name] += 1
 
     save_global_data(global_data)
-    logger.info(f"Spielstatistik aktualisiert: {game_name} wurde nun {global_data['game_stats'][game_name]}x gespielt.")
+    logger.info(
+        f"Spielstatistik aktualisiert: {game_name} wurde nun {global_data['game_stats'][game_name]}x gespielt."
+    )
+
 
 def get_favorite_game() -> str:
     global_data = load_global_data()
@@ -120,6 +128,7 @@ def get_favorite_game() -> str:
 
     most_played_game, count = max(game_stats.items(), key=lambda item: item[1])
     return f"{most_played_game} ({count}x gespielt)"
+
 
 def get_mvp() -> str:
     """
@@ -134,9 +143,7 @@ def get_mvp() -> str:
 
     # Spieler mit meisten Siegen finden
     sorted_players = sorted(
-        player_stats.items(),
-        key=lambda item: item[1].get("wins", 0),
-        reverse=True
+        player_stats.items(), key=lambda item: item[1].get("wins", 0), reverse=True
     )
 
     if not sorted_players or sorted_players[0][1].get("wins", 0) == 0:
@@ -147,10 +154,11 @@ def get_mvp() -> str:
 
     return mvp_name
 
+
 def update_player_stats(winner_ids: list, chosen_game: str):
     """
     Aktualisiert die Spielerstatistiken und die Turnier-Historie.
-    
+
     :param winner_ids: Liste von Gewinner-UserIDs (als Strings).
     :param chosen_game: Das Spiel, das gespielt wurde.
     """
@@ -164,26 +172,34 @@ def update_player_stats(winner_ids: list, chosen_game: str):
 
     # Gewinner aktualisieren
     for user_id in winner_ids:
-        player = global_data["player_stats"].setdefault(str(user_id), {
-            "wins": 0,
-            "participations": 0,
-            "mention": f"<@{user_id}>",
-            "display_name": f"User {user_id}",
-            "game_stats": {}
-        })
+        player = global_data["player_stats"].setdefault(
+            str(user_id),
+            {
+                "wins": 0,
+                "participations": 0,
+                "mention": f"<@{user_id}>",
+                "display_name": f"User {user_id}",
+                "game_stats": {},
+            },
+        )
 
         player["wins"] += 1
         player["participations"] += 1
         player["game_stats"][chosen_game] = player["game_stats"].get(chosen_game, 0) + 1
 
     # Turnier-Historie ergänzen
-    global_data["tournament_history"].append({
-        "game": chosen_game,
-        "ended_at": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S")
-    })
+    global_data["tournament_history"].append(
+        {
+            "game": chosen_game,
+            "ended_at": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S"),
+        }
+    )
 
     save_global_data(global_data)
-    logger.info(f"[END] Statistiken aktualisiert für Gewinner {winner_ids} im Spiel '{chosen_game}'.")
+    logger.info(
+        f"[END] Statistiken aktualisiert für Gewinner {winner_ids} im Spiel '{chosen_game}'."
+    )
+
 
 def get_winner_ids() -> list:
     """
@@ -203,12 +219,13 @@ def get_winner_ids() -> list:
 
     winner_ids = []
     for member in winner_members:
-        match = re.search(r'\d+', member)
+        match = re.search(r"\d+", member)
         if match:
             winner_ids.append(match.group(0))
 
     logger.info(f"[GET_WINNER_IDS] Gewinner-IDs gefunden: {winner_ids}")
     return winner_ids
+
 
 def get_winner_team(winner_ids: list) -> Optional[str]:
     """
@@ -225,6 +242,7 @@ def get_winner_team(winner_ids: list) -> Optional[str]:
 
     return None
 
+
 # ----------------------------------------
 # Slash-Commands
 # ----------------------------------------
@@ -232,21 +250,24 @@ class StatsGroup(app_commands.Group):
     def __init__(self):
         super().__init__(name="stats", description="Statistiken und Auswertungen")
 
-    @app_commands.command(name="leaderboard", description="Zeigt die Bestenliste aller Spieler an.")
+    @app_commands.command(
+        name="leaderboard", description="Zeigt die Bestenliste aller Spieler an."
+    )
     async def leaderboard(self, interaction: Interaction):
         if not has_permission(interaction.user, "Moderator", "Admin"):
-            await interaction.response.send_message("🚫 Du hast keine Berechtigung dafür.", ephemeral=True)
+            await interaction.response.send_message(
+                "🚫 Du hast keine Berechtigung dafür.", ephemeral=True
+            )
             return
 
         board = get_leaderboard()
-        embed = Embed(
-            title="🏆 Bestenliste",
-            description=board,
-            color=0xF1C40F
-        )
+        embed = Embed(title="🏆 Bestenliste", description=board, color=0xF1C40F)
         await interaction.response.send_message(embed=embed)
 
-    @app_commands.command(name="stats", description="Zeigt deine oder die Statistiken eines anderen Spielers an.")
+    @app_commands.command(
+        name="stats",
+        description="Zeigt deine oder die Statistiken eines anderen Spielers an.",
+    )
     @app_commands.describe(user="Optional: Spieler auswählen")
     @app_commands.autocomplete(user=autocomplete_players)
     async def stats(self, interaction: Interaction, user: str = None):
@@ -270,16 +291,22 @@ class StatsGroup(app_commands.Group):
         player_stats = global_data.get("player_stats", {}).get(user_id)
 
         if not player_stats:
-            await interaction.response.send_message("⚠ Es gibt noch keine Statistiken für diesen Spieler.", ephemeral=True)
+            await interaction.response.send_message(
+                "⚠ Es gibt noch keine Statistiken für diesen Spieler.", ephemeral=True
+            )
             return
 
         embed = build_stats_embed(target_user, player_stats)
         await interaction.response.send_message(embed=embed)
 
-    @app_commands.command(name="tournament_stats", description="Zeigt allgemeine Turnierstatistiken an.")
+    @app_commands.command(
+        name="tournament_stats", description="Zeigt allgemeine Turnierstatistiken an."
+    )
     async def tournament_stats(self, interaction: Interaction):
         if not has_permission(interaction.user, "Moderator", "Admin"):
-            await interaction.response.send_message("🚫 Du hast keine Berechtigung dafür.", ephemeral=True)
+            await interaction.response.send_message(
+                "🚫 Du hast keine Berechtigung dafür.", ephemeral=True
+            )
             return
 
         global_data = load_global_data()
@@ -290,13 +317,17 @@ class StatsGroup(app_commands.Group):
         total_players = len(player_stats)
         total_wins = sum(player.get("wins", 0) for player in player_stats.values())
 
-        best_player_entry = max(player_stats.items(), key=lambda kv: kv[1].get("wins", 0), default=None)
+        best_player_entry = max(
+            player_stats.items(), key=lambda kv: kv[1].get("wins", 0), default=None
+        )
         if best_player_entry:
             best_player = f"{best_player_entry[1]['display_name']} ({best_player_entry[1]['wins']} Siege)"
         else:
             best_player = "Niemand"
 
-        game_counter = Counter(entry["game"] for entry in tournament_history if "game" in entry)
+        game_counter = Counter(
+            entry["game"] for entry in tournament_history if "game" in entry
+        )
         if game_counter:
             most_played_game, count = game_counter.most_common(1)[0]
             favorite_game = f"{most_played_game} ({count}x)"
@@ -304,9 +335,13 @@ class StatsGroup(app_commands.Group):
             favorite_game = "Keine Spiele gespielt."
 
         # Embed verschicken
-        await send_tournament_stats(interaction, total_players, total_wins, best_player, favorite_game)
+        await send_tournament_stats(
+            interaction, total_players, total_wins, best_player, favorite_game
+        )
 
-    @app_commands.command(name="team_stats", description="Zeigt Statistiken eines bestimmten Teams.")
+    @app_commands.command(
+        name="team_stats", description="Zeigt Statistiken eines bestimmten Teams."
+    )
     @app_commands.describe(team="Wähle ein Team aus")
     @app_commands.autocomplete(team=autocomplete_teams)
     async def team_stats(self, interaction: Interaction, team: str):
@@ -314,23 +349,25 @@ class StatsGroup(app_commands.Group):
 
         team_data = tournament.get("teams", {}).get(team)
         if not team_data:
-            await interaction.response.send_message(f"⚠ Das Team **{team}** existiert nicht.", ephemeral=True)
+            await interaction.response.send_message(
+                f"⚠ Das Team **{team}** existiert nicht.", ephemeral=True
+            )
             return
 
         wins = team_data.get("wins", 0)
         matches_played = team_data.get("matches_played", 0)
 
-        embed = discord.Embed(
-            title=f"📊 Teamstatistik: {team}",
-            color=0x1ABC9C
-        )
+        embed = discord.Embed(title=f"📊 Teamstatistik: {team}", color=0x1ABC9C)
         embed.add_field(name="🏆 Siege", value=wins, inline=True)
         embed.add_field(name="🎯 Gespielte Matches", value=matches_played, inline=True)
         embed.set_footer(text="Turnierauswertung")
-        
+
         await interaction.response.send_message(embed=embed)
 
-    @app_commands.command(name="match_history", description="Zeigt die Turnier-Matchhistorie an. Optional für ein bestimmtes Team.")
+    @app_commands.command(
+        name="match_history",
+        description="Zeigt die Turnier-Matchhistorie an. Optional für ein bestimmtes Team.",
+    )
     @app_commands.describe(team="Optional: Filtere nach einem bestimmten Team")
     @app_commands.autocomplete(team=autocomplete_teams)
     async def match_history(self, interaction: Interaction, team: str = None):
@@ -339,19 +376,27 @@ class StatsGroup(app_commands.Group):
 
         # Filter anwenden, falls Team angegeben
         if team:
-            matches = [match for match in matches if match.get("team") == team or match.get("opponent") == team]
+            matches = [
+                match
+                for match in matches
+                if match.get("team") == team or match.get("opponent") == team
+            ]
 
         if not matches:
             if team:
-                await interaction.response.send_message(f"⚠️ Keine Matches für Team **{team}** gefunden.", ephemeral=True)
+                await interaction.response.send_message(
+                    f"⚠️ Keine Matches für Team **{team}** gefunden.", ephemeral=True
+                )
             else:
-                await interaction.response.send_message("⚠️ Keine Matches gefunden.", ephemeral=True)
+                await interaction.response.send_message(
+                    "⚠️ Keine Matches gefunden.", ephemeral=True
+                )
             return
 
         embed = Embed(
             title="🏛️ Turnier-Match-Historie" if not team else f"🏛️ Matches von {team}",
             description="Hier sind die bisherigen Matches:",
-            color=0x7289DA
+            color=0x7289DA,
         )
 
         for match in matches:
@@ -364,12 +409,14 @@ class StatsGroup(app_commands.Group):
             embed.add_field(
                 name=f"{team_name} vs {opponent}",
                 value=f"{outcome_symbol} Ergebnis: **{result}**\n🕑 {timestamp}",
-                inline=False
+                inline=False,
             )
 
         await interaction.response.send_message(embed=embed)
 
-    @app_commands.command(name="status", description="Zeigt den aktuellen Turnierstatus an.")
+    @app_commands.command(
+        name="status", description="Zeigt den aktuellen Turnierstatus an."
+    )
     async def status(self, interaction: Interaction):
         tournament = load_tournament_data()
         now = datetime.now()
@@ -400,14 +447,17 @@ class StatsGroup(app_commands.Group):
             "registration": registration_text,
             "tournament": tournament_text,
             "game": chosen_game,
-            "matches": str(len(matches))
+            "matches": str(len(matches)),
         }
 
         await send_status(interaction, placeholders)
+
 
 class StatsCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.bot.tree.add_command(StatsGroup())
+
+
 async def setup(bot):
     await bot.add_cog(StatsCog(bot))

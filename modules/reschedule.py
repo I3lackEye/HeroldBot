@@ -16,7 +16,11 @@ from zoneinfo import ZoneInfo
 from modules.dataStorage import load_tournament_data, save_tournament_data, load_config
 from modules.utils import smart_send, get_player_team, get_team_open_matches
 from modules.matchmaker import generate_weekend_slots
-from modules.embeds import send_notify_team_members, send_request_reschedule, build_embed_from_template
+from modules.embeds import (
+    send_notify_team_members,
+    send_request_reschedule,
+    build_embed_from_template,
+)
 from modules.logger import logger
 from views.reschedule_view import RescheduleView
 from modules.shared_states import pending_reschedules
@@ -29,6 +33,7 @@ RESCHEDULE_TIMEOUT_HOURS = int(config.get("RESCHEDULE_TIMEOUT_HOURS", 24))
 # Helper: IDs extrahieren
 # ---------------------------------------
 
+
 def extract_ids(members):
     ids = []
     for m in members:
@@ -37,10 +42,13 @@ def extract_ids(members):
             ids.append(match.group(0))
     return ids
 
+
 # ---------------------------------------
 # Command: /request_reschedule
 # ---------------------------------------
-async def handle_request_reschedule(interaction: Interaction, match_id: int, neuer_zeitpunkt: str):
+async def handle_request_reschedule(
+    interaction: Interaction, match_id: int, neuer_zeitpunkt: str
+):
     global pending_reschedules
     tournament = load_tournament_data()
     user_id = str(interaction.user.id)
@@ -48,51 +56,71 @@ async def handle_request_reschedule(interaction: Interaction, match_id: int, neu
     # 1️⃣ Team und Match prüfen
     team_name = get_player_team(user_id)
     if not team_name:
-        await interaction.response.send_message("🚫 Du bist in keinem Team registriert.", ephemeral=True)
+        await interaction.response.send_message(
+            "🚫 Du bist in keinem Team registriert.", ephemeral=True
+        )
         return
 
     open_matches = get_team_open_matches(team_name)
     open_match_ids = [m["match_id"] for m in open_matches]
 
     if match_id not in open_match_ids:
-        await interaction.response.send_message("🚫 Ungültige Match-ID oder nicht dein Match!", ephemeral=True)
+        await interaction.response.send_message(
+            "🚫 Ungültige Match-ID oder nicht dein Match!", ephemeral=True
+        )
         return
 
     if match_id in pending_reschedules:
-        await interaction.response.send_message("🚫 Für dieses Match läuft bereits eine Reschedule-Anfrage!", ephemeral=True)
+        await interaction.response.send_message(
+            "🚫 Für dieses Match läuft bereits eine Reschedule-Anfrage!", ephemeral=True
+        )
         return
 
-    match = next((m for m in tournament.get("matches", []) if m.get("match_id") == match_id), None)
+    match = next(
+        (m for m in tournament.get("matches", []) if m.get("match_id") == match_id),
+        None,
+    )
     if not match:
-        await interaction.response.send_message("🚫 Match nicht gefunden.", ephemeral=True)
+        await interaction.response.send_message(
+            "🚫 Match nicht gefunden.", ephemeral=True
+        )
         return
 
     # 2️⃣ Neuer Zeitpunkt prüfen
     try:
-        new_dt = datetime.strptime(neuer_zeitpunkt, "%d.%m.%Y %H:%M").replace(tzinfo=ZoneInfo("Europe/Berlin"))
+        new_dt = datetime.strptime(neuer_zeitpunkt, "%d.%m.%Y %H:%M").replace(
+            tzinfo=ZoneInfo("Europe/Berlin")
+        )
     except ValueError:
         await interaction.response.send_message(
             "🚫 Ungültiges Datumsformat! Bitte benutze `TT.MM.JJJJ HH:MM`.",
-            ephemeral=True
+            ephemeral=True,
         )
         return
 
     if new_dt <= datetime.now(ZoneInfo("Europe/Berlin")):
         await interaction.response.send_message(
-            "🚫 Der neue Zeitpunkt muss in der Zukunft liegen!",
-            ephemeral=True
+            "🚫 Der neue Zeitpunkt muss in der Zukunft liegen!", ephemeral=True
         )
         return
 
     all_slots = generate_weekend_slots(tournament)
-    booked_slots = set(m["scheduled_time"] for m in tournament.get("matches", []) if m.get("scheduled_time"))
+    booked_slots = set(
+        m["scheduled_time"]
+        for m in tournament.get("matches", [])
+        if m.get("scheduled_time")
+    )
     free_slots = [slot for slot in all_slots if slot not in booked_slots]
-    future_slots = [datetime.fromisoformat(slot).astimezone(ZoneInfo("Europe/Berlin")) for slot in free_slots if datetime.fromisoformat(slot).astimezone(ZoneInfo("Europe/Berlin")) > datetime.now(ZoneInfo("Europe/Berlin"))]
+    future_slots = [
+        datetime.fromisoformat(slot).astimezone(ZoneInfo("Europe/Berlin"))
+        for slot in free_slots
+        if datetime.fromisoformat(slot).astimezone(ZoneInfo("Europe/Berlin"))
+        > datetime.now(ZoneInfo("Europe/Berlin"))
+    ]
 
     if new_dt not in future_slots:
         await interaction.response.send_message(
-            "🚫 Der gewählte Zeitpunkt ist kein erlaubter Slot!",
-            ephemeral=True
+            "🚫 Der gewählte Zeitpunkt ist kein erlaubter Slot!", ephemeral=True
         )
         return
 
@@ -102,23 +130,29 @@ async def handle_request_reschedule(interaction: Interaction, match_id: int, neu
         if scheduled_dt - datetime.utcnow() <= timedelta(hours=1):
             await interaction.response.send_message(
                 "🚫 Du kannst Matches nur bis spätestens 1 Stunde vor geplantem Beginn verschieben.",
-                ephemeral=True
+                ephemeral=True,
             )
             return
 
     # 3️⃣ Anfrage starten
     pending_reschedules.add(match_id)
-    interaction.client.loop.create_task(start_reschedule_timer(interaction.client, match_id))
+    interaction.client.loop.create_task(
+        start_reschedule_timer(interaction.client, match_id)
+    )
 
     await interaction.response.defer(ephemeral=True)
 
     reschedule_channel = interaction.guild.get_channel(RESCHEDULE_CHANNEL_ID)
     if not reschedule_channel:
-        await interaction.followup.send("🚫 Reschedule-Channel nicht gefunden.", ephemeral=True)
+        await interaction.followup.send(
+            "🚫 Reschedule-Channel nicht gefunden.", ephemeral=True
+        )
         return
 
     if not reschedule_channel.permissions_for(interaction.guild.me).send_messages:
-        await interaction.followup.send("🚫 Keine Berechtigung im Reschedule-Channel.", ephemeral=True)
+        await interaction.followup.send(
+            "🚫 Keine Berechtigung im Reschedule-Channel.", ephemeral=True
+        )
         return
 
     # 4️⃣ Teilnehmer vorbereiten
@@ -140,21 +174,21 @@ async def handle_request_reschedule(interaction: Interaction, match_id: int, neu
                 continue
 
     if not valid_members:
-        await interaction.followup.send("🚫 Konnte keine gültigen Spieler für die Reschedule-Anfrage finden.", ephemeral=True)
+        await interaction.followup.send(
+            "🚫 Konnte keine gültigen Spieler für die Reschedule-Anfrage finden.",
+            ephemeral=True,
+        )
         return
 
     # 5️⃣ Anfrage-Embed und View senden
     await send_request_reschedule(
-        reschedule_channel,
-        match_id,
-        team1,
-        team2,
-        new_dt,
-        valid_members
+        reschedule_channel, match_id, team1, team2, new_dt, valid_members
     )
 
     # 6️⃣ Abschlussnachricht
-    await interaction.followup.send("✅ Deine Reschedule-Anfrage wurde im Channel erstellt!", ephemeral=True)
+    await interaction.followup.send(
+        "✅ Deine Reschedule-Anfrage wurde im Channel erstellt!", ephemeral=True
+    )
 
     logger.info(f"[RESCHEDULE] Anfrage von {team_name} für Match {match_id} gestartet.")
 
@@ -178,14 +212,16 @@ async def match_id_autocomplete(interaction: Interaction, current: str):
             choices.append(
                 app_commands.Choice(
                     name=f"Match {m['match_id']}: {m['team1']} vs {m['team2']}",
-                    value=m["match_id"]
+                    value=m["match_id"],
                 )
             )
     return choices[:25]  # Discord erlaubt maximal 25 Vorschläge
 
+
 # ---------------------------------------
 # Helper: Autocomplete für neue Terminwahl
 # ---------------------------------------
+
 
 async def neuer_zeitpunkt_autocomplete(interaction: Interaction, current: str):
     tournament = load_tournament_data()
@@ -207,8 +243,7 @@ async def neuer_zeitpunkt_autocomplete(interaction: Interaction, current: str):
 
     # 🔥 Jetzt: Nur Slots, die nach JETZT liegen
     free_slots = [
-        slot for slot in free_slots
-        if datetime.fromisoformat(slot) > datetime.now()
+        slot for slot in free_slots if datetime.fromisoformat(slot) > datetime.now()
     ]
 
     if current:
@@ -218,10 +253,11 @@ async def neuer_zeitpunkt_autocomplete(interaction: Interaction, current: str):
     for slot in free_slots[:25]:
         dt = datetime.fromisoformat(slot)
         label = f"{dt.strftime('%A')} {dt.strftime('%d.%m.%Y %H:%M')} Uhr"  # Sichtbarer Text
-        value = dt.strftime('%d.%m.%Y %H:%M')  # Tatsächlich übergebener Wert
+        value = dt.strftime("%d.%m.%Y %H:%M")  # Tatsächlich übergebener Wert
         choices.append(app_commands.Choice(name=label, value=value))
 
     return choices
+
 
 async def start_reschedule_timer(bot, match_id: int):
     """
@@ -232,9 +268,13 @@ async def start_reschedule_timer(bot, match_id: int):
 
     if match_id in pending_reschedules:
         pending_reschedules.discard(match_id)
-        logger.info(f"[RESCHEDULE] Automatische Aufräumung: Match {match_id} wurde zurückgesetzt (Timeout nach {RESCHEDULE_TIMEOUT_HOURS} Stunden).")
+        logger.info(
+            f"[RESCHEDULE] Automatische Aufräumung: Match {match_id} wurde zurückgesetzt (Timeout nach {RESCHEDULE_TIMEOUT_HOURS} Stunden)."
+        )
 
         # ➔ Nachricht im Reschedule-Channel schicken
         reschedule_channel = bot.get_channel(RESCHEDULE_CHANNEL_ID)
         if reschedule_channel:
-            await reschedule_channel.send(f"❗ Die Reschedule-Anfrage für Match `{match_id}` wurde automatisch beendet, da keine Einigung innerhalb von {RESCHEDULE_TIMEOUT_HOURS} Stunden erzielt wurde.")
+            await reschedule_channel.send(
+                f"❗ Die Reschedule-Anfrage für Match `{match_id}` wurde automatisch beendet, da keine Einigung innerhalb von {RESCHEDULE_TIMEOUT_HOURS} Stunden erzielt wurde."
+            )

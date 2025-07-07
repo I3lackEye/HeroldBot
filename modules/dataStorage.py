@@ -2,9 +2,7 @@
 
 import os
 import json
-import logging
 from dotenv import load_dotenv
-from typing import Optional
 from datetime import datetime
 import discord
 import shutil
@@ -15,6 +13,7 @@ from modules.logger import logger
 
 # Lade .env files
 load_dotenv()
+
 
 def load_config(config_path="../configs/config.json"):
     try:
@@ -29,6 +28,7 @@ def load_config(config_path="../configs/config.json"):
     except json.JSONDecodeError as e:
         logger.error(f"Error parsing config file: {e}")
         return {}
+
 
 def load_games() -> list:
     """
@@ -47,10 +47,12 @@ def load_games() -> list:
         logger.error(f"[GAMES] Fehler beim Parsen der games.json: {e}")
         return []
 
+
 def load_names(language="de"):
     path = f"configs/names_{language}.json"
     with open(path, "r", encoding="utf-8") as f:
         return json.load(f)
+
 
 # Konfiguration laden
 config = load_config()
@@ -66,11 +68,7 @@ DATA_FILE_PATH = os.path.join(BASE_DIR, data_path_env)
 TOURNAMENT_FILE_PATH = os.path.join(BASE_DIR, tournament_path_env)
 
 # Standardinhalte für persistente Daten
-DEFAULT_GLOBAL_DATA = {
-    "games": [],
-    "last_tournament_winner": {},
-    "player_stats": {}
-}
+DEFAULT_GLOBAL_DATA = {"games": [], "last_tournament_winner": {}, "player_stats": {}}
 
 # Standardinhalte für die turnierspezifischen Daten (tournament.json)
 DEFAULT_TOURNAMENT_DATA = {
@@ -79,13 +77,14 @@ DEFAULT_TOURNAMENT_DATA = {
     "punkte": {},
     "running": False,
     "registration_open": False,
-    "poll_results": None
+    "poll_results": None,
 }
+
 
 async def validate_channels(bot: discord.Client):
     config = load_config()
     channels = config.get("CHANNELS", {})
-    
+
     if not channels:
         logger.error("[CHANNEL CHECKER] Keine CHANNELS in der Config gefunden.")
         return
@@ -96,29 +95,40 @@ async def validate_channels(bot: discord.Client):
         try:
             channel_id = int(channel_id_str)
         except (TypeError, ValueError):
-            logger.error(f"[CHANNEL CHECKER] Channel-ID für '{name}' ist ungültig: {channel_id_str}")
+            logger.error(
+                f"[CHANNEL CHECKER] Channel-ID für '{name}' ist ungültig: {channel_id_str}"
+            )
             continue
 
         channel = bot.get_channel(channel_id)
 
         if not channel:
-            logger.error(f"[CHANNEL CHECKER] Channel '{name}' mit ID {channel_id} wurde NICHT gefunden!")
+            logger.error(
+                f"[CHANNEL CHECKER] Channel '{name}' mit ID {channel_id} wurde NICHT gefunden!"
+            )
             continue
 
         if not isinstance(channel, discord.TextChannel):
-            logger.warning(f"[CHANNEL CHECKER] Channel '{name}' (ID {channel_id}) ist kein TextChannel.")
+            logger.warning(
+                f"[CHANNEL CHECKER] Channel '{name}' (ID {channel_id}) ist kein TextChannel."
+            )
 
         perms = channel.permissions_for(channel.guild.me)
 
         if not perms.view_channel:
-            logger.error(f"[CHANNEL CHECKER] Bot hat KEINE Sichtbarkeit auf '{name}' (ID {channel_id})!")
+            logger.error(
+                f"[CHANNEL CHECKER] Bot hat KEINE Sichtbarkeit auf '{name}' (ID {channel_id})!"
+            )
 
         if not perms.send_messages:
-            logger.error(f"[CHANNEL CHECKER] Bot kann NICHT in '{name}' schreiben (ID {channel_id})!")
+            logger.error(
+                f"[CHANNEL CHECKER] Bot kann NICHT in '{name}' schreiben (ID {channel_id})!"
+            )
 
         logger.info(f"[CHANNEL CHECKER] OK: {name} (ID {channel_id})")
 
     logger.info("[CHANNEL CHECKER] Channel-Validierung abgeschlossen.")
+
 
 async def validate_permissions(guild: discord.Guild):
     """
@@ -130,20 +140,31 @@ async def validate_permissions(guild: discord.Guild):
 
     config = load_config()
     role_permissions = config.get("ROLE_PERMISSIONS", {})
-    logger.info(f"[PERMISSION CHECKER] Starte Rechte-Validierung für Server '{guild.name}'...")
+    logger.info(
+        f"[PERMISSION CHECKER] Starte Rechte-Validierung für Server '{guild.name}'..."
+    )
 
     for permission_group, entries in role_permissions.items():
-        logger.info(f"[PERMISSION CHECKER] Gruppe '{permission_group}': Erlaubte Rollen/IDs: {entries}")
+        logger.info(
+            f"[PERMISSION CHECKER] Gruppe '{permission_group}': Erlaubte Rollen/IDs: {entries}"
+        )
         for entry in entries:
             if entry.isdigit() and len(entry) > 10:
-                logger.info(f"[PERMISSION CHECKER] User-ID '{entry}' als Dev/Permission erkannt (keine Rollenprüfung notwendig).")
+                logger.info(
+                    f"[PERMISSION CHECKER] User-ID '{entry}' als Dev/Permission erkannt (keine Rollenprüfung notwendig)."
+                )
             else:
                 role = discord.utils.get(guild.roles, name=entry)
                 if role:
-                    logger.info(f"[PERMISSION CHECKER] Rolle '{entry}' gefunden (ID: {role.id})")
+                    logger.info(
+                        f"[PERMISSION CHECKER] Rolle '{entry}' gefunden (ID: {role.id})"
+                    )
                 else:
-                    logger.warning(f"[PERMISSION CHECKER] ⚠️ Rolle '{entry}' NICHT im Server '{guild.name}' gefunden!")
+                    logger.warning(
+                        f"[PERMISSION CHECKER] ⚠️ Rolle '{entry}' NICHT im Server '{guild.name}' gefunden!"
+                    )
     logger.info("[PERMISSION CHECKER] Permission-Validierung abgeschlossen.")
+
 
 def init_file(file_path, default_content):
     if not os.path.exists(file_path):
@@ -152,6 +173,7 @@ def init_file(file_path, default_content):
         logger.info(f"{file_path} erstellt")
     else:
         logger.info(f"{file_path} existiert bereits")
+
 
 # Funktionen für globale Daten (data.json)
 def load_global_data():
@@ -164,13 +186,17 @@ def load_global_data():
                     return {}
                 return data
         except json.JSONDecodeError:
-            logger.error("⚠ Global data file ist beschädigt. Leere Daten werden zurückgegeben.")
+            logger.error(
+                "⚠ Global data file ist beschädigt. Leere Daten werden zurückgegeben."
+            )
             return {}
     return {}
+
 
 def save_global_data(data):
     with open(DATA_FILE_PATH, "w", encoding="utf-8") as file:
         json.dump(data, file, indent=4, ensure_ascii=False)
+
 
 def save_games(games: list):
     """
@@ -183,6 +209,7 @@ def save_games(games: list):
             json.dump({"games": games}, file, indent=2, ensure_ascii=False)
     except Exception as e:
         logger.error(f"[GAMES] Fehler beim Speichern der games.json: {e}")
+
 
 # Funktionen für turnierspezifische Daten (tournament.json)
 def load_tournament_data():
@@ -199,13 +226,17 @@ def load_tournament_data():
                         tournament[key] = value
                 return tournament
         except json.JSONDecodeError:
-            logger.error("⚠ Tournament file ist beschädigt. Standard-Daten werden zurückgegeben.")
+            logger.error(
+                "⚠ Tournament file ist beschädigt. Standard-Daten werden zurückgegeben."
+            )
             return DEFAULT_TOURNAMENT_DATA.copy()
     return DEFAULT_TOURNAMENT_DATA.copy()
+
 
 def save_tournament_data(tournament):
     with open(TOURNAMENT_FILE_PATH, "w", encoding="utf-8") as file:
         json.dump(tournament, file, indent=4, ensure_ascii=False)
+
 
 def reset_tournament():
     """
@@ -218,13 +249,14 @@ def reset_tournament():
         "tournament_end": None,
         "matches": [],
         "teams": {},
-        "poll_results": {}
+        "poll_results": {},
     }
 
     with open(TOURNAMENT_FILE_PATH, "w", encoding="utf-8") as f:
         json.dump(empty_tournament, f, indent=4, ensure_ascii=False)
 
     logger.info(f"[RESET] Turnierdaten wurden erfolgreich zurückgesetzt.")
+
 
 def add_game(game_title: str):
     """
@@ -236,8 +268,10 @@ def add_game(game_title: str):
     MAX_TITLE_LENGTH = config.get("STR_MAX_LENGTH", 100)  # fallback falls config fehlt
 
     if len(game_title) > MAX_TITLE_LENGTH:
-        raise ValueError(f"Der Spielname darf maximal {MAX_TITLE_LENGTH} Zeichen lang sein.")
-    
+        raise ValueError(
+            f"Der Spielname darf maximal {MAX_TITLE_LENGTH} Zeichen lang sein."
+        )
+
     games = load_games()
 
     if game_title in games:
@@ -247,6 +281,7 @@ def add_game(game_title: str):
     games.append(game_title)
     save_games(games)
     logger.info(f"[GAMES] Spiel '{game_title}' erfolgreich gespeichert.")
+
 
 def remove_game(game_title: str):
     """
@@ -264,6 +299,7 @@ def remove_game(game_title: str):
     save_games(games)
     logger.info(f"[GAMES] Spiel '{game_title}' erfolgreich entfernt.")
 
+
 def backup_current_state():
     """
     Erstellt Backups der aktuellen Turnier- und Globaldaten aus /data/.
@@ -274,10 +310,10 @@ def backup_current_state():
         os.makedirs(backup_folder)
 
     now = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    
+
     files_to_backup = {
         "data/tournament.json": f"tournament_backup_{now}.json",
-        "data/data.json": f"data_backup_{now}.json"
+        "data/data.json": f"data_backup_{now}.json",
     }
 
     for source_file, backup_name in files_to_backup.items():
@@ -285,7 +321,10 @@ def backup_current_state():
             shutil.copy(source_file, os.path.join(backup_folder, backup_name))
             logger.info(f"[BACKUP] Gesichert: {source_file}")
         else:
-            logger.info(f"[BACKUP] Achtung: {source_file} nicht gefunden – wird übersprungen.")
+            logger.info(
+                f"[BACKUP] Achtung: {source_file} nicht gefunden – wird übersprungen."
+            )
+
 
 def delete_tournament_file():
     """
