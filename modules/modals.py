@@ -1,17 +1,16 @@
 # modules/modals.py
 
 import discord
-
 from discord import Interaction
-from discord.ui import Modal, TextInput, View, Select
+from discord.ui import Modal, Select, TextInput, View
 
 # Lokale Modules
 from modules.dataStorage import load_tournament_data, save_tournament_data
 from modules.utils import (
-    validate_string,
     generate_team_name,
-    validate_time_range,
     validate_date,
+    validate_string,
+    validate_time_range,
 )
 
 ### Helper function

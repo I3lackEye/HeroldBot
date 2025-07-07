@@ -1,24 +1,25 @@
 # modules/utils.py
 
-import discord
-import re
 import random
+import re
 import time
-
-from discord import app_commands, Interaction, Embed
 from datetime import datetime, timedelta
 from typing import Optional
 
-# Lokale Module
-from modules.logger import logger
+import discord
+from discord import Embed, Interaction, app_commands
+
 from modules.dataStorage import (
     load_config,
-    load_global_data,
-    save_global_data,
-    load_tournament_data,
     load_games,
+    load_global_data,
     load_names,
+    load_tournament_data,
+    save_global_data,
 )
+
+# Lokale Module
+from modules.logger import logger
 
 # Konfiguration laden
 config = load_config()

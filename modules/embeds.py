@@ -1,20 +1,20 @@
 # modules/embeds.py
 
-import discord
 import json
 import os
 import re
-
-from typing import List
-from discord import Embed, Interaction, TextChannel
 from datetime import datetime
+from typing import List, Optional
 from zoneinfo import ZoneInfo
-from typing import Optional
+
+import discord
+from discord import Embed, Interaction, TextChannel
+
+from modules.dataStorage import load_tournament_data
+from modules.logger import logger
 
 # Lokale Module
 from modules.utils import load_config, smart_send
-from modules.logger import logger
-from modules.dataStorage import load_tournament_data
 from views.reschedule_view import RescheduleView
 
 

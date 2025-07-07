@@ -1,31 +1,31 @@
-import discord
-from discord import app_commands, Interaction, Member, Embed
 from typing import Optional
-from discord.ui import Modal, TextInput
+
+import discord
+from discord import Embed, Interaction, Member, app_commands
 from discord.ext import commands
+from discord.ui import Modal, TextInput
 
 # Lokale Module
-from modules.dataStorage import load_tournament_data, save_tournament_data, config
-from modules.utils import (
-    has_permission,
-    parse_availability,
-    validate_string,
-    intersect_availability,
-    generate_team_name,
-)
-from modules.logger import logger
+from modules.dataStorage import config, load_tournament_data, save_tournament_data
 from modules.embeds import (
-    send_registration_confirmation,
     send_participants_overview,
+    send_registration_confirmation,
     send_wrong_channel,
 )
+from modules.logger import logger
+from modules.modals import TeamFullJoinModal
 from modules.reschedule import (
     handle_request_reschedule,
     match_id_autocomplete,
     neuer_zeitpunkt_autocomplete,
 )
-from modules.modals import TeamFullJoinModal
-
+from modules.utils import (
+    generate_team_name,
+    has_permission,
+    intersect_availability,
+    parse_availability,
+    validate_string,
+)
 
 # ----------------------------------------
 # Slash-Commandsu

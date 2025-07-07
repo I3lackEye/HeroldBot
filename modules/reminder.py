@@ -1,14 +1,15 @@
 # modules/reminder.py
 
 import asyncio
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+
 from discord import TextChannel
+
+from modules.dataStorage import load_tournament_data, save_tournament_data
+from modules.embeds import send_match_reminder
 
 # Lokale Module
 from modules.logger import logger
-from modules.dataStorage import load_tournament_data, save_tournament_data
-from modules.embeds import send_match_reminder
-from datetime import datetime, timezone
 
 
 async def match_reminder_loop(channel: TextChannel):

@@ -1,15 +1,16 @@
 # modules/archive.py
-import os
 import json
+import os
 from datetime import datetime
+
+from modules.dataStorage import (
+    load_global_data,
+    load_tournament_data,
+    save_tournament_data,
+)
 
 # Lokale Module
 from modules.logger import logger
-from modules.dataStorage import (
-    load_tournament_data,
-    save_tournament_data,
-    load_global_data,
-)
 
 
 def archive_current_tournament():

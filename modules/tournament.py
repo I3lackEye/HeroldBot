@@ -2,63 +2,63 @@
 
 import asyncio
 import re
-import discord
-
 from datetime import datetime, timedelta
 from typing import Optional
 from zoneinfo import ZoneInfo
-from discord import Interaction, Embed
-from discord import app_commands
+
+import discord
+from discord import Embed, Interaction, app_commands
 from discord.ext import commands
 
 # Lokale Module
 from modules import poll
-from modules.dataStorage import load_global_data, load_games
-from modules.logger import logger
-from modules.matchmaker import (
-    auto_match_solo,
-    create_round_robin_schedule,
-    generate_schedule_overview,
-    assign_matches_to_slots,
-    cleanup_orphan_teams,
-    generate_and_assign_slots,
-)
-from modules.utils import (
-    has_permission,
-    update_player_stats,
-    get_player_team,
-    autocomplete_teams,
-    get_current_chosen_game,
-    smart_send,
-    update_all_participants,
-    all_matches_completed,
-)
+from modules.archive import archive_current_tournament, update_tournament_history
 from modules.dataStorage import (
-    load_tournament_data,
-    save_tournament_data,
     backup_current_state,
-    reset_tournament,
     delete_tournament_file,
+    load_games,
+    load_global_data,
+    load_tournament_data,
+    reset_tournament,
+    save_tournament_data,
 )
 from modules.embeds import (
-    send_tournament_announcement,
-    send_list_matches,
-    load_embed_template,
     build_embed_from_template,
-    send_tournament_end_announcement,
+    load_embed_template,
+    send_list_matches,
     send_match_schedule_for_channel,
     send_registration_closed,
+    send_tournament_announcement,
+    send_tournament_end_announcement,
+)
+from modules.logger import logger
+from modules.matchmaker import (
+    assign_matches_to_slots,
+    auto_match_solo,
+    cleanup_orphan_teams,
+    create_round_robin_schedule,
+    generate_and_assign_slots,
+    generate_schedule_overview,
 )
 from modules.stats import (
     autocomplete_players,
     autocomplete_teams,
     get_mvp,
-    update_player_stats,
     get_winner_ids,
     get_winner_team,
+    update_player_stats,
 )
-from modules.archive import archive_current_tournament, update_tournament_history
 from modules.task_manager import add_task
+from modules.utils import (
+    all_matches_completed,
+    autocomplete_teams,
+    get_current_chosen_game,
+    get_player_team,
+    has_permission,
+    smart_send,
+    update_all_participants,
+    update_player_stats,
+)
 
 # Global Var
 _registration_closed = False
@@ -121,9 +121,9 @@ class TournamentCog(commands.Cog):
         await interaction.response.send_message(embed=embed)
 
         # ➔ Umfrage starten
-        from modules.dataStorage import (
+        from modules.dataStorage import (  # Lokal importieren, damit oben sauber bleibt
             load_games,
-        )  # Lokal importieren, damit oben sauber bleibt
+        )
 
         poll_options = load_games()
         await poll.start_poll(

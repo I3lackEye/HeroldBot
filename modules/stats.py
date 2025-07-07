@@ -1,20 +1,20 @@
 # modules/stats.py
 
-import discord
 import re
-
-from discord import app_commands, Interaction, Embed, User
-from discord.app_commands import Choice
-from discord.ext import commands
 from collections import Counter
 from datetime import datetime
 from typing import Optional
 
+import discord
+from discord import Embed, Interaction, User, app_commands
+from discord.app_commands import Choice
+from discord.ext import commands
+
 # Lokale Module
-from modules.dataStorage import load_global_data, save_global_data, load_tournament_data
-from modules.utils import has_permission, autocomplete_players, autocomplete_teams
+from modules.dataStorage import load_global_data, load_tournament_data, save_global_data
+from modules.embeds import send_status, send_tournament_stats
 from modules.logger import logger
-from modules.embeds import send_tournament_stats, send_status
+from modules.utils import autocomplete_players, autocomplete_teams, has_permission
 
 # ----------------------------------------
 # Hilfsfunktionen

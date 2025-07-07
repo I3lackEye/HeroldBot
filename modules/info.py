@@ -1,14 +1,14 @@
 # modules/info.py
 
-import discord
-
 from datetime import datetime
-from discord import app_commands, Interaction, Embed
+
+import discord
+from discord import Embed, Interaction, app_commands
 from discord.ext import commands
 
 # Lokale Module
 from modules.dataStorage import load_tournament_data
-from modules.embeds import send_participants_overview, send_match_schedule, send_help
+from modules.embeds import send_help, send_match_schedule, send_participants_overview
 from modules.matchmaker import generate_schedule_overview
 
 

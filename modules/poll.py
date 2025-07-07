@@ -1,17 +1,18 @@
 # new_poll.py
-import discord
 import asyncio
 import random
-from discord.ext import commands
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
+import discord
+from discord.ext import commands
+
 # Lokale Modules
 from modules.dataStorage import load_tournament_data, save_tournament_data
-from modules.logger import logger
 from modules.embeds import send_poll_results, send_registration_open
-from modules.tournament import auto_end_poll, close_registration_after_delay
+from modules.logger import logger
 from modules.task_manager import add_task
+from modules.tournament import auto_end_poll, close_registration_after_delay
 
 # Globale Variablen
 poll_message_id = None

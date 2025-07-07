@@ -1,10 +1,10 @@
 # modules/main.py
 
 import asyncio
-import discord
 import json
 import os
 
+import discord
 from discord import app_commands
 from discord.ext import commands
 from dotenv import load_dotenv
@@ -12,15 +12,15 @@ from dotenv import load_dotenv
 # Lokale Module
 from modules import poll, tournament
 from modules.dataStorage import (
+    load_config,
     load_global_data,
     load_tournament_data,
-    load_config,
     validate_channels,
     validate_permissions,
 )
 from modules.logger import logger
-from modules.task_manager import add_task, cancel_all_tasks
 from modules.reminder import match_reminder_loop
+from modules.task_manager import add_task, cancel_all_tasks
 
 load_dotenv()
 TOKEN = os.getenv("DISCORD_TOKEN")

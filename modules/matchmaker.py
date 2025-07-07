@@ -1,20 +1,19 @@
 # matchmaker.py
-import random
 import logging
-
-from math import ceil
-from itertools import combinations
+import random
 from collections import defaultdict
-from datetime import datetime, timedelta, time
-from typing import Optional, List, Tuple, Dict
-from discord import TextChannel
+from datetime import datetime, time, timedelta
+from itertools import combinations
+from math import ceil
+from typing import Dict, List, Optional, Tuple
 
+from discord import TextChannel
 
 # Lokale Module
 from modules.dataStorage import load_tournament_data, save_tournament_data
+from modules.embeds import send_cleanup_summary
 from modules.logger import logger
 from modules.utils import generate_team_name
-from modules.embeds import send_cleanup_summary
 
 
 def auto_match_solo():
