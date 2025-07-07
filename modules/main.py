@@ -30,7 +30,7 @@ def debug_dump_configs():
     logger.info("[DEBUG] Starte Dump der Konfigurations- und Datendateien...")
 
     try:
-        with open("config.json", "r", encoding="utf-8") as f:
+        with open("configs/config.json", "r", encoding="utf-8") as f:
             config_data = json.load(f)
         logger.info("[DEBUG] Inhalt von config.json:")
         logger.info(json.dumps(config_data, indent=2, ensure_ascii=False))

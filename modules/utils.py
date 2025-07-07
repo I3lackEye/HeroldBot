@@ -563,6 +563,3 @@ def generate_random_availability() -> tuple[str, dict[str, str]]:
         special["sonntag"] = f"{start_sonntag:02d}:00-{end_sonntag:02d}:00"
 
     return allgemeine_verfugbarkeit, special
-
-
-#witziger kommentar

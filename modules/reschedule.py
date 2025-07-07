@@ -9,6 +9,7 @@ from discord import app_commands, Interaction, ButtonStyle, Embed
 from discord.ext import commands
 from discord.ui import View, Button
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 
 # Lokale modules
