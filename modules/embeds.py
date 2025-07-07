@@ -10,12 +10,14 @@ from zoneinfo import ZoneInfo
 import discord
 from discord import Embed, Interaction, TextChannel
 
-from modules.dataStorage import load_tournament_data
-from modules.logger import logger
+
 
 # Lokale Module
 from modules.utils import load_config, smart_send
 from views.reschedule_view import RescheduleView
+from modules.dataStorage import load_tournament_data
+from modules.logger import logger
+from modules.dataStorage import REMINDER_PING
 
 
 def load_embed_template(template_name: str, category: str = "default") -> dict:
@@ -193,8 +195,21 @@ async def send_match_reminder(channel: TextChannel, placeholders: dict):
     if not template:
         logger.error("[EMBED] REMINDER Template fehlt.")
         return
+
     embed = build_embed_from_template(template, placeholders)
-    await channel.send(embed=embed)
+
+    # Optional ping der Spieler
+    ping_text = ""
+    if REMINDER_PING:
+        tournament = load_tournament_data()
+        team1 = placeholders.get("team1")
+        team2 = placeholders.get("team2")
+        members1 = tournament.get("teams", {}).get(team1, {}).get("members", [])
+        members2 = tournament.get("teams", {}).get(team2, {}).get("members", [])
+        mentions = members1 + members2
+        ping_text = " ".join(mentions)
+
+    await channel.send(content=ping_text if ping_text else None, embed=embed)
 
 
 async def send_notify_team_members(

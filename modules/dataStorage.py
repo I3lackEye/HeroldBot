@@ -14,6 +14,10 @@ from modules.logger import logger
 # Lade .env files
 load_dotenv()
 
+# load vars from config
+REMINDER_PING = int(os.getenv("REMINDER_PING", "0"))
+TOKEN = os.getenv("DISCORD_TOKEN")
+DEBUG_MODE = int(os.getenv("DEBUG", "0"))
 
 def load_config(config_path="../configs/config.json"):
     try:

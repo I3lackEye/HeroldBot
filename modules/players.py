@@ -202,7 +202,10 @@ class PlayerGroup(app_commands.Group):
         team_lines = []
         for name, team_entry in sorted_teams:
             members = ", ".join(team_entry.get("members", []))
-            team_lines.append(f"- {name}: {members}")
+            ver = team_entry.get("verfügbarkeit", {})
+            samstag = ver.get("samstag", "-")
+            sonntag = ver.get("sonntag", "-")
+            team_lines.append(f"- {name}: {members}\n Samstag: {samstag}, Sonntag: {sonntag}\n")
 
         solo_lines = []
         for solo_entry in sorted_solo:

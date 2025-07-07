@@ -3,11 +3,31 @@
 import logging
 import os
 from datetime import datetime
+from dotenv import load_dotenv
 
+class ColorFormatter(logging.Formatter):
+    COLORS = {
+        "DEBUG": "\033[94m",     # Blau
+        "INFO": "\033[92m",      # Grün
+        "WARNING": "\033[93m",   # Gelb
+        "ERROR": "\033[91m",     # Rot
+        "CRITICAL": "\033[95m",  # Magenta
+    }
+    RESET = "\033[0m"
+
+    def format(self, record):
+        color = self.COLORS.get(record.levelname, self.RESET)
+        record.levelname = f"{color}{record.levelname}{self.RESET}"
+        return super().format(record)
+
+# Lade .env files
+load_dotenv()
+
+debug_level = int(os.getenv("DEBUG", "0"))
 
 def setup_logger(log_folder="logs", level=logging.INFO):
     # Falls DEBUG aktiviert ist, setze level auf DEBUG
-    if level == logging.INFO and os.getenv("DEBUG") == "1":
+    if level == logging.INFO and debug_level >= 1:
         level = logging.DEBUG
 
     # Erstelle das Log-Verzeichnis, falls es nicht existiert
@@ -39,7 +59,11 @@ def setup_logger(log_folder="logs", level=logging.INFO):
     # Optionale Ausgabe auf der Konsole
     console_handler = logging.StreamHandler()
     console_handler.setLevel(level)
-    console_handler.setFormatter(formatter)
+    color_formatter = ColorFormatter(
+        "%(asctime)s [%(levelname)s] %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S"
+    )
+    console_handler.setFormatter(color_formatter)
     logger.addHandler(console_handler)
 
     return logger

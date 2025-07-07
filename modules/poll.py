@@ -125,7 +125,14 @@ async def end_poll(bot: discord.Client, channel: discord.TextChannel):
     registration_end_str = tournament.get("registration_end")
     if registration_end_str:
         registration_end = datetime.fromisoformat(registration_end_str)
+
+        # Falls ohne Zeitzone: explizit UTC setzen
+        if registration_end.tzinfo is None:
+            registration_end = registration_end.replace(tzinfo=ZoneInfo("UTC"))
+
         now = datetime.now(ZoneInfo("UTC"))
+        logger.debug(f"registration_end: {registration_end} ({registration_end.tzinfo})")
+        logger.debug(f"now: {now} ({now.tzinfo})")
         delay_seconds = max(0, int((registration_end - now).total_seconds()))
 
         add_task(

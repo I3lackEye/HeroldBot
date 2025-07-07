@@ -561,28 +561,17 @@ async def update_all_participants():
 
 
 # Hilfsfunktion für den dummy gen
-def generate_random_availability() -> tuple[str, dict[str, str]]:
+def generate_random_availability() -> dict[str, str]:
     """
-    Generiert eine sinnvoll breite Verfügbarkeit für einen Dummy-Spieler:
-    - Allgemein: 6–10 Stunden Zeitfenster
-    - Samstag/Sonntag: extra spezielle Zeiten (optional)
+    Generiert zufällige Verfügbarkeiten **nur** für Samstag und Sonntag.
+    Jeder Tag bekommt ein Zeitfenster von 4–8 Stunden zwischen 9:00 und 23:00.
     """
-    start_hour = random.randint(8, 14)  # zwischen 08:00 und 14:00 starten
-    duration = random.randint(6, 10)  # Verfügbarkeit 6 bis 10 Stunden
-    end_hour = min(start_hour + duration, 23)
-
-    allgemeine_verfugbarkeit = f"{start_hour:02d}:00-{end_hour:02d}:00"
-
-    # Spezielle Verfügbarkeiten für Samstag und Sonntag (50% Chance)
     special = {}
-    if random.random() < 0.5:
-        start_samstag = random.randint(9, 14)
-        end_samstag = min(start_samstag + random.randint(4, 8), 23)
-        special["samstag"] = f"{start_samstag:02d}:00-{end_samstag:02d}:00"
 
-    if random.random() < 0.5:
-        start_sonntag = random.randint(9, 14)
-        end_sonntag = min(start_sonntag + random.randint(4, 8), 23)
-        special["sonntag"] = f"{start_sonntag:02d}:00-{end_sonntag:02d}:00"
+    for tag in ["samstag", "sonntag"]:
+        start_hour = random.randint(9, 14)
+        duration = random.randint(4, 8)
+        end_hour = min(start_hour + duration, 23)
+        special[tag] = f"{start_hour:02d}:00-{end_hour:02d}:00"
 
-    return allgemeine_verfugbarkeit, special
+    return special

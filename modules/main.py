@@ -17,21 +17,20 @@ from modules.dataStorage import (
     load_tournament_data,
     validate_channels,
     validate_permissions,
+    DEBUG_MODE,
+    TOKEN
 )
 from modules.logger import logger
 from modules.reminder import match_reminder_loop
 from modules.task_manager import add_task, cancel_all_tasks, get_all_tasks
 
 load_dotenv()
-TOKEN = os.getenv("DISCORD_TOKEN")
-DEBUG_MODE = os.getenv("DEBUG") == "1"
-
 
 def debug_dump_configs():
     """
     Gibt bei aktivem DEBUG-Modus die Konfigurationsdateien ins Log aus.
     """
-    if not DEBUG_MODE:
+    if DEBUG_MODE < 2:
         return
 
     logger.info("[DEBUG] Starte Dump der Konfigurations- und Datendateien...")

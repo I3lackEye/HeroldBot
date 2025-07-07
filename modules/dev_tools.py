@@ -48,13 +48,10 @@ class DevGroup(app_commands.Group):
         # Solo-Spieler erzeugen
         solo_players = []
         for i in range(num_solo):
-            player_name = f"DummySolo_{i+1}"
-            availability, special = generate_random_availability()
+            player_name = f"<@{222220000000000 + i*2}>"
+            availability= generate_random_availability()
 
             player_entry = {"player": player_name, "verfügbarkeit": availability}
-            if special:
-                player_entry.update(special)
-
             solo_players.append(player_entry)
 
         tournament.setdefault("solo", []).extend(solo_players)
@@ -63,14 +60,11 @@ class DevGroup(app_commands.Group):
         teams = tournament.setdefault("teams", {})
         for i in range(num_teams):
             team_name = generate_team_name()
-            member1 = f"TeamMember_{i+1}_1"
-            member2 = f"TeamMember_{i+1}_2"
-            availability, special = generate_random_availability()
+            member1 = f"<@{1111110000000000 + i*2}>"  # Dummy Mentions
+            member2 = f"<@{1111110000000001 + i*2}>"
+            availability = generate_random_availability()
 
             team_entry = {"members": [member1, member2], "verfügbarkeit": availability}
-            if special:
-                team_entry.update(special)
-
             teams[team_name] = team_entry
 
         save_tournament_data(tournament)
@@ -220,26 +214,30 @@ class DevGroup(app_commands.Group):
 
         # Turnierdaten vorbereiten
         now = datetime.utcnow()
+
+        # Turnierzeitraum: Start jetzt, Ende nach zwei vollen Wochenenden ab nächstem Samstag
+        next_saturday = now + timedelta((5 - now.weekday()) % 7)
+        tournament_end = next_saturday + timedelta(days=8)  # Samstag + Sonntag + Samstag + Sonntag
+
         tournament_data = {
             "registration_open": False,
             "running": True,
             "solo": [],
             "registration_end": (now + timedelta(seconds=20)).isoformat(),
-            "tournament_end": (now + timedelta(days=7)).isoformat(),
+            "tournament_end": tournament_end.isoformat(),
             "matches": [],
             "poll_results": {},
         }
 
         # Dummy-Spieler und Teams hinzufügen
         teams = {}
-        for i in range(2):  # Zwei Dummy-Teams
-            team_name = f"TestTeam_{i+1}"
+        for i in range(6):  # Zwei Dummy-Teams
+            team_name = generate_team_name()
             member1 = f"<@{1111110000000000 + i*2}>"  # Dummy Mentions
             member2 = f"<@{1111110000000001 + i*2}>"
-            availability, special = generate_random_availability()
+            availability = generate_random_availability()
 
             team_entry = {"members": [member1, member2], "verfügbarkeit": availability}
-            team_entry.update(special)
             teams[team_name] = team_entry
 
         tournament_data["teams"] = teams
@@ -258,7 +256,7 @@ class DevGroup(app_commands.Group):
         asyncio.create_task(auto_end_poll(interaction.client, interaction.channel, delay_seconds=10))
 
         # Anmeldungsschluss simulieren
-        asyncio.create_task(close_registration_after_delay(delay_seconds=20, channel=interaction.channel))
+        #asyncio.create_task(close_registration_after_delay(delay_seconds=20, channel=interaction.channel))
 
     @app_commands.command(
         name="health_check",
@@ -376,10 +374,17 @@ class DevGroup(app_commands.Group):
             return
 
         embed = discord.Embed(title="Aktive Hintergrund-Tasks", color=0x42F587)
-        for name, task in tasks.items():
+        for name, entry in list(tasks.items())[:5]:
+            task = entry["task"]
+            coro = entry["coro"]
             status = "✅ abgeschlossen" if task.done() else "🟢 läuft"
-            embed.add_field(name=name, value=f"Status: {status}\nTask: {task}", inline=False)
+            embed.add_field(name=name, value=f"Status: {status}\nCoroutine: `{coro}`", inline=False)
+
+        if len(tasks) > 5:
+            embed.set_footer(text=f"... und {len(tasks)-5} weitere Task(s)")
+
         await interaction.response.send_message(embed=embed, ephemeral=True)
+
 
 
 class DevCog(commands.Cog):

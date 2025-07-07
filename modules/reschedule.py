@@ -19,7 +19,7 @@ from modules.embeds import (
     send_request_reschedule,
 )
 from modules.logger import logger
-from modules.matchmaker import generate_weekend_slots
+from modules.matchmaker import get_all_possible_slots
 from modules.shared_states import pending_reschedules
 from modules.utils import get_player_team, get_team_open_matches, smart_send
 from views.reschedule_view import RescheduleView
@@ -91,9 +91,11 @@ async def handle_request_reschedule(interaction: Interaction, match_id: int, neu
         await interaction.response.send_message("🚫 Der neue Zeitpunkt muss in der Zukunft liegen!", ephemeral=True)
         return
 
-    all_slots = generate_weekend_slots(tournament)
+    match_slots = get_all_possible_slots(tournament)
+    allowed_slots = match_slots.get(match_id, [])
+    allowed_iso = {slot.isoformat() for slot in allowed_slots}
     booked_slots = set(m["scheduled_time"] for m in tournament.get("matches", []) if m.get("scheduled_time"))
-    free_slots = [slot for slot in all_slots if slot not in booked_slots]
+    free_slots = [slot for slot in allowed_iso if slot not in booked_slots]
     future_slots = [
         datetime.fromisoformat(slot).astimezone(ZoneInfo("Europe/Berlin"))
         for slot in free_slots
@@ -197,21 +199,31 @@ async def neuer_zeitpunkt_autocomplete(interaction: Interaction, current: str):
     tournament = load_tournament_data()
 
     try:
-        all_slots = generate_weekend_slots(tournament)
+        match_slots = get_all_possible_slots(tournament)
+        user_id = str(interaction.user.id)
+        team_name = get_player_team(user_id)
+        match_id_candidates = get_team_open_matches(team_name)
+        if not match_id_candidates:
+            return []
+
+        match_id = match_id_candidates[0]["match_id"]
+
+        allowed_slots = match_slots.get(match_id, [])
+        allowed_iso = {slot.isoformat() for slot in allowed_slots}
+
     except ValueError:
-        # Falls noch keine Matches existieren ➔ einfach KEINE Vorschläge machen
         return []
 
-    # Schon belegte Slots raussuchen
+    # Schon belegte Slots heraussuchen
     booked_slots = set()
     for match in tournament.get("matches", []):
         if match.get("scheduled_time"):
             booked_slots.add(match["scheduled_time"])
 
-    # Freie Slots herausfiltern
-    free_slots = [slot for slot in all_slots if slot not in booked_slots]
+    # Nur erlaubte & freie Slots
+    free_slots = [slot for slot in allowed_iso if slot not in booked_slots]
 
-    # 🔥 Jetzt: Nur Slots, die nach JETZT liegen
+    # Nur zukünftige Slots
     free_slots = [slot for slot in free_slots if datetime.fromisoformat(slot) > datetime.now()]
 
     if current:
@@ -220,8 +232,8 @@ async def neuer_zeitpunkt_autocomplete(interaction: Interaction, current: str):
     choices = []
     for slot in free_slots[:25]:
         dt = datetime.fromisoformat(slot)
-        label = f"{dt.strftime('%A')} {dt.strftime('%d.%m.%Y %H:%M')} Uhr"  # Sichtbarer Text
-        value = dt.strftime("%d.%m.%Y %H:%M")  # Tatsächlich übergebener Wert
+        label = f"{dt.strftime('%A')} {dt.strftime('%d.%m.%Y %H:%M')} Uhr"
+        value = dt.strftime("%d.%m.%Y %H:%M")
         choices.append(app_commands.Choice(name=label, value=value))
 
     return choices

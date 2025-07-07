@@ -33,7 +33,6 @@ from modules.embeds import (
 )
 from modules.logger import logger
 from modules.matchmaker import (
-    assign_matches_to_slots,
     auto_match_solo,
     cleanup_orphan_teams,
     create_round_robin_schedule,

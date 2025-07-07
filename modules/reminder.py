@@ -1,6 +1,7 @@
 # modules/reminder.py
 
 import asyncio
+import os
 from datetime import datetime, timedelta, timezone
 
 from discord import TextChannel
@@ -11,6 +12,7 @@ from modules.embeds import send_match_reminder
 # Lokale Module
 from modules.logger import logger
 
+REMINDER_PING = os.getenv("REMINDER_PING", "0") == "1"
 
 async def match_reminder_loop(channel: TextChannel):
     """
@@ -22,7 +24,6 @@ async def match_reminder_loop(channel: TextChannel):
     while True:
         tournament = load_tournament_data()
         matches = tournament.get("matches", [])
-
         now = now = datetime.now(timezone.utc)
 
         for match in matches:
@@ -38,9 +39,16 @@ async def match_reminder_loop(channel: TextChannel):
                 continue  # Falls Format mal abweicht
 
             # Reminder 1h vorher senden
-            if 0 < (scheduled_time - now) <= timedelta(hours=1):
+            reminder_time = scheduled_time - now
+            if timedelta(0) < reminder_time <= timedelta(hours=1):
+                logger.debug(f"[REMINDER] reminder_time = {reminder_time} ({type(reminder_time)})")
                 await send_match_reminder(channel, match)
                 match["reminder_sent"] = True  # markieren
+            else:
+                logger.debug(
+                    f"[REMINDER] Match {match.get('match_id')} startet in {reminder_time}. "
+                    f"Reminder nicht gesendet (entweder zu früh oder zu spät)."
+                )
 
         save_tournament_data(tournament)
 
