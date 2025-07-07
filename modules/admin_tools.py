@@ -50,22 +50,14 @@ async def force_sign_out(interaction: Interaction, user_mention: str):
     for team, team_entry in tournament.get("teams", {}).items():
         if user_mention in team_entry.get("members", []):
             del tournament["teams"][team]
-            logger.info(
-                f"[ADMIN] {user_mention} wurde aus Team '{team}' entfernt."
-                f"Team aufgelöst."
-            )
+            logger.info(f"[ADMIN] {user_mention} wurde aus Team '{team}' entfernt." f"Team aufgelöst.")
 
-            other_members = [
-                m for m in team_entry.get("members", []) if m != user_mention
-            ]
+            other_members = [m for m in team_entry.get("members", []) if m != user_mention]
             if other_members:
                 verfugbarkeit = team_entry.get("verfügbarkeit", "")
-                tournament.setdefault("solo", []).append(
-                    {"player": other_members[0], "verfügbarkeit": verfugbarkeit}
-                )
+                tournament.setdefault("solo", []).append({"player": other_members[0], "verfügbarkeit": verfugbarkeit})
                 logger.info(
-                    f"[ADMIN] {user_name} wurde in die Solo-Liste übernommen"
-                    f"mit Verfügbarkeit: {verfugbarkeit}"
+                    f"[ADMIN] {user_name} wurde in die Solo-Liste übernommen" f"mit Verfügbarkeit: {verfugbarkeit}"
                 )
             updated = True
             break
@@ -103,9 +95,7 @@ async def pending_match_autocomplete(interaction: Interaction, current: str):
 
     for match_id in pending_reschedules:
         if current in str(match_id):  # Filtert nach eingegebener Zahl
-            choices.append(
-                app_commands.Choice(name=f"Match {match_id}", value=match_id)
-            )
+            choices.append(app_commands.Choice(name=f"Match {match_id}", value=match_id))
 
     return choices[:25]  # Maximal 25 Einträge zurückgeben
 
@@ -125,9 +115,7 @@ class AdminGroup(app_commands.Group):
     @app_commands.describe(user="Der Spieler, der entfernt werden soll.")
     async def sign_out(self, interaction: Interaction, user: discord.Member):
         if not has_permission(interaction.user, "Moderator", "Admin"):
-            await interaction.response.send_message(
-                "🚫 Du hast keine Berechtigung für diesen Befehl.", ephemeral=True
-            )
+            await interaction.response.send_message("🚫 Du hast keine Berechtigung für diesen Befehl.", ephemeral=True)
             return
 
         await force_sign_out(interaction, user.mention)
@@ -139,9 +127,7 @@ class AdminGroup(app_commands.Group):
     @app_commands.describe(user="Der Spieler, der den Sieg erhalten soll.")
     async def add_win(self, interaction: Interaction, user: discord.Member):
         if not has_permission(interaction.user, "Moderator", "Admin"):
-            await interaction.response.send_message(
-                "🚫 Du hast keine Berechtigung für diesen Befehl.", ephemeral=True
-            )
+            await interaction.response.send_message("🚫 Du hast keine Berechtigung für diesen Befehl.", ephemeral=True)
             return
 
         global_data = load_global_data()
@@ -160,14 +146,10 @@ class AdminGroup(app_commands.Group):
         )
         logger.info(f"[ADMIN] {user.display_name} wurde manuell ein Sieg hinzugefügt.")
 
-    @app_commands.command(
-        name="end_tournament", description="Admin-Befehl: Beendet das aktuelle Turnier."
-    )
+    @app_commands.command(name="end_tournament", description="Admin-Befehl: Beendet das aktuelle Turnier.")
     async def end_tournament(self, interaction: Interaction):
         if not has_permission(interaction.user, "Moderator", "Admin"):
-            await interaction.response.send_message(
-                "🚫 Du hast keine Berechtigung für diesen Befehl.", ephemeral=True
-            )
+            await interaction.response.send_message("🚫 Du hast keine Berechtigung für diesen Befehl.", ephemeral=True)
             return
 
         await interaction.response.defer(ephemeral=True)
@@ -186,9 +168,7 @@ class AdminGroup(app_commands.Group):
     @app_commands.describe(game="Name des Spiels, das hinzugefügt werden soll.")
     async def add_game_command(self, interaction: Interaction, game: str):
         if not has_permission(interaction.user, "Moderator", "Admin"):
-            await interaction.response.send_message(
-                "🚫 Du hast keine Berechtigung für diesen Befehl.", ephemeral=True
-            )
+            await interaction.response.send_message("🚫 Du hast keine Berechtigung für diesen Befehl.", ephemeral=True)
             return
 
         try:
@@ -208,9 +188,7 @@ class AdminGroup(app_commands.Group):
     @app_commands.autocomplete(game=game_autocomplete)
     async def remove_game_command(self, interaction: Interaction, game: str):
         if not has_permission(interaction.user, "Moderator", "Admin"):
-            await interaction.response.send_message(
-                "🚫 Du hast keine Berechtigung für diesen Befehl.", ephemeral=True
-            )
+            await interaction.response.send_message("🚫 Du hast keine Berechtigung für diesen Befehl.", ephemeral=True)
             return
 
         try:
@@ -231,13 +209,9 @@ class AdminGroup(app_commands.Group):
         game="Gespieltes Spiel.",
     )
     @app_commands.autocomplete(winning_team=autocomplete_teams)
-    async def award_overall_winner(
-        self, interaction: Interaction, winning_team: str, points: int, game: str
-    ):
+    async def award_overall_winner(self, interaction: Interaction, winning_team: str, points: int, game: str):
         if not has_permission(interaction.user, "Moderator", "Admin"):
-            await interaction.response.send_message(
-                "🚫 Du hast keine Berechtigung für diesen Befehl.", ephemeral=True
-            )
+            await interaction.response.send_message("🚫 Du hast keine Berechtigung für diesen Befehl.", ephemeral=True)
             return
 
         global_data = load_global_data()
@@ -252,26 +226,18 @@ class AdminGroup(app_commands.Group):
             f"✅ Gesamtsieger **{winning_team}** mit {points} Punkten in {game} eingetragen!",
             ephemeral=False,
         )
-        logger.info(
-            f"[ADMIN] Gesamtsieger {winning_team} eingetragen: {points} Punkte in {game}."
-        )
+        logger.info(f"[ADMIN] Gesamtsieger {winning_team} eingetragen: {points} Punkte in {game}.")
 
-    @app_commands.command(
-        name="report_match", description="Trage das Ergebnis eines Matches ein."
-    )
+    @app_commands.command(name="report_match", description="Trage das Ergebnis eines Matches ein.")
     @app_commands.describe(
         team="Dein Teamname",
         opponent="Gegnerischer Teamname",
         result="Ergebnis auswählen",
     )
     @app_commands.autocomplete(team=autocomplete_teams, opponent=autocomplete_teams)
-    async def report_match(
-        self, interaction: Interaction, team: str, opponent: str, result: str
-    ):
+    async def report_match(self, interaction: Interaction, team: str, opponent: str, result: str):
         if not has_permission(interaction.user, "Moderator", "Admin"):
-            await interaction.response.send_message(
-                "🚫 Du hast keine Berechtigung für diesen Befehl.", ephemeral=True
-            )
+            await interaction.response.send_message("🚫 Du hast keine Berechtigung für diesen Befehl.", ephemeral=True)
             return
         """
         Ermöglicht das Eintragen eines Match-Ergebnisses für ein Turnierspiel.
@@ -311,32 +277,20 @@ class AdminGroup(app_commands.Group):
 
         logger.info(f"[MATCH REPORT] {team} vs {opponent} – Ergebnis: {result.lower()}")
 
-    @app_commands.command(
-        name="reload", description="Synchronisiert alle Slash-Commands neu."
-    )
+    @app_commands.command(name="reload", description="Synchronisiert alle Slash-Commands neu.")
     async def reload_commands(self, interaction: Interaction):
         if not has_permission(interaction.user, "Moderator", "Admin"):
-            await interaction.response.send_message(
-                "🚫 Du hast keine Berechtigung für diesen Befehl.", ephemeral=True
-            )
+            await interaction.response.send_message("🚫 Du hast keine Berechtigung für diesen Befehl.", ephemeral=True)
             return
 
-        await interaction.response.send_message(
-            "🔄 Synchronisiere Slash-Commands...", ephemeral=True
-        )
+        await interaction.response.send_message("🔄 Synchronisiere Slash-Commands...", ephemeral=True)
 
         try:
             synced = await interaction.client.tree.sync()
-            await interaction.edit_original_response(
-                content=f"✅ {len(synced)} Slash-Commands wurden neu geladen."
-            )
-            logger.info(
-                f"[RELOAD] {len(synced)} Slash-Commands neu geladen von {interaction.user.display_name}"
-            )
+            await interaction.edit_original_response(content=f"✅ {len(synced)} Slash-Commands wurden neu geladen.")
+            logger.info(f"[RELOAD] {len(synced)} Slash-Commands neu geladen von {interaction.user.display_name}")
         except Exception as e:
-            await interaction.edit_original_response(
-                content=f"❌ Fehler beim Neuladen: {e}"
-            )
+            await interaction.edit_original_response(content=f"❌ Fehler beim Neuladen: {e}")
             logger.error(f"[RELOAD ERROR] {e}")
 
     @app_commands.command(
@@ -345,16 +299,12 @@ class AdminGroup(app_commands.Group):
     )
     async def close_registration(self, interaction: Interaction):
         if not has_permission(interaction.user, "Moderator", "Admin"):
-            await interaction.response.send_message(
-                "🚫 Du hast keine Berechtigung.", ephemeral=True
-            )
+            await interaction.response.send_message("🚫 Du hast keine Berechtigung.", ephemeral=True)
             return
 
         tournament = load_tournament_data()
 
-        if not tournament.get("running", False) or not tournament.get(
-            "registration_open", False
-        ):
+        if not tournament.get("running", False) or not tournament.get("registration_open", False):
             await interaction.response.send_message(
                 "⚠️ Die Anmeldung ist bereits geschlossen oder es läuft kein Turnier.",
                 ephemeral=True,
@@ -397,20 +347,14 @@ class AdminGroup(app_commands.Group):
         description_text = generate_schedule_overview(matches)
         await send_match_schedule(interaction, description_text)
 
-    @app_commands.command(
-        name="archive_tournament", description="Archiviert das aktuelle Turnier."
-    )
+    @app_commands.command(name="archive_tournament", description="Archiviert das aktuelle Turnier.")
     async def archive_tournament(self, interaction: Interaction):
         if not has_permission(interaction.user, "Moderator", "Admin"):
-            await interaction.response.send_message(
-                "🚫 Du hast keine Berechtigung für diesen Befehl.", ephemeral=True
-            )
+            await interaction.response.send_message("🚫 Du hast keine Berechtigung für diesen Befehl.", ephemeral=True)
             return
 
         file_path = archive_current_tournament()
-        await interaction.response.send_message(
-            f"✅ Turnier archiviert: `{file_path}`", ephemeral=True
-        )
+        await interaction.response.send_message(f"✅ Turnier archiviert: `{file_path}`", ephemeral=True)
 
         logger.info(f"[ARCHIVE] Turnier erfolgreich archiviert unter {file_path}")
 
@@ -423,9 +367,7 @@ class AdminGroup(app_commands.Group):
     async def reset_reschedule(self, interaction: Interaction, match_id: int):
         global pending_reschedules
         if not has_permission(interaction.user, "Moderator", "Admin"):
-            await interaction.response.send_message(
-                "🚫 Du hast keine Berechtigung für diesen Befehl.", ephemeral=True
-            )
+            await interaction.response.send_message("🚫 Du hast keine Berechtigung für diesen Befehl.", ephemeral=True)
             return
 
         if match_id in pending_reschedules:
@@ -445,23 +387,17 @@ class AdminGroup(app_commands.Group):
     )
     async def end_poll_command(self, interaction: discord.Interaction):
         if not has_permission(interaction.user, "Moderator", "Admin"):
-            await interaction.response.send_message(
-                "🚫 Du hast keine Berechtigung dafür.", ephemeral=True
-            )
+            await interaction.response.send_message("🚫 Du hast keine Berechtigung dafür.", ephemeral=True)
             return
 
         await interaction.response.defer(ephemeral=True)
         try:
             await end_poll(interaction.client, interaction.channel)
             logger.info("[END_POLL] end_poll() erfolgreich abgeschlossen.")
-            await interaction.edit_original_response(
-                content="✅ Umfrage wurde beendet!"
-            )
+            await interaction.edit_original_response(content="✅ Umfrage wurde beendet!")
         except Exception as e:
             logger.error(f"[END_POLL] Fehler beim Beenden der Umfrage: {e}")
-            await interaction.edit_original_response(
-                content=f"❌ Fehler beim Beenden der Umfrage: {e}"
-            )
+            await interaction.edit_original_response(content=f"❌ Fehler beim Beenden der Umfrage: {e}")
 
     @app_commands.command(
         name="export_data",
@@ -469,9 +405,7 @@ class AdminGroup(app_commands.Group):
     )
     async def export_data(self, interaction: Interaction):
         if not has_permission(interaction.user, "Moderator", "Admin"):
-            await interaction.response.send_message(
-                "🚫 Keine Berechtigung.", ephemeral=True
-            )
+            await interaction.response.send_message("🚫 Keine Berechtigung.", ephemeral=True)
             return
 
         export_dir = "exports"
@@ -490,12 +424,8 @@ class AdminGroup(app_commands.Group):
 
         # ✅ Versuch, per DM zu senden
         try:
-            await interaction.user.send(
-                content="📦 Hier ist dein Turnier-Export:", file=file
-            )
-            await interaction.response.send_message(
-                "✅ ZIP-Datei wurde dir per DM geschickt.", ephemeral=True
-            )
+            await interaction.user.send(content="📦 Hier ist dein Turnier-Export:", file=file)
+            await interaction.response.send_message("✅ ZIP-Datei wurde dir per DM geschickt.", ephemeral=True)
         except discord.Forbidden:
             await interaction.response.send_message(
                 "⚠️ Konnte dir keine DM schicken. Stelle sicher, dass DMs vom Server erlaubt sind.",

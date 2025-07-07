@@ -10,9 +10,7 @@ all_tasks = {}  # define task list
 
 def add_task(name, task):
     if name in all_tasks and not all_tasks[name].done():
-        logger.info(
-            f"[TASK-MANAGER] Task '{name}' wird überschrieben und alter Task gecancelt."
-        )
+        logger.info(f"[TASK-MANAGER] Task '{name}' wird überschrieben und alter Task gecancelt.")
         all_tasks[name].cancel()
     all_tasks[name] = task
     logger.info(f"[TASK-MANAGER] Task '{name}' gestartet.")

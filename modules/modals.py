@@ -35,10 +35,7 @@ def find_member(guild, search_str):
                 return m
     # Displayname Case-Insensitive (Fuzzy)
     for m in guild.members:
-        if (
-            m.display_name.lower() == search_str.lower()
-            or m.name.lower() == search_str.lower()
-        ):
+        if m.display_name.lower() == search_str.lower() or m.name.lower() == search_str.lower():
             return m
     # Optional: Fuzzy-Match (z.B. Levenshtein)
     return None
@@ -94,33 +91,23 @@ class TeamFullJoinModal(Modal):
         mitspieler_name = self.mitspieler_field.value.strip()
         samstag = self.samstag_zeit.value.strip()
         sonntag = self.sonntag_zeit.value.strip()
-        unavailable_raw = (
-            self.unavailable_dates.value.strip().replace("\n", ",").replace(" ", "")
-        )
-        unavailable_list = (
-            [d for d in unavailable_raw.split(",") if d] if unavailable_raw else []
-        )
+        unavailable_raw = self.unavailable_dates.value.strip().replace("\n", ",").replace(" ", "")
+        unavailable_list = [d for d in unavailable_raw.split(",") if d] if unavailable_raw else []
 
         # Teamname validieren
         is_valid, err = validate_string(team_name, max_length=32)
         if not is_valid:
-            await interaction.response.send_message(
-                f"❌ Teamname ungültig: {err}", ephemeral=True
-            )
+            await interaction.response.send_message(f"❌ Teamname ungültig: {err}", ephemeral=True)
             return
 
         # Zeiten validieren
         valid, err = validate_time_range(samstag)
         if not valid:
-            await interaction.response.send_message(
-                f"❌ Fehler bei Samstag: {err}", ephemeral=True
-            )
+            await interaction.response.send_message(f"❌ Fehler bei Samstag: {err}", ephemeral=True)
             return
         valid, err = validate_time_range(sonntag)
         if not valid:
-            await interaction.response.send_message(
-                f"❌ Fehler bei Sonntag: {err}", ephemeral=True
-            )
+            await interaction.response.send_message(f"❌ Fehler bei Sonntag: {err}", ephemeral=True)
             return
 
         # Blockierte Tage validieren
@@ -135,10 +122,7 @@ class TeamFullJoinModal(Modal):
             # Mitspieler suchen
             mitspieler = None
             for m in interaction.guild.members:
-                if (
-                    m.display_name.lower() == mitspieler_name.lower()
-                    or m.name.lower() == mitspieler_name.lower()
-                ):
+                if m.display_name.lower() == mitspieler_name.lower() or m.name.lower() == mitspieler_name.lower():
                     mitspieler = m
                     break
             if not mitspieler:
@@ -167,9 +151,7 @@ class TeamFullJoinModal(Modal):
             # SOLO-Anmeldung
             solo_list = tournament.setdefault("solo", [])
             # Prüfe, ob der User schon Solo ist!
-            if any(
-                entry.get("player") == interaction.user.mention for entry in solo_list
-            ):
+            if any(entry.get("player") == interaction.user.mention for entry in solo_list):
                 await interaction.response.send_message(
                     "❗ Du bist bereits als Solo-Spieler angemeldet.", ephemeral=True
                 )

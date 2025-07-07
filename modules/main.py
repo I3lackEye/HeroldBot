@@ -128,9 +128,7 @@ async def on_ready():
         channel = bot.get_channel(reminder_channel_id)
         if channel:
             add_task("reminder", asyncio.create_task(match_reminder_loop(channel)))
-            logger.info(
-                f"[STARTUP] Match-Reminder gestartet im Channel {channel.name}."
-            )
+            logger.info(f"[STARTUP] Match-Reminder gestartet im Channel {channel.name}.")
         else:
             logger.error("[STARTUP] Reminder-Channel nicht gefunden oder ungültige ID!")
     except Exception as e:

@@ -32,9 +32,7 @@ async def match_reminder_loop(channel: TextChannel):
                 continue
 
             try:
-                scheduled_time = datetime.strptime(
-                    scheduled_time_str, "%Y-%m-%dT%H:%M:%S"
-                ).replace(tzinfo=timezone.utc)
+                scheduled_time = datetime.strptime(scheduled_time_str, "%Y-%m-%dT%H:%M:%S").replace(tzinfo=timezone.utc)
             except ValueError:
                 continue  # Falls Format mal abweicht
 

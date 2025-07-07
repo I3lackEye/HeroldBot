@@ -74,9 +74,7 @@ def validate_string(input_str: str, max_length: int = None) -> (bool, str):
 
     # Erlaubte Zeichen: alphanumerisch, '_' , '-' und Leerzeichen
     allowed_special = ["_", "-", " "]
-    invalid_chars = [
-        char for char in input_str if not (char.isalnum() or char in allowed_special)
-    ]
+    invalid_chars = [char for char in input_str if not (char.isalnum() or char in allowed_special)]
     if invalid_chars:
         invalid_unique = ", ".join(sorted(set(invalid_chars)))
         return (
@@ -285,9 +283,7 @@ def update_favorite_game(user_ids: list[int], game: str):
         stats.setdefault("mention", f"<@{uid}>")
         stats.setdefault("display_name", f"Spieler {uid_str}")
 
-        logger.info(
-            f"[STATS] Spielpräferenz aktualisiert: {game} für {stats['mention']} → {game_stats[game]}x"
-        )
+        logger.info(f"[STATS] Spielpräferenz aktualisiert: {game} für {stats['mention']} → {game_stats[game]}x")
 
         player_stats[uid_str] = stats
 
@@ -295,9 +291,7 @@ def update_favorite_game(user_ids: list[int], game: str):
     logger.info(f"[STATS] Spielstatistik aktualisiert für {len(user_ids)} Spieler.")
 
 
-def finalize_tournament(
-    winning_team: str, winners: list[int], game: str, points: int = 1
-):
+def finalize_tournament(winning_team: str, winners: list[int], game: str, points: int = 1):
     """
     Aktualisiert die globalen Statistiken mit Siegerinfos & Spiel.
     :param winning_team: Name des Siegerteams
@@ -323,18 +317,14 @@ def finalize_tournament(
         stats["mention"] = f"<@{uid}>"
         stats.setdefault("display_name", f"Spieler {uid_str}")
         data["player_stats"][uid_str] = stats
-        logger.info(
-            f"[STATS] Turniersieg für {stats['mention']} → {stats['wins']} Siege"
-        )
+        logger.info(f"[STATS] Turniersieg für {stats['mention']} → {stats['wins']} Siege")
 
         # Spiel hochzählen
         game_stats = stats.setdefault("game_stats", {})
         game_stats[game] = game_stats.get(game, 0) + 1
 
     save_global_data(data)
-    logger.info(
-        f"[TOURNAMENT] Abschluss gespeichert für Team '{winning_team}' mit Spiel: {game}"
-    )
+    logger.info(f"[TOURNAMENT] Abschluss gespeichert für Team '{winning_team}' mit Spiel: {game}")
 
 
 def generate_team_name() -> str:
@@ -361,13 +351,9 @@ async def smart_send(
     oder über interaction.followup.send, falls bereits geantwortet wurde.
     """
     try:
-        await interaction.response.send_message(
-            content=content, embed=embed, ephemeral=ephemeral
-        )
+        await interaction.response.send_message(content=content, embed=embed, ephemeral=ephemeral)
     except discord.InteractionResponded:
-        await interaction.followup.send(
-            content=content, embed=embed, ephemeral=ephemeral
-        )
+        await interaction.followup.send(content=content, embed=embed, ephemeral=ephemeral)
 
     # Hilfsfunktion für zufällige Verfügbarkeiten
 
@@ -391,16 +377,12 @@ def parse_availability(avail_str: str) -> tuple[time, time]:
 
         # Mindestdauer: 1 Stunde
         if (end_dt - start_dt) < timedelta(hours=1):
-            raise ValueError(
-                f"Verfügbarkeit zu kurz: Mindestens 1 Stunde erforderlich – Eingabe: '{avail_str}'"
-            )
+            raise ValueError(f"Verfügbarkeit zu kurz: Mindestens 1 Stunde erforderlich – Eingabe: '{avail_str}'")
 
         return start_time, end_time
 
     except Exception as e:
-        logger.warning(
-            f"[AVAILABILITY] Fehler beim Parsen der Verfügbarkeit '{avail_str}': {e}"
-        )
+        logger.warning(f"[AVAILABILITY] Fehler beim Parsen der Verfügbarkeit '{avail_str}': {e}")
         raise ValueError(f"Ungültiges Verfügbarkeitsformat: {avail_str}")
 
 
@@ -456,9 +438,7 @@ def get_team_open_matches(team_name: str) -> list:
     open_matches = []
 
     for match in tournament.get("matches", []):
-        if match.get("status") != "erledigt" and (
-            match.get("team1") == team_name or match.get("team2") == team_name
-        ):
+        if match.get("status") != "erledigt" and (match.get("team1") == team_name or match.get("team2") == team_name):
             open_matches.append(match)
 
     return open_matches
@@ -475,11 +455,7 @@ async def autocomplete_players(interaction: Interaction, current: str):
         if member:
             display_name = member.display_name
         else:
-            display_name = (
-                stats.get("display_name")
-                or stats.get("name")
-                or f"Unbekannt ({user_id})"
-            )
+            display_name = stats.get("display_name") or stats.get("name") or f"Unbekannt ({user_id})"
 
         if current.lower() in display_name.lower():
             choices.append(app_commands.Choice(name=display_name, value=user_id))
@@ -504,9 +480,7 @@ async def autocomplete_teams(interaction: Interaction, current: str):
 
     # Filtere die Teams, die zum aktuellen Eingabetext passen
     suggestions = [
-        app_commands.Choice(name=team, value=team)
-        for team in teams.keys()
-        if current.lower() in team.lower()
+        app_commands.Choice(name=team, value=team) for team in teams.keys() if current.lower() in team.lower()
     ][:25]
 
     logger.info(f"[AUTOCOMPLETE] {len(suggestions)} Vorschläge erstellt.")
@@ -517,11 +491,7 @@ async def autocomplete_teams(interaction: Interaction, current: str):
 async def game_autocomplete(interaction: Interaction, current: str):
     games = load_games()
 
-    return [
-        app_commands.Choice(name=game, value=game)
-        for game in games
-        if current.lower() in game.lower()
-    ][
+    return [app_commands.Choice(name=game, value=game) for game in games if current.lower() in game.lower()][
         :25
     ]  # Discord API erlaubt max 25 Ergebnisse
 

@@ -35,9 +35,7 @@ def archive_current_tournament():
     return filename
 
 
-def update_tournament_history(
-    winner_ids: list[str], chosen_game: str, mvp_name: str = None
-):
+def update_tournament_history(winner_ids: list[str], chosen_game: str, mvp_name: str = None):
     """
     Aktualisiert die tournament_history.json mit einem neuen Eintrag für das beendete Turnier.
 
@@ -55,9 +53,7 @@ def update_tournament_history(
             try:
                 history_data = json.load(f)
             except json.JSONDecodeError:
-                logger.warning(
-                    "[HISTORY] tournament_history.json beschädigt. Erstelle neue Datei."
-                )
+                logger.warning("[HISTORY] tournament_history.json beschädigt. Erstelle neue Datei.")
                 history_data = []
 
     # Gewinnernamen aus global_data holen
@@ -85,6 +81,4 @@ def update_tournament_history(
     with open(history_path, "w", encoding="utf-8") as f:
         json.dump(history_data, f, indent=4, ensure_ascii=False)
 
-    logger.info(
-        f"[HISTORY] Turnier abgeschlossen und in tournament_history.json eingetragen: {chosen_game}."
-    )
+    logger.info(f"[HISTORY] Turnier abgeschlossen und in tournament_history.json eingetragen: {chosen_game}.")

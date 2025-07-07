@@ -36,13 +36,9 @@ class DevGroup(app_commands.Group):
         description="(Admin) Erzeugt Dummy-Solos und Dummy-Teams zum Testen.",
     )
     @app_commands.describe(num_solo="Anzahl Solo-Spieler", num_teams="Anzahl Teams")
-    async def generate_dummy_teams(
-        self, interaction: Interaction, num_solo: int = 4, num_teams: int = 2
-    ):
+    async def generate_dummy_teams(self, interaction: Interaction, num_solo: int = 4, num_teams: int = 2):
         if not has_permission(interaction.user, "Dev"):
-            await interaction.response.send_message(
-                "🚫 Du hast keine Berechtigung dafür.", ephemeral=True
-            )
+            await interaction.response.send_message("🚫 Du hast keine Berechtigung dafür.", ephemeral=True)
             return
 
         tournament = load_tournament_data()
@@ -89,9 +85,7 @@ class DevGroup(app_commands.Group):
     )
     async def test_reminder(self, interaction: Interaction):
         if not has_permission(interaction.user, "Dev"):
-            await interaction.response.send_message(
-                "🚫 Du hast keine Berechtigung für diesen Befehl.", ephemeral=True
-            )
+            await interaction.response.send_message("🚫 Du hast keine Berechtigung für diesen Befehl.", ephemeral=True)
             return
 
         config = load_config()
@@ -148,9 +142,7 @@ class DevGroup(app_commands.Group):
         template = load_embed_template("reminder", category="default").get("REMINDER")
         if not template:
             logger.error("[EMBED] REMINDER Template fehlt.")
-            await smart_send(
-                interaction, content="🚫 Reminder-Template fehlt.", ephemeral=True
-            )
+            await smart_send(interaction, content="🚫 Reminder-Template fehlt.", ephemeral=True)
             return
 
         # Embed bauen und senden
@@ -172,21 +164,15 @@ class DevGroup(app_commands.Group):
     )
     async def simulate_poll_end(self, interaction: Interaction):
         if not has_permission(interaction.user, "Dev"):
-            await interaction.response.send_message(
-                "🚫 Du hast keine Berechtigung dafür.", ephemeral=True
-            )
+            await interaction.response.send_message("🚫 Du hast keine Berechtigung dafür.", ephemeral=True)
             return
 
-        await interaction.response.send_message(
-            "⏳ Simuliere Poll-Ende in 10 Sekunden...", ephemeral=True
-        )
+        await interaction.response.send_message("⏳ Simuliere Poll-Ende in 10 Sekunden...", ephemeral=True)
 
         from modules.tournament import auto_end_poll
 
         # Aktuellen Channel + Client übergeben
-        asyncio.create_task(
-            auto_end_poll(interaction.client, interaction.channel, delay_seconds=10)
-        )
+        asyncio.create_task(auto_end_poll(interaction.client, interaction.channel, delay_seconds=10))
 
     @app_commands.command(
         name="simulate_registration_close",
@@ -194,9 +180,7 @@ class DevGroup(app_commands.Group):
     )
     async def simulate_registration_close(self, interaction: Interaction):
         if not has_permission(interaction.user, "Dev"):
-            await interaction.response.send_message(
-                "🚫 Du hast keine Berechtigung dafür.", ephemeral=True
-            )
+            await interaction.response.send_message("🚫 Du hast keine Berechtigung dafür.", ephemeral=True)
             return
 
         await interaction.response.send_message(
@@ -206,11 +190,7 @@ class DevGroup(app_commands.Group):
 
         from modules.tournament import close_registration_after_delay
 
-        asyncio.create_task(
-            close_registration_after_delay(
-                delay_seconds=10, channel=interaction.channel
-            )
-        )
+        asyncio.create_task(close_registration_after_delay(delay_seconds=10, channel=interaction.channel))
 
     @app_commands.command(
         name="simulate_full_flow",
@@ -218,9 +198,7 @@ class DevGroup(app_commands.Group):
     )
     async def simulate_full_flow(self, interaction: Interaction):
         if not has_permission(interaction.user, "Dev"):
-            await interaction.response.send_message(
-                "🚫 Du hast keine Berechtigung dafür.", ephemeral=True
-            )
+            await interaction.response.send_message("🚫 Du hast keine Berechtigung dafür.", ephemeral=True)
             return
 
         await interaction.response.defer(ephemeral=True)
@@ -275,16 +253,10 @@ class DevGroup(app_commands.Group):
         )
 
         # Poll-Ende simulieren
-        asyncio.create_task(
-            auto_end_poll(interaction.client, interaction.channel, delay_seconds=10)
-        )
+        asyncio.create_task(auto_end_poll(interaction.client, interaction.channel, delay_seconds=10))
 
         # Anmeldungsschluss simulieren
-        asyncio.create_task(
-            close_registration_after_delay(
-                delay_seconds=20, channel=interaction.channel
-            )
-        )
+        asyncio.create_task(close_registration_after_delay(delay_seconds=20, channel=interaction.channel))
 
     @app_commands.command(
         name="health_check",
@@ -292,21 +264,15 @@ class DevGroup(app_commands.Group):
     )
     async def health_check_command(self, interaction: Interaction):
         if not has_permission(interaction.user, "Dev"):
-            await interaction.response.send_message(
-                "🚫 Du hast keine Berechtigung für diesen Befehl.", ephemeral=True
-            )
+            await interaction.response.send_message("🚫 Du hast keine Berechtigung für diesen Befehl.", ephemeral=True)
             return
 
         tournament = load_tournament_data()
-        embed = discord.Embed(
-            title="🩺 System Health Check", color=discord.Color.green()
-        )
+        embed = discord.Embed(title="🩺 System Health Check", color=discord.Color.green())
 
         # 1. Turnierstatus
         running = tournament.get("running", False)
-        embed.add_field(
-            name="Turnier läuft", value="✅ Ja" if running else "❌ Nein", inline=True
-        )
+        embed.add_field(name="Turnier läuft", value="✅ Ja" if running else "❌ Nein", inline=True)
 
         # 2. Poll aktiv?
         from modules.poll import poll_message_id, poll_channel_id
@@ -324,9 +290,7 @@ class DevGroup(app_commands.Group):
             try:
                 dt = datetime.fromisoformat(reg_end)
                 remaining = dt - datetime.utcnow()
-                reg_info = (
-                    f"✅ Offen (noch {remaining.days}d {remaining.seconds//3600}h)"
-                )
+                reg_info = f"✅ Offen (noch {remaining.days}d {remaining.seconds//3600}h)"
             except Exception:
                 reg_info = "⚠️ Ungültiges Datumsformat"
         else:
@@ -339,12 +303,8 @@ class DevGroup(app_commands.Group):
         embed.add_field(name="Geplante Matches", value=str(len(matches)), inline=True)
 
         # 5. Teilnehmer
-        embed.add_field(
-            name="Teams", value=str(len(tournament.get("teams", {}))), inline=True
-        )
-        embed.add_field(
-            name="Solo-Spieler", value=str(len(tournament.get("solo", []))), inline=True
-        )
+        embed.add_field(name="Teams", value=str(len(tournament.get("teams", {}))), inline=True)
+        embed.add_field(name="Solo-Spieler", value=str(len(tournament.get("solo", []))), inline=True)
 
         # Antwort
         await interaction.response.send_message(embed=embed, ephemeral=True)
@@ -355,9 +315,7 @@ class DevGroup(app_commands.Group):
     )
     async def diagnose_all(self, interaction: Interaction):
         if not has_permission(interaction.user, "Dev"):
-            await interaction.response.send_message(
-                "🚫 Keine Berechtigung.", ephemeral=True
-            )
+            await interaction.response.send_message("🚫 Keine Berechtigung.", ephemeral=True)
             return
 
         from modules.dataStorage import load_config, load_games
@@ -369,9 +327,7 @@ class DevGroup(app_commands.Group):
 
         # Games
         games = load_games()
-        report.append(
-            f"🎮 Spiele geladen: {len(games)} {'✅' if games else '❌ KEINE SPIELE'}"
-        )
+        report.append(f"🎮 Spiele geladen: {len(games)} {'✅' if games else '❌ KEINE SPIELE'}")
 
         # Channels
         channels = config.get("CHANNELS", {})
@@ -384,9 +340,7 @@ class DevGroup(app_commands.Group):
                     continue
                 perms = channel.permissions_for(channel.guild.me)
                 if not perms.send_messages:
-                    report.append(
-                        f"⚠️ Channel {key} (#{channel.name}): Keine Schreibrechte"
-                    )
+                    report.append(f"⚠️ Channel {key} (#{channel.name}): Keine Schreibrechte")
                 else:
                     report.append(f"✅ Channel {key} (#{channel.name}): OK")
             except Exception as e:
@@ -407,32 +361,22 @@ class DevGroup(app_commands.Group):
 
         # Rückgabe
         text = "\n".join(report)
-        await interaction.response.send_message(
-            f"🩺 **Diagnosebericht:**\n```{text}```", ephemeral=True
-        )
+        await interaction.response.send_message(f"🩺 **Diagnosebericht:**\n```{text}```", ephemeral=True)
 
-    @app_commands.command(
-        name="tasks", description="Zeigt alle aktuell laufenden Bot-Tasks an."
-    )
+    @app_commands.command(name="tasks", description="Zeigt alle aktuell laufenden Bot-Tasks an.")
     async def tasks(self, interaction: Interaction):
         if not has_permission(interaction.user, "Dev"):
-            await interaction.response.send_message(
-                "🚫 Keine Berechtigung.", ephemeral=True
-            )
+            await interaction.response.send_message("🚫 Keine Berechtigung.", ephemeral=True)
             return
         tasks = get_all_tasks()
         if not tasks:
-            await interaction.response.send_message(
-                "🚦 Es laufen aktuell **keine** Hintergrund-Tasks.", ephemeral=True
-            )
+            await interaction.response.send_message("🚦 Es laufen aktuell **keine** Hintergrund-Tasks.", ephemeral=True)
             return
 
         embed = discord.Embed(title="Aktive Hintergrund-Tasks", color=0x42F587)
         for name, task in tasks.items():
             status = "✅ abgeschlossen" if task.done() else "🟢 läuft"
-            embed.add_field(
-                name=name, value=f"Status: {status}\nTask: {task}", inline=False
-            )
+            embed.add_field(name=name, value=f"Status: {status}\nTask: {task}", inline=False)
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
 

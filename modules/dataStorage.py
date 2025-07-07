@@ -95,35 +95,25 @@ async def validate_channels(bot: discord.Client):
         try:
             channel_id = int(channel_id_str)
         except (TypeError, ValueError):
-            logger.error(
-                f"[CHANNEL CHECKER] Channel-ID für '{name}' ist ungültig: {channel_id_str}"
-            )
+            logger.error(f"[CHANNEL CHECKER] Channel-ID für '{name}' ist ungültig: {channel_id_str}")
             continue
 
         channel = bot.get_channel(channel_id)
 
         if not channel:
-            logger.error(
-                f"[CHANNEL CHECKER] Channel '{name}' mit ID {channel_id} wurde NICHT gefunden!"
-            )
+            logger.error(f"[CHANNEL CHECKER] Channel '{name}' mit ID {channel_id} wurde NICHT gefunden!")
             continue
 
         if not isinstance(channel, discord.TextChannel):
-            logger.warning(
-                f"[CHANNEL CHECKER] Channel '{name}' (ID {channel_id}) ist kein TextChannel."
-            )
+            logger.warning(f"[CHANNEL CHECKER] Channel '{name}' (ID {channel_id}) ist kein TextChannel.")
 
         perms = channel.permissions_for(channel.guild.me)
 
         if not perms.view_channel:
-            logger.error(
-                f"[CHANNEL CHECKER] Bot hat KEINE Sichtbarkeit auf '{name}' (ID {channel_id})!"
-            )
+            logger.error(f"[CHANNEL CHECKER] Bot hat KEINE Sichtbarkeit auf '{name}' (ID {channel_id})!")
 
         if not perms.send_messages:
-            logger.error(
-                f"[CHANNEL CHECKER] Bot kann NICHT in '{name}' schreiben (ID {channel_id})!"
-            )
+            logger.error(f"[CHANNEL CHECKER] Bot kann NICHT in '{name}' schreiben (ID {channel_id})!")
 
         logger.info(f"[CHANNEL CHECKER] OK: {name} (ID {channel_id})")
 
@@ -140,14 +130,10 @@ async def validate_permissions(guild: discord.Guild):
 
     config = load_config()
     role_permissions = config.get("ROLE_PERMISSIONS", {})
-    logger.info(
-        f"[PERMISSION CHECKER] Starte Rechte-Validierung für Server '{guild.name}'..."
-    )
+    logger.info(f"[PERMISSION CHECKER] Starte Rechte-Validierung für Server '{guild.name}'...")
 
     for permission_group, entries in role_permissions.items():
-        logger.info(
-            f"[PERMISSION CHECKER] Gruppe '{permission_group}': Erlaubte Rollen/IDs: {entries}"
-        )
+        logger.info(f"[PERMISSION CHECKER] Gruppe '{permission_group}': Erlaubte Rollen/IDs: {entries}")
         for entry in entries:
             if entry.isdigit() and len(entry) > 10:
                 logger.info(
@@ -156,13 +142,9 @@ async def validate_permissions(guild: discord.Guild):
             else:
                 role = discord.utils.get(guild.roles, name=entry)
                 if role:
-                    logger.info(
-                        f"[PERMISSION CHECKER] Rolle '{entry}' gefunden (ID: {role.id})"
-                    )
+                    logger.info(f"[PERMISSION CHECKER] Rolle '{entry}' gefunden (ID: {role.id})")
                 else:
-                    logger.warning(
-                        f"[PERMISSION CHECKER] ⚠️ Rolle '{entry}' NICHT im Server '{guild.name}' gefunden!"
-                    )
+                    logger.warning(f"[PERMISSION CHECKER] ⚠️ Rolle '{entry}' NICHT im Server '{guild.name}' gefunden!")
     logger.info("[PERMISSION CHECKER] Permission-Validierung abgeschlossen.")
 
 
@@ -186,9 +168,7 @@ def load_global_data():
                     return {}
                 return data
         except json.JSONDecodeError:
-            logger.error(
-                "⚠ Global data file ist beschädigt. Leere Daten werden zurückgegeben."
-            )
+            logger.error("⚠ Global data file ist beschädigt. Leere Daten werden zurückgegeben.")
             return {}
     return {}
 
@@ -226,9 +206,7 @@ def load_tournament_data():
                         tournament[key] = value
                 return tournament
         except json.JSONDecodeError:
-            logger.error(
-                "⚠ Tournament file ist beschädigt. Standard-Daten werden zurückgegeben."
-            )
+            logger.error("⚠ Tournament file ist beschädigt. Standard-Daten werden zurückgegeben.")
             return DEFAULT_TOURNAMENT_DATA.copy()
     return DEFAULT_TOURNAMENT_DATA.copy()
 
@@ -268,9 +246,7 @@ def add_game(game_title: str):
     MAX_TITLE_LENGTH = config.get("STR_MAX_LENGTH", 100)  # fallback falls config fehlt
 
     if len(game_title) > MAX_TITLE_LENGTH:
-        raise ValueError(
-            f"Der Spielname darf maximal {MAX_TITLE_LENGTH} Zeichen lang sein."
-        )
+        raise ValueError(f"Der Spielname darf maximal {MAX_TITLE_LENGTH} Zeichen lang sein.")
 
     games = load_games()
 
@@ -321,9 +297,7 @@ def backup_current_state():
             shutil.copy(source_file, os.path.join(backup_folder, backup_name))
             logger.info(f"[BACKUP] Gesichert: {source_file}")
         else:
-            logger.info(
-                f"[BACKUP] Achtung: {source_file} nicht gefunden – wird übersprungen."
-            )
+            logger.info(f"[BACKUP] Achtung: {source_file} nicht gefunden – wird übersprungen.")
 
 
 def delete_tournament_file():

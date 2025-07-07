@@ -41,9 +41,7 @@ async def start_poll(
         poll_options[emoji] = option
 
     # Ablaufzeit berechnen
-    poll_end_time = datetime.now(ZoneInfo("Europe/Berlin")) + timedelta(
-        hours=registration_hours
-    )
+    poll_end_time = datetime.now(ZoneInfo("Europe/Berlin")) + timedelta(hours=registration_hours)
     poll_end_str = poll_end_time.strftime("%d.%m.%Y %H:%M Uhr")
 
     embed = discord.Embed(
@@ -94,9 +92,7 @@ async def end_poll(bot: discord.Client, channel: discord.TextChannel):
         sorted_votes = sorted(real_votes.items(), key=lambda kv: kv[1], reverse=True)
         max_votes = sorted_votes[0][1]
         top_options = [option for option, votes in sorted_votes if votes == max_votes]
-        chosen_game = top_options[
-            0
-        ]  # Falls Gleichstand: einfach erstes nehmen (könnte man randomisieren)
+        chosen_game = top_options[0]  # Falls Gleichstand: einfach erstes nehmen (könnte man randomisieren)
 
     # Speichern ins Turnier
     tournament = load_tournament_data()
@@ -135,13 +131,9 @@ async def end_poll(bot: discord.Client, channel: discord.TextChannel):
             "close_registration",
             asyncio.create_task(close_registration_after_delay(delay_seconds, channel)),
         )
-        logger.info(
-            f"[POLL] Anmeldung wird automatisch geschlossen in {delay_seconds // 3600} Stunden."
-        )
+        logger.info(f"[POLL] Anmeldung wird automatisch geschlossen in {delay_seconds // 3600} Stunden.")
     else:
-        logger.warning(
-            "[POLL] Kein registration_end gefunden – Anmeldung wird NICHT automatisch geschlossen."
-        )
+        logger.warning("[POLL] Kein registration_end gefunden – Anmeldung wird NICHT automatisch geschlossen.")
 
 
 # Event Handler

@@ -46,9 +46,7 @@ def extract_ids(members):
 # ---------------------------------------
 # Command: /request_reschedule
 # ---------------------------------------
-async def handle_request_reschedule(
-    interaction: Interaction, match_id: int, neuer_zeitpunkt: str
-):
+async def handle_request_reschedule(interaction: Interaction, match_id: int, neuer_zeitpunkt: str):
     global pending_reschedules
     tournament = load_tournament_data()
     user_id = str(interaction.user.id)
@@ -56,18 +54,14 @@ async def handle_request_reschedule(
     # 1️⃣ Team und Match prüfen
     team_name = get_player_team(user_id)
     if not team_name:
-        await interaction.response.send_message(
-            "🚫 Du bist in keinem Team registriert.", ephemeral=True
-        )
+        await interaction.response.send_message("🚫 Du bist in keinem Team registriert.", ephemeral=True)
         return
 
     open_matches = get_team_open_matches(team_name)
     open_match_ids = [m["match_id"] for m in open_matches]
 
     if match_id not in open_match_ids:
-        await interaction.response.send_message(
-            "🚫 Ungültige Match-ID oder nicht dein Match!", ephemeral=True
-        )
+        await interaction.response.send_message("🚫 Ungültige Match-ID oder nicht dein Match!", ephemeral=True)
         return
 
     if match_id in pending_reschedules:
@@ -81,16 +75,12 @@ async def handle_request_reschedule(
         None,
     )
     if not match:
-        await interaction.response.send_message(
-            "🚫 Match nicht gefunden.", ephemeral=True
-        )
+        await interaction.response.send_message("🚫 Match nicht gefunden.", ephemeral=True)
         return
 
     # 2️⃣ Neuer Zeitpunkt prüfen
     try:
-        new_dt = datetime.strptime(neuer_zeitpunkt, "%d.%m.%Y %H:%M").replace(
-            tzinfo=ZoneInfo("Europe/Berlin")
-        )
+        new_dt = datetime.strptime(neuer_zeitpunkt, "%d.%m.%Y %H:%M").replace(tzinfo=ZoneInfo("Europe/Berlin"))
     except ValueError:
         await interaction.response.send_message(
             "🚫 Ungültiges Datumsformat! Bitte benutze `TT.MM.JJJJ HH:MM`.",
@@ -99,29 +89,20 @@ async def handle_request_reschedule(
         return
 
     if new_dt <= datetime.now(ZoneInfo("Europe/Berlin")):
-        await interaction.response.send_message(
-            "🚫 Der neue Zeitpunkt muss in der Zukunft liegen!", ephemeral=True
-        )
+        await interaction.response.send_message("🚫 Der neue Zeitpunkt muss in der Zukunft liegen!", ephemeral=True)
         return
 
     all_slots = generate_weekend_slots(tournament)
-    booked_slots = set(
-        m["scheduled_time"]
-        for m in tournament.get("matches", [])
-        if m.get("scheduled_time")
-    )
+    booked_slots = set(m["scheduled_time"] for m in tournament.get("matches", []) if m.get("scheduled_time"))
     free_slots = [slot for slot in all_slots if slot not in booked_slots]
     future_slots = [
         datetime.fromisoformat(slot).astimezone(ZoneInfo("Europe/Berlin"))
         for slot in free_slots
-        if datetime.fromisoformat(slot).astimezone(ZoneInfo("Europe/Berlin"))
-        > datetime.now(ZoneInfo("Europe/Berlin"))
+        if datetime.fromisoformat(slot).astimezone(ZoneInfo("Europe/Berlin")) > datetime.now(ZoneInfo("Europe/Berlin"))
     ]
 
     if new_dt not in future_slots:
-        await interaction.response.send_message(
-            "🚫 Der gewählte Zeitpunkt ist kein erlaubter Slot!", ephemeral=True
-        )
+        await interaction.response.send_message("🚫 Der gewählte Zeitpunkt ist kein erlaubter Slot!", ephemeral=True)
         return
 
     scheduled_time_str = match.get("scheduled_time")
@@ -136,23 +117,17 @@ async def handle_request_reschedule(
 
     # 3️⃣ Anfrage starten
     pending_reschedules.add(match_id)
-    interaction.client.loop.create_task(
-        start_reschedule_timer(interaction.client, match_id)
-    )
+    interaction.client.loop.create_task(start_reschedule_timer(interaction.client, match_id))
 
     await interaction.response.defer(ephemeral=True)
 
     reschedule_channel = interaction.guild.get_channel(RESCHEDULE_CHANNEL_ID)
     if not reschedule_channel:
-        await interaction.followup.send(
-            "🚫 Reschedule-Channel nicht gefunden.", ephemeral=True
-        )
+        await interaction.followup.send("🚫 Reschedule-Channel nicht gefunden.", ephemeral=True)
         return
 
     if not reschedule_channel.permissions_for(interaction.guild.me).send_messages:
-        await interaction.followup.send(
-            "🚫 Keine Berechtigung im Reschedule-Channel.", ephemeral=True
-        )
+        await interaction.followup.send("🚫 Keine Berechtigung im Reschedule-Channel.", ephemeral=True)
         return
 
     # 4️⃣ Teilnehmer vorbereiten
@@ -181,14 +156,10 @@ async def handle_request_reschedule(
         return
 
     # 5️⃣ Anfrage-Embed und View senden
-    await send_request_reschedule(
-        reschedule_channel, match_id, team1, team2, new_dt, valid_members
-    )
+    await send_request_reschedule(reschedule_channel, match_id, team1, team2, new_dt, valid_members)
 
     # 6️⃣ Abschlussnachricht
-    await interaction.followup.send(
-        "✅ Deine Reschedule-Anfrage wurde im Channel erstellt!", ephemeral=True
-    )
+    await interaction.followup.send("✅ Deine Reschedule-Anfrage wurde im Channel erstellt!", ephemeral=True)
 
     logger.info(f"[RESCHEDULE] Anfrage von {team_name} für Match {match_id} gestartet.")
 
@@ -242,9 +213,7 @@ async def neuer_zeitpunkt_autocomplete(interaction: Interaction, current: str):
     free_slots = [slot for slot in all_slots if slot not in booked_slots]
 
     # 🔥 Jetzt: Nur Slots, die nach JETZT liegen
-    free_slots = [
-        slot for slot in free_slots if datetime.fromisoformat(slot) > datetime.now()
-    ]
+    free_slots = [slot for slot in free_slots if datetime.fromisoformat(slot) > datetime.now()]
 
     if current:
         free_slots = [slot for slot in free_slots if current in slot]

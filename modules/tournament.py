@@ -71,9 +71,7 @@ class TournamentCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    @app_commands.command(
-        name="start_tournament", description="Starte ein neues Turnier."
-    )
+    @app_commands.command(name="start_tournament", description="Starte ein neues Turnier.")
     @app_commands.describe(
         registration_hours="Wie viele Stunden soll die Anmeldung offen bleiben? (Standard: 72)",
         tournament_weeks="Wie viele Wochen soll das Turnier laufen? (Standard: 1)",
@@ -87,9 +85,7 @@ class TournamentCog(commands.Cog):
         poll_duration_hours: Optional[int] = None,
     ):
         if not has_permission(interaction.user, "Moderator", "Admin"):
-            await interaction.response.send_message(
-                "🚫 Du hast keine Berechtigung für diesen Befehl.", ephemeral=True
-            )
+            await interaction.response.send_message("🚫 Du hast keine Berechtigung für diesen Befehl.", ephemeral=True)
             return
 
         tournament = load_tournament_data()
@@ -102,18 +98,14 @@ class TournamentCog(commands.Cog):
 
         now = datetime.now(ZoneInfo("Europe/Berlin"))
         registration_end = now + timedelta(hours=registration_hours)
-        tournament_end = registration_end + timedelta(
-            weeks=max(tournament_weeks, 1)
-        )  # Minimum 1 Woche
+        tournament_end = registration_end + timedelta(weeks=max(tournament_weeks, 1))  # Minimum 1 Woche
 
         tournament = {
             "registration_open": False,  # Erst nach Poll-Ende
             "running": True,
             "teams": {},
             "solo": [],
-            "registration_end": registration_end.astimezone(
-                ZoneInfo("UTC")
-            ).isoformat(),
+            "registration_end": registration_end.astimezone(ZoneInfo("UTC")).isoformat(),
             "tournament_end": tournament_end.isoformat(),
             "matches": [],
         }
@@ -124,9 +116,7 @@ class TournamentCog(commands.Cog):
         )
 
         # Turnierstart-Embed schicken
-        template = load_embed_template("tournament_start", category="default").get(
-            "TOURNAMENT_ANNOUNCEMENT"
-        )
+        template = load_embed_template("tournament_start", category="default").get("TOURNAMENT_ANNOUNCEMENT")
         embed = build_embed_from_template(template)
         await interaction.response.send_message(embed=embed)
 
@@ -146,22 +136,16 @@ class TournamentCog(commands.Cog):
         duration = poll_duration_hours if poll_duration_hours is not None else 48
         add_task(
             "auto_end_poll",
-            asyncio.create_task(
-                auto_end_poll(interaction.client, interaction.channel, duration * 3600)
-            ),
+            asyncio.create_task(auto_end_poll(interaction.client, interaction.channel, duration * 3600)),
         )
 
-        logger.info(
-            "[TOURNAMENT] Umfrage gestartet. Automatischer Poll-Ende-Timer läuft."
-        )
+        logger.info("[TOURNAMENT] Umfrage gestartet. Automatischer Poll-Ende-Timer läuft.")
 
     @app_commands.command(
         name="list_matches",
         description="Zeigt alle geplanten Matches oder die eines bestimmten Teams.",
     )
-    @app_commands.describe(
-        team="Optional: Name des Teams oder 'meine' für eigene Matches."
-    )
+    @app_commands.describe(team="Optional: Name des Teams oder 'meine' für eigene Matches.")
     @app_commands.autocomplete(team=autocomplete_teams)
     async def list_matches(self, interaction: Interaction, team: Optional[str] = None):
         tournament = load_tournament_data()
@@ -186,16 +170,12 @@ class TournamentCog(commands.Cog):
                 matches = [
                     m
                     for m in matches
-                    if m.get("team1", "").lower() == my_team.lower()
-                    or m.get("team2", "").lower() == my_team.lower()
+                    if m.get("team1", "").lower() == my_team.lower() or m.get("team2", "").lower() == my_team.lower()
                 ]
             else:
                 # Nach spezifischem Team suchen
                 matches = [
-                    m
-                    for m in matches
-                    if m.get("team1", "").lower() == team
-                    or m.get("team2", "").lower() == team
+                    m for m in matches if m.get("team1", "").lower() == team or m.get("team2", "").lower() == team
                 ]
 
         if not matches:
@@ -208,9 +188,7 @@ class TournamentCog(commands.Cog):
 
         await send_list_matches(interaction, matches)
 
-        logger.info(
-            f"[MATCHES] {len(matches)} Matches aufgelistet (Filter: '{team or 'alle'}')."
-        )
+        logger.info(f"[MATCHES] {len(matches)} Matches aufgelistet (Filter: '{team or 'alle'}').")
 
 
 # ---------------------------------------
@@ -226,12 +204,8 @@ async def end_tournament_procedure(
     tournament = load_tournament_data()
 
     if not manual_trigger and not all_matches_completed():
-        logger.info(
-            "[TOURNAMENT] Nicht alle Matches abgeschlossen. Abbruch des automatischen Endes."
-        )
-        await channel.send(
-            "⚠️ Es sind noch nicht alle Matches abgeschlossen. Turnier bleibt offen."
-        )
+        logger.info("[TOURNAMENT] Nicht alle Matches abgeschlossen. Abbruch des automatischen Endes.")
+        await channel.send("⚠️ Es sind noch nicht alle Matches abgeschlossen. Turnier bleibt offen.")
         return
 
     # Archivieren und aufräumen
@@ -263,9 +237,7 @@ async def end_tournament_procedure(
 
     if winner_ids and chosen_game != "Unbekannt":
         update_player_stats(winner_ids, chosen_game)
-        logger.info(
-            f"[END] Gewinner gespeichert: {winner_ids} für Spiel: {chosen_game}"
-        )
+        logger.info(f"[END] Gewinner gespeichert: {winner_ids} für Spiel: {chosen_game}")
     else:
         logger.warning("[END] Keine Gewinner oder kein Spielname gefunden.")
 
@@ -284,12 +256,8 @@ async def end_tournament_procedure(
         logger.error(f"[END] Fehler beim Löschen der Turnierdatei: {e}")
 
     # Abschluss-Embed schicken
-    mvp_message = (
-        f"🏆 MVP des Turniers: **{mvp}**!" if mvp else "🏆 Kein MVP ermittelt."
-    )
-    await send_tournament_end_announcement(
-        channel, mvp_message, winner_ids, new_champion_id
-    )
+    mvp_message = f"🏆 MVP des Turniers: **{mvp}**!" if mvp else "🏆 Kein MVP ermittelt."
+    await send_tournament_end_announcement(channel, mvp_message, winner_ids, new_champion_id)
 
     if mvp:  # Wenn MVP existiert
         try:
@@ -297,23 +265,17 @@ async def end_tournament_procedure(
             mvp_id = int(mvp.strip("<@!>"))  # MVP aus Mention extrahieren
             await update_champion_role(guild, mvp_id)
         except Exception as e:
-            logger.error(
-                f"[CHAMPION] Fehler beim Aktualisieren der Champion-Rolle: {e}"
-            )
+            logger.error(f"[CHAMPION] Fehler beim Aktualisieren der Champion-Rolle: {e}")
 
     logger.info("[END] Turnier abgeschlossen und System bereit für Neues.")
 
 
-async def auto_end_poll(
-    bot: discord.Client, channel: discord.TextChannel, delay_seconds: int
-):
+async def auto_end_poll(bot: discord.Client, channel: discord.TextChannel, delay_seconds: int):
     await asyncio.sleep(delay_seconds)
     await poll.end_poll(bot, channel)
 
 
-async def update_champion_role(
-    guild: discord.Guild, new_champion_id: int, role_name: str = "Champion"
-):
+async def update_champion_role(guild: discord.Guild, new_champion_id: int, role_name: str = "Champion"):
     """
     Aktualisiert die Champion-Rolle im Server:
     - Entzieht die Rolle allen bisherigen Trägern
@@ -328,9 +290,7 @@ async def update_champion_role(
     # Neuen Champion zuweisen
     new_champion = guild.get_member(new_champion_id)
     if not new_champion:
-        logger.error(
-            f"[CHAMPION] Neuer Champion (User ID {new_champion_id}) nicht gefunden!"
-        )
+        logger.error(f"[CHAMPION] Neuer Champion (User ID {new_champion_id}) nicht gefunden!")
         return
 
     # Check: Hat der neue Champion die Rolle schon?
@@ -344,27 +304,17 @@ async def update_champion_role(
     for member in guild.members:
         if champion_role in member.roles:
             try:
-                await member.remove_roles(
-                    champion_role, reason="Neuer Champion wurde vergeben."
-                )
-                logger.info(
-                    f"[CHAMPION] Champion-Rolle entfernt von {member.display_name}"
-                )
+                await member.remove_roles(champion_role, reason="Neuer Champion wurde vergeben.")
+                logger.info(f"[CHAMPION] Champion-Rolle entfernt von {member.display_name}")
             except Exception as e:
-                logger.error(
-                    f"[CHAMPION] Fehler beim Entfernen der Champion-Rolle von {member.display_name}: {e}"
-                )
+                logger.error(f"[CHAMPION] Fehler beim Entfernen der Champion-Rolle von {member.display_name}: {e}")
 
     # Rolle dem neuen Champion geben
     try:
         await new_champion.add_roles(champion_role, reason="Turniersieg MVP.")
-        logger.info(
-            f"[CHAMPION] Champion-Rolle vergeben an {new_champion.display_name}"
-        )
+        logger.info(f"[CHAMPION] Champion-Rolle vergeben an {new_champion.display_name}")
     except Exception as e:
-        logger.error(
-            f"[CHAMPION] Fehler beim Vergeben der Champion-Rolle an {new_champion.display_name}: {e}"
-        )
+        logger.error(f"[CHAMPION] Fehler beim Vergeben der Champion-Rolle an {new_champion.display_name}: {e}")
 
 
 # ---------------------------------------
@@ -372,9 +322,7 @@ async def update_champion_role(
 # ---------------------------------------
 
 
-async def close_registration_after_delay(
-    delay_seconds: int, channel: discord.TextChannel
-):
+async def close_registration_after_delay(delay_seconds: int, channel: discord.TextChannel):
     """
     Schließt die Anmeldung nach einer Verzögerung automatisch
     und startet das automatische Matchmaking & Cleanup.
@@ -385,22 +333,16 @@ async def close_registration_after_delay(
     await asyncio.sleep(delay_seconds)
 
     if _registration_closed:
-        logger.warning(
-            "[REGISTRATION] Ablauf bereits abgeschlossen – Doppelvermeidung aktiv."
-        )
+        logger.warning("[REGISTRATION] Ablauf bereits abgeschlossen – Doppelvermeidung aktiv.")
         return
     _registration_closed = True
 
     if not tournament.get("running", False):
-        await channel.send(
-            f"⚠️ Es läuft kein Turnier – Registrierung wird nicht geschlossen."
-        )
+        await channel.send(f"⚠️ Es läuft kein Turnier – Registrierung wird nicht geschlossen.")
         return
 
     if not tournament.get("registration_open", False):
-        logger.warning(
-            "[CLOSE] Anmeldung war bereits geschlossen, fahre aber mit Matchplanung fort."
-        )
+        logger.warning("[CLOSE] Anmeldung war bereits geschlossen, fahre aber mit Matchplanung fort.")
     else:
         # Jetzt erst schließen
         tournament["registration_open"] = False
@@ -438,9 +380,7 @@ async def close_registration_after_delay(
     await send_match_schedule_for_channel(channel, description_text)
 
 
-async def close_tournament_after_delay(
-    delay_seconds: int, channel: discord.TextChannel
-):
+async def close_tournament_after_delay(delay_seconds: int, channel: discord.TextChannel):
     await asyncio.sleep(delay_seconds)
 
     await end_tournament_procedure(channel)

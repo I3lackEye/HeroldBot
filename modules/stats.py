@@ -31,9 +31,7 @@ def get_leaderboard() -> str:
     if not player_stats:
         return "Keine Statistiken verfügbar."
 
-    sorted_players = sorted(
-        player_stats.items(), key=lambda item: item[1].get("wins", 0), reverse=True
-    )
+    sorted_players = sorted(player_stats.items(), key=lambda item: item[1].get("wins", 0), reverse=True)
 
     lines = []
     for idx, (user_id, data) in enumerate(sorted_players, start=1):
@@ -78,9 +76,7 @@ def get_tournament_summary() -> str:
     total_wins = sum(player.get("wins", 0) for player in player_stats.values())
 
     if player_stats:
-        best_player_id, best_player_data = max(
-            player_stats.items(), key=lambda item: item[1].get("wins", 0)
-        )
+        best_player_id, best_player_data = max(player_stats.items(), key=lambda item: item[1].get("wins", 0))
         best_name = best_player_data.get("name", f"<@{best_player_id}>")
         best_wins = best_player_data.get("wins", 0)
     else:
@@ -114,9 +110,7 @@ def update_global_game_stats(game_name: str):
     global_data["game_stats"][game_name] += 1
 
     save_global_data(global_data)
-    logger.info(
-        f"Spielstatistik aktualisiert: {game_name} wurde nun {global_data['game_stats'][game_name]}x gespielt."
-    )
+    logger.info(f"Spielstatistik aktualisiert: {game_name} wurde nun {global_data['game_stats'][game_name]}x gespielt.")
 
 
 def get_favorite_game() -> str:
@@ -142,9 +136,7 @@ def get_mvp() -> str:
         return None
 
     # Spieler mit meisten Siegen finden
-    sorted_players = sorted(
-        player_stats.items(), key=lambda item: item[1].get("wins", 0), reverse=True
-    )
+    sorted_players = sorted(player_stats.items(), key=lambda item: item[1].get("wins", 0), reverse=True)
 
     if not sorted_players or sorted_players[0][1].get("wins", 0) == 0:
         return None  # Keine Siege vorhanden
@@ -196,9 +188,7 @@ def update_player_stats(winner_ids: list, chosen_game: str):
     )
 
     save_global_data(global_data)
-    logger.info(
-        f"[END] Statistiken aktualisiert für Gewinner {winner_ids} im Spiel '{chosen_game}'."
-    )
+    logger.info(f"[END] Statistiken aktualisiert für Gewinner {winner_ids} im Spiel '{chosen_game}'.")
 
 
 def get_winner_ids() -> list:
@@ -250,14 +240,10 @@ class StatsGroup(app_commands.Group):
     def __init__(self):
         super().__init__(name="stats", description="Statistiken und Auswertungen")
 
-    @app_commands.command(
-        name="leaderboard", description="Zeigt die Bestenliste aller Spieler an."
-    )
+    @app_commands.command(name="leaderboard", description="Zeigt die Bestenliste aller Spieler an.")
     async def leaderboard(self, interaction: Interaction):
         if not has_permission(interaction.user, "Moderator", "Admin"):
-            await interaction.response.send_message(
-                "🚫 Du hast keine Berechtigung dafür.", ephemeral=True
-            )
+            await interaction.response.send_message("🚫 Du hast keine Berechtigung dafür.", ephemeral=True)
             return
 
         board = get_leaderboard()
@@ -299,14 +285,10 @@ class StatsGroup(app_commands.Group):
         embed = build_stats_embed(target_user, player_stats)
         await interaction.response.send_message(embed=embed)
 
-    @app_commands.command(
-        name="tournament_stats", description="Zeigt allgemeine Turnierstatistiken an."
-    )
+    @app_commands.command(name="tournament_stats", description="Zeigt allgemeine Turnierstatistiken an.")
     async def tournament_stats(self, interaction: Interaction):
         if not has_permission(interaction.user, "Moderator", "Admin"):
-            await interaction.response.send_message(
-                "🚫 Du hast keine Berechtigung dafür.", ephemeral=True
-            )
+            await interaction.response.send_message("🚫 Du hast keine Berechtigung dafür.", ephemeral=True)
             return
 
         global_data = load_global_data()
@@ -317,17 +299,13 @@ class StatsGroup(app_commands.Group):
         total_players = len(player_stats)
         total_wins = sum(player.get("wins", 0) for player in player_stats.values())
 
-        best_player_entry = max(
-            player_stats.items(), key=lambda kv: kv[1].get("wins", 0), default=None
-        )
+        best_player_entry = max(player_stats.items(), key=lambda kv: kv[1].get("wins", 0), default=None)
         if best_player_entry:
             best_player = f"{best_player_entry[1]['display_name']} ({best_player_entry[1]['wins']} Siege)"
         else:
             best_player = "Niemand"
 
-        game_counter = Counter(
-            entry["game"] for entry in tournament_history if "game" in entry
-        )
+        game_counter = Counter(entry["game"] for entry in tournament_history if "game" in entry)
         if game_counter:
             most_played_game, count = game_counter.most_common(1)[0]
             favorite_game = f"{most_played_game} ({count}x)"
@@ -335,13 +313,9 @@ class StatsGroup(app_commands.Group):
             favorite_game = "Keine Spiele gespielt."
 
         # Embed verschicken
-        await send_tournament_stats(
-            interaction, total_players, total_wins, best_player, favorite_game
-        )
+        await send_tournament_stats(interaction, total_players, total_wins, best_player, favorite_game)
 
-    @app_commands.command(
-        name="team_stats", description="Zeigt Statistiken eines bestimmten Teams."
-    )
+    @app_commands.command(name="team_stats", description="Zeigt Statistiken eines bestimmten Teams.")
     @app_commands.describe(team="Wähle ein Team aus")
     @app_commands.autocomplete(team=autocomplete_teams)
     async def team_stats(self, interaction: Interaction, team: str):
@@ -349,9 +323,7 @@ class StatsGroup(app_commands.Group):
 
         team_data = tournament.get("teams", {}).get(team)
         if not team_data:
-            await interaction.response.send_message(
-                f"⚠ Das Team **{team}** existiert nicht.", ephemeral=True
-            )
+            await interaction.response.send_message(f"⚠ Das Team **{team}** existiert nicht.", ephemeral=True)
             return
 
         wins = team_data.get("wins", 0)
@@ -376,11 +348,7 @@ class StatsGroup(app_commands.Group):
 
         # Filter anwenden, falls Team angegeben
         if team:
-            matches = [
-                match
-                for match in matches
-                if match.get("team") == team or match.get("opponent") == team
-            ]
+            matches = [match for match in matches if match.get("team") == team or match.get("opponent") == team]
 
         if not matches:
             if team:
@@ -388,9 +356,7 @@ class StatsGroup(app_commands.Group):
                     f"⚠️ Keine Matches für Team **{team}** gefunden.", ephemeral=True
                 )
             else:
-                await interaction.response.send_message(
-                    "⚠️ Keine Matches gefunden.", ephemeral=True
-                )
+                await interaction.response.send_message("⚠️ Keine Matches gefunden.", ephemeral=True)
             return
 
         embed = Embed(
@@ -414,9 +380,7 @@ class StatsGroup(app_commands.Group):
 
         await interaction.response.send_message(embed=embed)
 
-    @app_commands.command(
-        name="status", description="Zeigt den aktuellen Turnierstatus an."
-    )
+    @app_commands.command(name="status", description="Zeigt den aktuellen Turnierstatus an.")
     async def status(self, interaction: Interaction):
         tournament = load_tournament_data()
         now = datetime.now()

@@ -158,9 +158,7 @@ async def anmelden(
 
 class PlayerGroup(app_commands.Group):
     def __init__(self):
-        super().__init__(
-            name="player", description="Befehle für Spieleranmeldung und Verfügbarkeit."
-        )
+        super().__init__(name="player", description="Befehle für Spieleranmeldung und Verfügbarkeit.")
 
     @app_commands.command(
         name="update_availability",
@@ -198,9 +196,7 @@ class PlayerGroup(app_commands.Group):
             if sonntag:
                 parse_availability(sonntag)
         except ValueError as e:
-            await interaction.response.send_message(
-                f"🚫 Ungültiges Format: {str(e)}", ephemeral=True
-            )
+            await interaction.response.send_message(f"🚫 Ungültiges Format: {str(e)}", ephemeral=True)
             return
 
         # Turnierdaten laden
@@ -252,9 +248,7 @@ class PlayerGroup(app_commands.Group):
         tournament = load_tournament_data()
 
         if not tournament.get("running", False):
-            await interaction.response.send_message(
-                "Momentan läuft kein Turnier.", ephemeral=True
-            )
+            await interaction.response.send_message("Momentan läuft kein Turnier.", ephemeral=True)
             return
 
         user_mention = interaction.user.mention
@@ -270,9 +264,7 @@ class PlayerGroup(app_commands.Group):
 
         if found_team:
             if tournament.get("registration_open", False):
-                other_members = [
-                    m for m in found_team_entry.get("members", []) if m != user_mention
-                ]
+                other_members = [m for m in found_team_entry.get("members", []) if m != user_mention]
                 del tournament["teams"][found_team]
                 if other_members:
                     verfugbarkeit = found_team_entry.get("verfügbarkeit", "")
@@ -283,17 +275,11 @@ class PlayerGroup(app_commands.Group):
                     # Namen auflösen
                     other_id = int(other_members[0].strip("<@>"))
                     other_member = interaction.guild.get_member(other_id)
-                    other_name = (
-                        other_member.display_name if other_member else other_members[0]
-                    )
+                    other_name = other_member.display_name if other_member else other_members[0]
 
-                    logger.info(
-                        f"[LEAVE] {other_name[0]} wurde aus Team {found_team} in die Solo-Liste übernommen."
-                    )
+                    logger.info(f"[LEAVE] {other_name[0]} wurde aus Team {found_team} in die Solo-Liste übernommen.")
                 save_tournament_data(tournament)
-                logger.info(
-                    f"[LEAVE] {user_name} hat Team {found_team} verlassen. Team wurde aufgelöst."
-                )
+                logger.info(f"[LEAVE] {user_name} hat Team {found_team} verlassen. Team wurde aufgelöst.")
                 await interaction.response.send_message(
                     f"✅ Du wurdest erfolgreich von Team {found_team} abgemeldet.",
                     ephemeral=True,
@@ -302,38 +288,28 @@ class PlayerGroup(app_commands.Group):
             else:
                 del tournament["teams"][found_team]
                 save_tournament_data(tournament)
-                logger.info(
-                    f"[LEAVE] {user_name} hat Team {found_team} verlassen. Turnier war bereits geschlossen."
-                )
-                await interaction.response.send_message(
-                    f"✅ Dein Team {found_team} wurde entfernt.", ephemeral=True
-                )
+                logger.info(f"[LEAVE] {user_name} hat Team {found_team} verlassen. Turnier war bereits geschlossen.")
+                await interaction.response.send_message(f"✅ Dein Team {found_team} wurde entfernt.", ephemeral=True)
                 return
 
         for entry in tournament.get("solo", []):
             if entry.get("player") == user_mention:
                 tournament["solo"].remove(entry)
                 save_tournament_data(tournament)
-                logger.info(
-                    f"[LEAVE] Solo-Spieler {user_name} wurde erfolgreich abgemeldet."
-                )
+                logger.info(f"[LEAVE] Solo-Spieler {user_name} wurde erfolgreich abgemeldet.")
                 await interaction.response.send_message(
                     "✅ Du wurdest erfolgreich aus der Solo-Liste entfernt.",
                     ephemeral=True,
                 )
                 return
 
-        logger.warning(
-            f"[LEAVE] {user_name} wollte sich abmelden, wurde aber nicht gefunden."
-        )
+        logger.warning(f"[LEAVE] {user_name} wollte sich abmelden, wurde aber nicht gefunden.")
         await interaction.response.send_message(
             "⚠ Du bist weder in einem Team noch in der Solo-Liste angemeldet.",
             ephemeral=True,
         )
 
-    @app_commands.command(
-        name="participants", description="Liste aller Teilnehmer anzeigen."
-    )
+    @app_commands.command(name="participants", description="Liste aller Teilnehmer anzeigen.")
     async def participants(self, interaction: Interaction):
         """
         Listet alle aktuellen Teilnehmer (Teams und Einzelspieler), alphabetisch sortiert.
@@ -368,15 +344,11 @@ class PlayerGroup(app_commands.Group):
             full_text += "**Einzelspieler:**\n" + "\n".join(solo_lines)
 
         if not full_text:
-            await interaction.response.send_message(
-                "❌ Es sind noch keine Teilnehmer angemeldet.", ephemeral=True
-            )
+            await interaction.response.send_message("❌ Es sind noch keine Teilnehmer angemeldet.", ephemeral=True)
         else:
             await send_participants_overview(interaction, full_text)
 
-    @app_commands.command(
-        name="join", description="Melde dich solo oder als Team zum Turnier an"
-    )
+    @app_commands.command(name="join", description="Melde dich solo oder als Team zum Turnier an")
     async def join(self, interaction: Interaction):
         modal = TeamFullJoinModal()
         await interaction.response.send_modal(modal)
@@ -392,12 +364,8 @@ class PlayerGroup(app_commands.Group):
         name="request_reschedule",
         description="Fordere eine Neuansetzung für ein Match an.",
     )
-    @app_commands.autocomplete(
-        match_id=match_id_autocomplete, neuer_zeitpunkt=neuer_zeitpunkt_autocomplete
-    )
-    async def request_reschedule(
-        self, interaction: Interaction, match_id: int, neuer_zeitpunkt: str
-    ):
+    @app_commands.autocomplete(match_id=match_id_autocomplete, neuer_zeitpunkt=neuer_zeitpunkt_autocomplete)
+    async def request_reschedule(self, interaction: Interaction, match_id: int, neuer_zeitpunkt: str):
         await handle_request_reschedule(interaction, match_id, neuer_zeitpunkt)
 
 

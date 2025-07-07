@@ -56,9 +56,7 @@ def auto_match_solo():
 
     save_tournament_data(tournament)
 
-    logger.info(
-        f"[MATCHMAKER] {len(new_teams)} neue Teams aus Solo-Spielern erstellt: {', '.join(new_teams.keys())}"
-    )
+    logger.info(f"[MATCHMAKER] {len(new_teams)} neue Teams aus Solo-Spielern erstellt: {', '.join(new_teams.keys())}")
 
     return new_teams
 
@@ -165,9 +163,7 @@ def generate_schedule_overview(matches: list) -> str:
             else:
                 emoji = "🕒"
 
-            description += (
-                f"{emoji} {dt.strftime('%H:%M')} – **{team1}** vs **{team2}**\n"
-            )
+            description += f"{emoji} {dt.strftime('%H:%M')} – **{team1}** vs **{team2}**\n"
 
         description += "\n"
 
@@ -210,9 +206,7 @@ async def cleanup_orphan_teams(channel: TextChannel):
 
     await send_cleanup_summary(channel, teams_deleted, players_rescued)
 
-    logger.info(
-        f"[CLEANUP] {teams_deleted} leere Teams gelöscht, {players_rescued} Spieler gerettet."
-    )
+    logger.info(f"[CLEANUP] {teams_deleted} leere Teams gelöscht, {players_rescued} Spieler gerettet.")
 
 
 def parse_start_hour(availability_str: str) -> int:
@@ -224,9 +218,7 @@ def parse_start_hour(availability_str: str) -> int:
         hour = int(start_time.split(":")[0])
         return hour
     except Exception:
-        logger.warning(
-            f"[SLOT-PLANUNG] Fehler beim Parsen der Verfügbarkeit: {availability_str}"
-        )
+        logger.warning(f"[SLOT-PLANUNG] Fehler beim Parsen der Verfügbarkeit: {availability_str}")
         return 10  # Falls etwas schiefgeht, Standardwert 10 Uhr
 
 
@@ -316,9 +308,7 @@ def generate_weekend_slots(tournament: dict) -> list:
 
     logger.info(f"[SLOT-PLANUNG] Gesamtmatches: {total_matches}")
     logger.info(f"[SLOT-PLANUNG] Wochenendtage gefunden: {total_days}")
-    logger.info(
-        f"[SLOT-PLANUNG] Erforderliche Slots pro Tag: {required_slots_per_day} (begrenzt auf {slots_per_day})"
-    )
+    logger.info(f"[SLOT-PLANUNG] Erforderliche Slots pro Tag: {required_slots_per_day} (begrenzt auf {slots_per_day})")
     logger.info(f"[SLOT-PLANUNG] Insgesamt {len(slots)} Slots generiert.")
 
     return slots
@@ -328,9 +318,7 @@ def generate_weekend_slots(tournament: dict) -> list:
 # Matches zu Slots zuweisen
 # ------------------
 def assign_matches_to_slots(matches: list, slots: list, tournament: dict):
-    logger.info(
-        f"[MATCHMAKER] Starte Slot-Zuweisung für {len(matches)} Matches auf {len(slots)} Slots."
-    )
+    logger.info(f"[MATCHMAKER] Starte Slot-Zuweisung für {len(matches)} Matches auf {len(slots)} Slots.")
     scheduled_slots = set()
     team_last_slot = {}
     team_matches_per_day = {}
@@ -357,26 +345,18 @@ def assign_matches_to_slots(matches: list, slots: list, tournament: dict):
                 continue
 
             # Optional: Max. 1 Match pro Tag für ein Team
-            if team_matches_per_day.get((team1, slot_date)) or team_matches_per_day.get(
-                (team2, slot_date)
-            ):
+            if team_matches_per_day.get((team1, slot_date)) or team_matches_per_day.get((team2, slot_date)):
                 continue
 
             # Optional: Pause zwischen Spielen
             if (
                 team_last_slot.get(team1)
-                and (
-                    slot_datetime - datetime.fromisoformat(team_last_slot[team1])
-                ).total_seconds()
-                < 30 * 60
+                and (slot_datetime - datetime.fromisoformat(team_last_slot[team1])).total_seconds() < 30 * 60
             ):
                 continue
             if (
                 team_last_slot.get(team2)
-                and (
-                    slot_datetime - datetime.fromisoformat(team_last_slot[team2])
-                ).total_seconds()
-                < 30 * 60
+                and (slot_datetime - datetime.fromisoformat(team_last_slot[team2])).total_seconds() < 30 * 60
             ):
                 continue
 
@@ -399,14 +379,10 @@ def assign_matches_to_slots(matches: list, slots: list, tournament: dict):
                 if slot not in scheduled_slots:
                     match["scheduled_time"] = slot
                     scheduled_slots.add(slot)
-                    logger.warning(
-                        f"[MATCHMAKER] [RESCUE] {team1} vs {team2} auf {slot} zwangsweise gelegt."
-                    )
+                    logger.warning(f"[MATCHMAKER] [RESCUE] {team1} vs {team2} auf {slot} zwangsweise gelegt.")
                     break
 
-    logger.info(
-        f"[MATCHMAKER] Slot-Zuweisung abgeschlossen. {len(scheduled_slots)} Slots wurden belegt."
-    )
+    logger.info(f"[MATCHMAKER] Slot-Zuweisung abgeschlossen. {len(scheduled_slots)} Slots wurden belegt.")
 
 
 # ------------------

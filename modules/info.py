@@ -14,9 +14,7 @@ from modules.matchmaker import generate_schedule_overview
 
 class InfoGroup(app_commands.Group):
     def __init__(self):
-        super().__init__(
-            name="info", description="Infos über das Turnier und deine Teilnahme."
-        )
+        super().__init__(name="info", description="Infos über das Turnier und deine Teilnahme.")
 
     @app_commands.command(
         name="team",
@@ -86,17 +84,13 @@ class InfoGroup(app_commands.Group):
         )
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
-    @app_commands.command(
-        name="match_schedule", description="Zeigt den aktuellen Spielplan an."
-    )
+    @app_commands.command(name="match_schedule", description="Zeigt den aktuellen Spielplan an.")
     async def match_schedule(self, interaction: Interaction):
         tournament = load_tournament_data()
         matches = tournament.get("matches", [])
 
         if not matches:
-            await interaction.response.send_message(
-                "⚠️ Kein Spielplan vorhanden.", ephemeral=True
-            )
+            await interaction.response.send_message("⚠️ Kein Spielplan vorhanden.", ephemeral=True)
             return
 
         description_text = generate_schedule_overview(matches)
