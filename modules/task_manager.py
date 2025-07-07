@@ -23,7 +23,7 @@ def cancel_all_tasks():
                 logger.info(f"[TASK-MANAGER] Cancelling Task: {name}")
             except Exception:
                 pass
-                task.cancel()
+            task.cancel()
         all_tasks.pop(name, None)
 
 

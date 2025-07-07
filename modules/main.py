@@ -20,7 +20,7 @@ from modules.dataStorage import (
 )
 from modules.logger import logger
 from modules.reminder import match_reminder_loop
-from modules.task_manager import add_task, cancel_all_tasks
+from modules.task_manager import add_task, cancel_all_tasks, get_all_tasks
 
 load_dotenv()
 TOKEN = os.getenv("DISCORD_TOKEN")
@@ -79,8 +79,6 @@ EXTENSIONS = [
 ]
 
 # ========== EVENTS ==========
-
-
 @bot.event
 async def on_ready():
     # --- Startup-Checks ---
@@ -93,6 +91,13 @@ async def on_ready():
     except Exception as e:
         logger.warning(f"[STARTUP] Keine Tasks oder Fehler beim Cancelen: {e}")
 
+    for folder in ["logs", "backups", "archive", "data", "langs", "configs"]:
+        if not os.path.exists(folder):
+            os.makedirs(folder)
+            logger.info(f"[STARTUP] Verzeichnis angelegt: {folder}")
+        else:
+            logger.info(f"[STARTUP] Verzeichnis vorhanden: {folder}")
+
     required_files = ["data/data.json", "configs/config.json", "configs/names_de.json"]
     for f in required_files:
         if not os.path.exists(f):
@@ -104,13 +109,6 @@ async def on_ready():
                 logger.info(f"[STARTUP] Datei OK: {f}")
             except Exception as e:
                 logger.error(f"[STARTUP] Datei beschädigt: {f} – {e}")
-
-    for folder in ["logs", "backups", "archive", "data"]:
-        if not os.path.exists(folder):
-            os.makedirs(folder)
-            logger.info(f"[STARTUP] Verzeichnis angelegt: {folder}")
-        else:
-            logger.info(f"[STARTUP] Verzeichnis vorhanden: {folder}")
 
     # Check Channels
     await validate_channels(bot)
@@ -145,8 +143,6 @@ async def on_ready():
 
 
 # ========== EXTENSIONS LADEN & BOT STARTEN ==========
-
-
 async def main():
     # Extensions/Cogs laden
     for ext in EXTENSIONS:

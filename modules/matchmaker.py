@@ -135,7 +135,7 @@ def generate_schedule_overview(matches: list) -> str:
     for match in matches:
         scheduled_time = match.get("scheduled_time")
         if scheduled_time:
-            dt = datetime.strptime(scheduled_time, "%Y-%m-%dT%H:%M:%S")
+            dt = datetime.fromisoformat(scheduled_time)
             day = dt.strftime("%d.%m.%Y %A")
             schedule_by_day[day].append((dt, match))  # Speichere datetime + Match
 
