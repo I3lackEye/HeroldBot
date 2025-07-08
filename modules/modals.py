@@ -5,7 +5,8 @@ from discord import Interaction
 from discord.ui import Modal, Select, TextInput, View
 
 # Lokale Modules
-from modules.dataStorage import load_tournament_data, save_tournament_data
+from modules.dataStorage import load_tournament_data, save_tournament_data, add_game
+from modules.logger import logger
 from modules.utils import (
     generate_team_name,
     validate_date,
@@ -40,8 +41,11 @@ def find_member(guild, search_str):
     return None
 
 
-class TestModal(Modal, title="Testmodal"):
-    test = TextInput(label="Testfeld")
+class TestModal(discord.ui.Modal, title="Test funktioniert?"):
+    test = discord.ui.TextInput(label="Ein Testfeld")
+
+    async def on_submit(self, interaction: discord.Interaction):
+        await interaction.response.defer()
 
 
 class TeamFullJoinModal(Modal):
@@ -168,3 +172,40 @@ class TeamFullJoinModal(Modal):
                 f"Blockierte Tage: {', '.join(unavailable_list) if unavailable_list else 'Keine'}",
                 ephemeral=True,
             )
+class AddGameModal(discord.ui.Modal, title="Neues Spiel hinzufügen"):
+    name = discord.ui.TextInput(label="Anzeigename", max_length=50)
+    genre = discord.ui.TextInput(label="Genre (z.B. MOBA, Denkspiel)", max_length=30)
+    platform = discord.ui.TextInput(label="Plattform (z.B. PC, Offline)", default="PC", max_length=20)
+    team_size = discord.ui.TextInput(label="Teamgröße pro Team (z.B. 1 oder 5)", default="1")
+    match_duration = discord.ui.TextInput(label="Matchdauer in Minuten", default="60")
+
+    async def on_submit(self, interaction: discord.Interaction):
+        try:
+            tournament = load_tournament_data()
+            team_size_int = int(self.team_size.value)
+            duration = int(self.match_duration.value)
+
+            # Spiel-ID automatisch generieren (z. B. "League of Legends" → "League_of_Legends")
+            game_id = self.name.value.strip().replace(" ", "_")
+
+            add_game(
+                game_id=game_id,
+                name=self.name.value.strip(),
+                genre=self.genre.value.strip(),
+                platform=self.platform.value.strip(),
+                match_duration_minutes=duration,
+                pause_minutes=30,  # Default-Wert für Pause
+                min_players_per_team=team_size_int,
+                max_players_per_team=team_size_int,
+                emoji="🎮"  # Default-Emoji
+            )
+
+            save_tournament_data(tournament)
+            await interaction.response.send_message(
+                f"✅ Spiel **{self.name.value}** wurde gespeichert als `{game_id}`.",
+                ephemeral=True
+            )
+
+        except Exception as e:
+            logger.error(f"[ADD_GAME_MODAL] Fehler im on_submit: {e}")
+            await interaction.response.send_message(f"❌ Fehler beim Speichern: {e}", ephemeral=True)

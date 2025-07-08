@@ -33,25 +33,6 @@ def load_config(config_path="../configs/config.json"):
         logger.error(f"Error parsing config file: {e}")
         return {}
 
-
-def load_games() -> list:
-    """
-    Lädt die Liste aller verfügbaren Spiele aus data/games.json.
-    """
-    try:
-        current_dir = os.path.dirname(__file__)
-        games_path = os.path.join(current_dir, "../data/games.json")
-        with open(games_path, "r", encoding="utf-8") as file:
-            games_data = json.load(file)
-        return games_data.get("games", [])
-    except FileNotFoundError:
-        logger.error("[GAMES] games.json nicht gefunden!")
-        return []
-    except json.JSONDecodeError as e:
-        logger.error(f"[GAMES] Fehler beim Parsen der games.json: {e}")
-        return []
-
-
 def load_names(language="de"):
     path = f"configs/names_{language}.json"
     with open(path, "r", encoding="utf-8") as f:
@@ -182,10 +163,7 @@ def save_global_data(data):
         json.dump(data, file, indent=4, ensure_ascii=False)
 
 
-def save_games(games: list):
-    """
-    Speichert die Spieleliste in data/games.json.
-    """
+def save_games(games: dict):
     try:
         current_dir = os.path.dirname(__file__)
         games_path = os.path.join(current_dir, "../data/games.json")
@@ -193,6 +171,24 @@ def save_games(games: list):
             json.dump({"games": games}, file, indent=2, ensure_ascii=False)
     except Exception as e:
         logger.error(f"[GAMES] Fehler beim Speichern der games.json: {e}")
+
+
+def load_games() -> dict:
+    """
+    Lädt die Spiele als Dict aus data/games.json (Format: {"games": {...}})
+    """
+    try:
+        current_dir = os.path.dirname(__file__)
+        games_path = os.path.join(current_dir, "../data/games.json")
+        with open(games_path, "r", encoding="utf-8") as file:
+            games_data = json.load(file)
+        return games_data.get("games", {})  # <- dict statt []
+    except FileNotFoundError:
+        logger.error("[GAMES] games.json nicht gefunden!")
+        return {}
+    except json.JSONDecodeError as e:
+        logger.error(f"[GAMES] Fehler beim Parsen der games.json: {e}")
+        return {}
 
 
 # Funktionen für turnierspezifische Daten (tournament.json)
@@ -240,44 +236,50 @@ def reset_tournament():
     logger.info(f"[RESET] Turnierdaten wurden erfolgreich zurückgesetzt.")
 
 
-def add_game(game_title: str):
+def add_game(game_id: str, *,
+             name: str,
+             genre: str,
+             platform: str,
+             match_duration_minutes: int,
+             pause_minutes: int,
+             min_players_per_team: int,
+             max_players_per_team: int,
+             visible_in_poll: bool = True,
+             emoji: str = "🎮") -> None:
     """
-    Fügt ein neues Spiel in data/games.json hinzu.
-
-    :param game_title: Der Titel des Spiels als String.
-    :raises ValueError: Falls der Spielname länger als die erlaubte Länge ist.
+    Fügt ein Spiel zur globalen Spieleliste (games.json) hinzu.
     """
-    MAX_TITLE_LENGTH = config.get("STR_MAX_LENGTH", 100)  # fallback falls config fehlt
+    all_games = load_games()  # gibt dict mit game_id: {...}
 
-    if len(game_title) > MAX_TITLE_LENGTH:
-        raise ValueError(f"Der Spielname darf maximal {MAX_TITLE_LENGTH} Zeichen lang sein.")
+    if game_id in all_games:
+        raise ValueError(f"Spiel-ID '{game_id}' existiert bereits.")
+    if min_players_per_team > max_players_per_team:
+        raise ValueError("min_players_per_team darf nicht größer sein als max_players_per_team.")
 
+    all_games[game_id] = {
+        "name": name,
+        "genre": genre,
+        "platform": platform,
+        "match_duration_minutes": match_duration_minutes,
+        "pause_minutes": pause_minutes,
+        "min_players_per_team": min_players_per_team,
+        "max_players_per_team": max_players_per_team,
+        "visible_in_poll": visible_in_poll,
+        "emoji": emoji
+    }
+
+    save_games(all_games)
+    logger.info(f"[GAME] Spiel '{name}' ({game_id}) erfolgreich hinzugefügt.")
+
+
+def remove_game(game_id: str) -> None:
     games = load_games()
+    if game_id not in games:
+        raise ValueError(f"Spiel '{game_id}' wurde nicht gefunden.")
 
-    if game_title in games:
-        logger.warning(f"[GAMES] Das Spiel '{game_title}' existiert bereits.")
-        return
-
-    games.append(game_title)
+    del games[game_id]
     save_games(games)
-    logger.info(f"[GAMES] Spiel '{game_title}' erfolgreich gespeichert.")
-
-
-def remove_game(game_title: str):
-    """
-    Entfernt ein Spiel aus data/games.json.
-
-    :param game_title: Der Titel des Spiels, das entfernt werden soll.
-    """
-    games = load_games()
-
-    if game_title not in games:
-        logger.warning(f"[GAMES] Das Spiel '{game_title}' wurde nicht gefunden.")
-        return
-
-    games.remove(game_title)
-    save_games(games)
-    logger.info(f"[GAMES] Spiel '{game_title}' erfolgreich entfernt.")
+    logger.info(f"[GAME] Spiel '{game_id}' wurde gelöscht.")
 
 
 def backup_current_state():

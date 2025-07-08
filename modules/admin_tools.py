@@ -11,6 +11,7 @@ from discord.ext import commands
 from modules.archive import archive_current_tournament
 from modules.dataStorage import (
     add_game,
+    remove_game,
     load_global_data,
     load_tournament_data,
     remove_game,
@@ -19,6 +20,7 @@ from modules.dataStorage import (
 )
 from modules.embeds import send_match_schedule
 from modules.logger import logger
+from modules.modals import AddGameModal, TestModal
 from modules.matchmaker import (
     auto_match_solo,
     cleanup_orphan_teams,
@@ -33,7 +35,7 @@ from modules.shared_states import pending_reschedules
 from modules.tournament import end_tournament_procedure
 from modules.utils import (
     autocomplete_teams,
-    game_autocomplete,
+    games_autocomplete,
     has_permission,
     smart_send,
 )
@@ -162,41 +164,25 @@ class AdminGroup(app_commands.Group):
 
         await end_tournament_procedure(interaction.channel, manual_trigger=True)
 
-    @app_commands.command(
-        name="add_game",
-        description="Admin-Befehl: Fügt ein neues Spiel zur Spielauswahl hinzu.",
-    )
-    @app_commands.describe(game="Name des Spiels, das hinzugefügt werden soll.")
-    async def add_game_command(self, interaction: Interaction, game: str):
+    @app_commands.command(name="add_game", description="Admin-Befehl: Fügt ein neues Spiel zur Spielauswahl hinzu.",)
+    async def add_game_command(self, interaction: Interaction):
         if not has_permission(interaction.user, "Moderator", "Admin"):
             await interaction.response.send_message("🚫 Du hast keine Berechtigung für diesen Befehl.", ephemeral=True)
             return
 
-        try:
-            add_game(game)  # --> nutzt deine Backend-Logik!
-            await interaction.response.send_message(
-                f"✅ Das Spiel **{game}** wurde erfolgreich hinzugefügt.",
-                ephemeral=True,
-            )
-        except ValueError as e:
-            await interaction.response.send_message(f"⚠️ {str(e)}", ephemeral=True)
+        await interaction.response.send_modal(AddGameModal())
 
-    @app_commands.command(
-        name="remove_game",
-        description="Admin-Befehl: Entfernt ein Spiel aus der Spielauswahl.",
-    )
-    @app_commands.describe(game="Name des Spiels, das entfernt werden soll.")
-    @app_commands.autocomplete(game=game_autocomplete)
+    @app_commands.command(name="remove_game", description="Entfernt ein Spiel aus der globalen Spielesammlung.")
+    @app_commands.describe(game="Spiel-ID oder Name des Spiels")
+    @app_commands.autocomplete(game=games_autocomplete)
     async def remove_game_command(self, interaction: Interaction, game: str):
         if not has_permission(interaction.user, "Moderator", "Admin"):
-            await interaction.response.send_message("🚫 Du hast keine Berechtigung für diesen Befehl.", ephemeral=True)
+            await interaction.response.send_message("🚫 Keine Berechtigung.", ephemeral=True)
             return
 
         try:
             remove_game(game)
-            await interaction.response.send_message(
-                f"✅ Das Spiel **{game}** wurde erfolgreich entfernt.", ephemeral=True
-            )
+            await interaction.response.send_message(f"🗑 Spiel `{game}` wurde entfernt.", ephemeral=True)
         except ValueError as e:
             await interaction.response.send_message(f"⚠️ {str(e)}", ephemeral=True)
 

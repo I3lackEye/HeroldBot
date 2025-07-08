@@ -12,7 +12,7 @@ import json
 from discord import TextChannel
 
 # Lokale Module
-from modules.dataStorage import load_tournament_data, save_tournament_data
+from modules.dataStorage import load_tournament_data, save_tournament_data, DEBUG_MODE
 from modules.embeds import send_cleanup_summary
 from modules.logger import logger
 from modules.utils import generate_team_name
@@ -131,6 +131,10 @@ def generate_schedule_overview(matches: list) -> str:
     Erzeugt einen schön gruppierten Spielplan aus der übergebenen Matchliste.
     Hebt Matches von HEUTE mit 🔥 hervor, erledigte Matches mit ✅.
     """
+    logger.debug(f"[DEBUG] {len(matches)} Matches erhalten.")
+    scheduled_count = sum(1 for m in matches if m.get("scheduled_time"))
+    logger.debug(f"[DEBUG] Davon mit scheduled_time: {scheduled_count}")
+
     if not matches:
         return "Keine Matches geplant."
 
@@ -161,7 +165,9 @@ def generate_schedule_overview(matches: list) -> str:
             match_status = match.get("status", "offen")
 
             # Emoji bestimmen
-            if match_status == "erledigt":
+            if match.get("rescue_assigned"):
+                emoji = "❗"
+            elif match_status == "erledigt":
                 emoji = "✅"
             elif dt.date() == today:
                 emoji = "🔥"
@@ -365,6 +371,8 @@ def assign_best_slot_per_match(match_slots: dict, matches: list) -> list:
     used_slots = set()
     assigned = 0
     last_slot_per_team = {}
+    unassigned_matches = []
+    rejection_reasons = []
 
     for match in matches:
         match_id = match["match_id"]
@@ -376,16 +384,19 @@ def assign_best_slot_per_match(match_slots: dict, matches: list) -> list:
             slot_str = slot.isoformat()
             slot_date = slot.date()
 
-            # Prüfe Pausen zwischen Spielen
-            if not is_minimum_pause_respected(last_slot_per_team, team1, team2, slot):
-                logger.debug(f"[MATCHMAKER] Pausebedingung nicht erfüllt bei Match {match_id}.")
-                continue
-
-            # Slot schon belegt?
+            # 1. Slot bereits belegt?
+            slot_str = slot.isoformat()
             if slot_str in used_slots:
+                rejection_reasons.append("Slot belegt")
                 continue
 
-            # Prüfe Teilnahme-Zeitbudget pro Tag
+            # 2. Pausenbedingung prüfen
+            if not is_minimum_pause_respected(last_slot_per_team, team1, team2, slot):
+                rejection_reasons.append("Pause zu kurz")
+                continue
+
+            # 3. Zeitbudget prüfen
+            slot_date = slot.date()
             team1_budget = get_team_time_budget(team1, slot_date, matches)
             team2_budget = get_team_time_budget(team2, slot_date, matches)
 
@@ -393,13 +404,10 @@ def assign_best_slot_per_match(match_slots: dict, matches: list) -> list:
                 team1_budget + MATCH_DURATION + PAUSE_DURATION > MAX_TIME_BUDGET
                 or team2_budget + MATCH_DURATION + PAUSE_DURATION > MAX_TIME_BUDGET
             ):
-                logger.debug(
-                    f"[MATCHMAKER] Slot {slot_str} abgelehnt wegen Budget: "
-                    f"{team1}={team1_budget}, {team2}={team2_budget}"
-                )
+                rejection_reasons.append("Zeitbudget überschritten")
                 continue
 
-            # Slot passt – Zuweisung
+            # ➤ Wenn wir hier sind, passt der Slot:
             match["scheduled_time"] = slot_str
             used_slots.add(slot_str)
             last_slot_per_team[team1] = slot
@@ -409,11 +417,93 @@ def assign_best_slot_per_match(match_slots: dict, matches: list) -> list:
             break
 
         if not match.get("scheduled_time"):
+            reason_text = ", ".join(set(rejection_reasons)) if rejection_reasons else "Unbekannt"
+            logger.warning(f"[MATCHMAKER] Kein Slot gefunden für Match {match_id} ({team1} vs {team2}) – Gründe: {reason_text}")
+            unassigned_matches.append({
+                "match_id": match_id,
+                "team1": team1,
+                "team2": team2,
+                "reasons": reason_text
+            })
+
+        if not match.get("scheduled_time"):
             logger.warning(f"[MATCHMAKER] Kein Slot gefunden für Match {match_id}. Rescue wird benötigt.")
 
-    logger.info(f"[MATCHMAKER] {assigned} Matches erfolgreich geplant.")
-    return matches
+    total = len(matches)
+    planned = total - len(unassigned_matches)
 
+    logger.info(f"[MATCHMAKER] Slot-Zuweisung abgeschlossen: {planned}/{total} Matches geplant.")
+
+    if unassigned_matches:
+        logger.warning(f"[MATCHMAKER] {len(unassigned_matches)} Matches konnten nicht zugewiesen werden:")
+        for m in unassigned_matches:
+            logger.warning(f" - Match {m['match_id']}: {m['team1']} vs {m['team2']}")
+    logger.info(f"[MATCHMAKER] {assigned} Matches erfolgreich geplant.")
+    if DEBUG_MODE >= 1:
+        try:
+            debug_data = {
+                "unassigned_matches": unassigned_matches
+            }
+            os.makedirs("debug", exist_ok=True)
+            with open("debug/unassigned_matches.json", "w", encoding="utf-8") as f:
+                json.dump({"unassigned_matches": unassigned_matches}, f, indent=2, ensure_ascii=False)
+            logger.info("[MATCHMAKER] Unassigned Matches in unassigned_matches.json gespeichert.")
+        except Exception as e:
+            logger.warning(f"[MATCHMAKER] Fehler beim Speichern der Diagnose-Datei: {e}")
+
+    return matches, unassigned_matches
+
+
+def assign_rescue_slots(unassigned_matches, matches, match_slots, teams):
+    """
+    Versucht Matches aus der unassigned_matches-Liste trotzdem zu planen,
+    indem Pausen und Tages-Budget ignoriert werden.
+    Markiert diese mit 'rescue_assigned': True.
+    """
+    rescue_assigned = 0
+    used_slots = set(m.get("scheduled_time") for m in matches if m.get("scheduled_time"))
+    logger.info(f"[RESCUE] Starte Rescue-Modus für {len(unassigned_matches)} Matches.")
+
+    for problem in unassigned_matches:
+        match_id = problem["match_id"]
+        team1 = problem["team1"]
+        team2 = problem["team2"]
+
+        match = next((m for m in matches if m["match_id"] == match_id), None)
+        if not match:
+            continue
+
+        possible_slots = match_slots.get(match_id, [])
+        if not possible_slots:
+            logger.warning(f"[RESCUE] Keine verfügbaren Slots für Match {match_id}.")
+            continue
+
+        for slot in sorted(possible_slots):
+            slot_str = slot.isoformat()
+            logger.info(f"[RESCUE] → Match {match_id} geplant auf {slot_str}")
+            if slot_str in used_slots:
+                continue  # Slot schon vergeben
+
+            # Slot zuweisen trotz gelockerter Bedingungen
+            match["scheduled_time"] = slot_str
+            match["rescue_assigned"] = True
+            used_slots.add(slot_str)
+            rescue_assigned += 1
+
+            logger.info(
+                f"[RESCUE] Match {match_id} ({team1} vs {team2}) geplant auf {slot_str} "
+                f"(Regeln gelockert – ursprüngliche Gründe: {problem.get('reasons')})"
+            )
+            break
+
+        if not match.get("scheduled_time"):
+            logger.warning(
+                f"[RESCUE] Selbst im Rescue-Modus kein Slot für Match {match_id} ({team1} vs {team2}) gefunden."
+            )
+
+    logger.info(f"[RESCUE] Insgesamt {rescue_assigned} Matches im Rescue-Modus zugewiesen.")
+    logger.debug(f"[RESCUE] Match {match_id} → Slot: {slot_str}")
+    return matches
 
 
 async def generate_slots_from_team_availability():
@@ -427,12 +517,15 @@ async def generate_slots_from_team_availability():
         return
 
     slot_map = get_all_possible_slots(tournament)
-    updated_matches = assign_best_slot_per_match(slot_map, matches)
+    teams = tournament.get("teams", {})
+
+    updated_matches, unassigned_matches = assign_best_slot_per_match(slot_map, matches)
+    updated_matches = assign_rescue_slots(unassigned_matches, updated_matches, slot_map, teams)
+
     tournament["matches"] = updated_matches
     save_tournament_data(tournament)
 
     logger.info("[MATCHMAKER] Dynamische Slot-Zuweisung abgeschlossen.")
-
 
 # ------------------
 # Alles zusammenbauen

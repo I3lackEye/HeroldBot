@@ -489,12 +489,13 @@ async def autocomplete_teams(interaction: Interaction, current: str):
     return suggestions
 
 
-async def game_autocomplete(interaction: Interaction, current: str):
+async def games_autocomplete(interaction: discord.Interaction, current: str):
     games = load_games()
-
-    return [app_commands.Choice(name=game, value=game) for game in games if current.lower() in game.lower()][
-        :25
-    ]  # Discord API erlaubt max 25 Ergebnisse
+    return [
+        app_commands.Choice(name=cfg["name"], value=gid)
+        for gid, cfg in games.items()
+        if current.lower() in gid.lower() or current.lower() in cfg.get("name", "").lower()
+    ][:25]  # Discord API max 25
 
 
 def all_matches_completed() -> bool:
