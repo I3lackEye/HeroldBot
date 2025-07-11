@@ -19,7 +19,7 @@ from modules.embeds import (
     send_request_reschedule,
 )
 from modules.logger import logger
-from modules.matchmaker import get_all_possible_slots
+from modules.matchmaker import generate_slot_matrix, get_valid_slots_for_match
 from modules.shared_states import pending_reschedules
 from modules.utils import get_player_team, get_team_open_matches, smart_send
 from views.reschedule_view import RescheduleView
@@ -31,8 +31,6 @@ RESCHEDULE_TIMEOUT_HOURS = int(config.get("RESCHEDULE_TIMEOUT_HOURS", 24))
 # ---------------------------------------
 # Helper: IDs extrahieren
 # ---------------------------------------
-
-
 def extract_ids(members):
     ids = []
     for m in members:
@@ -40,6 +38,25 @@ def extract_ids(members):
         if match:
             ids.append(match.group(0))
     return ids
+
+
+def get_free_slots_for_match(tournament, match_id: int) -> list[datetime]:
+    """
+    Gibt alle erlaubten und freien Slots für ein bestimmtes Match zurück.
+    """
+    match = next((m for m in tournament.get("matches", []) if m["match_id"] == match_id), None)
+    if not match:
+        return []
+
+    team1 = match["team1"]
+    team2 = match["team2"]
+    slot_matrix = generate_slot_matrix(tournament)
+
+    all_valid = get_valid_slots_for_match(team1, team2, slot_matrix)
+
+    # Entferne bereits belegte Slots
+    booked = {m["scheduled_time"] for m in tournament["matches"] if m.get("scheduled_time")}
+    return [slot for slot in all_valid if slot.isoformat() not in booked]
 
 
 # ---------------------------------------
@@ -91,11 +108,13 @@ async def handle_request_reschedule(interaction: Interaction, match_id: int, neu
         await interaction.response.send_message("🚫 Der neue Zeitpunkt muss in der Zukunft liegen!", ephemeral=True)
         return
 
-    match_slots = get_all_possible_slots(tournament)
-    allowed_slots = match_slots.get(match_id, [])
+    # ✅ Slots prüfen – neue Matrix-basierte Logik
+    allowed_slots = get_free_slots_for_match(tournament, match_id)
     allowed_iso = {slot.isoformat() for slot in allowed_slots}
-    booked_slots = set(m["scheduled_time"] for m in tournament.get("matches", []) if m.get("scheduled_time"))
+
+    booked_slots = {m["scheduled_time"] for m in tournament["matches"] if m.get("scheduled_time")}
     free_slots = [slot for slot in allowed_iso if slot not in booked_slots]
+
     future_slots = [
         datetime.fromisoformat(slot).astimezone(ZoneInfo("Europe/Berlin"))
         for slot in free_slots
@@ -106,6 +125,7 @@ async def handle_request_reschedule(interaction: Interaction, match_id: int, neu
         await interaction.response.send_message("🚫 Der gewählte Zeitpunkt ist kein erlaubter Slot!", ephemeral=True)
         return
 
+    # 3️⃣ Match darf nicht zu knapp vor Start liegen
     scheduled_time_str = match.get("scheduled_time")
     if scheduled_time_str:
         scheduled_dt = datetime.fromisoformat(scheduled_time_str)
@@ -116,7 +136,7 @@ async def handle_request_reschedule(interaction: Interaction, match_id: int, neu
             )
             return
 
-    # 3️⃣ Anfrage starten
+    # 4️⃣ Anfrage starten
     pending_reschedules.add(match_id)
     interaction.client.loop.create_task(start_reschedule_timer(interaction.client, match_id))
 
@@ -131,7 +151,7 @@ async def handle_request_reschedule(interaction: Interaction, match_id: int, neu
         await interaction.followup.send("🚫 Keine Berechtigung im Reschedule-Channel.", ephemeral=True)
         return
 
-    # 4️⃣ Teilnehmer vorbereiten
+    # 5️⃣ Teilnehmer vorbereiten
     team1 = match["team1"]
     team2 = match["team2"]
     members_team1 = tournament.get("teams", {}).get(team1, {}).get("members", [])
@@ -156,13 +176,14 @@ async def handle_request_reschedule(interaction: Interaction, match_id: int, neu
         )
         return
 
-    # 5️⃣ Anfrage-Embed und View senden
+    # 6️⃣ Anfrage-Embed und View senden
     await send_request_reschedule(reschedule_channel, match_id, team1, team2, new_dt, valid_members)
 
-    # 6️⃣ Abschlussnachricht
+    # 7️⃣ Abschlussnachricht
     await interaction.followup.send("✅ Deine Reschedule-Anfrage wurde im Channel erstellt!", ephemeral=True)
 
     logger.info(f"[RESCHEDULE] Anfrage von {team_name} für Match {match_id} gestartet.")
+
 
 
 # ---------------------------------------
@@ -193,22 +214,11 @@ async def match_id_autocomplete(interaction: Interaction, current: str):
 # ---------------------------------------
 # Helper: Autocomplete für neue Terminwahl
 # ---------------------------------------
-
-
 async def neuer_zeitpunkt_autocomplete(interaction: Interaction, current: str):
     tournament = load_tournament_data()
 
     try:
-        match_slots = get_all_possible_slots(tournament)
-        user_id = str(interaction.user.id)
-        team_name = get_player_team(user_id)
-        match_id_candidates = get_team_open_matches(team_name)
-        if not match_id_candidates:
-            return []
-
-        match_id = match_id_candidates[0]["match_id"]
-
-        allowed_slots = match_slots.get(match_id, [])
+        allowed_slots = get_free_slots_for_match(tournament, match_id)
         allowed_iso = {slot.isoformat() for slot in allowed_slots}
 
     except ValueError:

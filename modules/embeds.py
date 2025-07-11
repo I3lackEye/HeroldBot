@@ -10,14 +10,12 @@ from zoneinfo import ZoneInfo
 import discord
 from discord import Embed, Interaction, TextChannel
 
-
+from modules.dataStorage import REMINDER_PING, load_tournament_data
+from modules.logger import logger
 
 # Lokale Module
 from modules.utils import load_config, smart_send
 from views.reschedule_view import RescheduleView
-from modules.dataStorage import load_tournament_data
-from modules.logger import logger
-from modules.dataStorage import REMINDER_PING
 
 
 def load_embed_template(template_name: str, category: str = "default") -> dict:

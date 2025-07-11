@@ -19,6 +19,7 @@ REMINDER_PING = int(os.getenv("REMINDER_PING", "0"))
 TOKEN = os.getenv("DISCORD_TOKEN")
 DEBUG_MODE = int(os.getenv("DEBUG", "0"))
 
+
 def load_config(config_path="../configs/config.json"):
     try:
         current_dir = os.path.dirname(__file__)
@@ -33,8 +34,9 @@ def load_config(config_path="../configs/config.json"):
         logger.error(f"Error parsing config file: {e}")
         return {}
 
+
 def load_names(language="de"):
-    path = f"configs/names_{language}.json"
+    path = f"langs/{language}/names_{language}.json"
     with open(path, "r", encoding="utf-8") as f:
         return json.load(f)
 
@@ -236,16 +238,19 @@ def reset_tournament():
     logger.info(f"[RESET] Turnierdaten wurden erfolgreich zurückgesetzt.")
 
 
-def add_game(game_id: str, *,
-             name: str,
-             genre: str,
-             platform: str,
-             match_duration_minutes: int,
-             pause_minutes: int,
-             min_players_per_team: int,
-             max_players_per_team: int,
-             visible_in_poll: bool = True,
-             emoji: str = "🎮") -> None:
+def add_game(
+    game_id: str,
+    *,
+    name: str,
+    genre: str,
+    platform: str,
+    match_duration_minutes: int,
+    pause_minutes: int,
+    min_players_per_team: int,
+    max_players_per_team: int,
+    visible_in_poll: bool = True,
+    emoji: str = "🎮",
+) -> None:
     """
     Fügt ein Spiel zur globalen Spieleliste (games.json) hinzu.
     """
@@ -265,7 +270,7 @@ def add_game(game_id: str, *,
         "min_players_per_team": min_players_per_team,
         "max_players_per_team": max_players_per_team,
         "visible_in_poll": visible_in_poll,
-        "emoji": emoji
+        "emoji": emoji,
     }
 
     save_games(all_games)

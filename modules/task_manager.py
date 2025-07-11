@@ -12,10 +12,7 @@ def add_task(name, task):
     if name in all_tasks and not all_tasks[name]["task"].done():
         logger.info(f"[TASK-MANAGER] Task '{name}' wird überschrieben und alter Task gecancelt.")
         all_tasks[name]["task"].cancel()
-    all_tasks[name] = {
-        "task": task,
-        "coro": str(task.get_coro().__name__) if hasattr(task, "get_coro") else "unknown"
-    }
+    all_tasks[name] = {"task": task, "coro": str(task.get_coro().__name__) if hasattr(task, "get_coro") else "unknown"}
     logger.info(f"[TASK-MANAGER] Task '{name}' gestartet.")
 
 
@@ -39,8 +36,6 @@ def log_active_tasks():
         task = entry["task"]
         coro = entry["coro"]
         logger.info(f"[TASK-MANAGER] Task: {name}, done={task.done()}, cancelled={task.cancelled()}, coroutine={coro}")
-
-
 
 
 def get_all_tasks():

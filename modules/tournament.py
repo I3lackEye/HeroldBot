@@ -70,124 +70,6 @@ class TournamentCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    @app_commands.command(name="start_tournament", description="Starte ein neues Turnier.")
-    @app_commands.describe(
-        registration_hours="Wie viele Stunden soll die Anmeldung offen bleiben? (Standard: 72)",
-        tournament_weeks="Wie viele Wochen soll das Turnier laufen? (Standard: 1)",
-        poll_duration_hours="Wie viele Stunden soll die Umfrage laufen? (optional, Standard: 48)",
-    )
-    async def start_tournament(
-        self,
-        interaction: Interaction,
-        registration_hours: Optional[int] = 72,
-        tournament_weeks: Optional[int] = 1,
-        poll_duration_hours: Optional[int] = None,
-    ):
-        if not has_permission(interaction.user, "Moderator", "Admin"):
-            await interaction.response.send_message("🚫 Du hast keine Berechtigung für diesen Befehl.", ephemeral=True)
-            return
-
-        tournament = load_tournament_data()
-        if tournament.get("running", False):
-            await interaction.response.send_message(
-                "🚫 Es läuft bereits ein Turnier! Bitte beende es erst mit `/end_tournament`.",
-                ephemeral=True,
-            )
-            return
-
-        now = datetime.now(ZoneInfo("Europe/Berlin"))
-        registration_end = now + timedelta(hours=registration_hours)
-        tournament_end = registration_end + timedelta(weeks=max(tournament_weeks, 1))  # Minimum 1 Woche
-
-        tournament = {
-            "registration_open": False,  # Erst nach Poll-Ende
-            "running": True,
-            "teams": {},
-            "solo": [],
-            "registration_end": registration_end.astimezone(ZoneInfo("UTC")).isoformat(),
-            "tournament_end": tournament_end.isoformat(),
-            "matches": [],
-        }
-        save_tournament_data(tournament)
-
-        logger.info(
-            f"[TOURNAMENT] Neues Turnier gestartet – Anmeldung bis {registration_end}. Turnier läuft bis {tournament_end}."
-        )
-
-        # Turnierstart-Embed schicken
-        template = load_embed_template("tournament_start", category="default").get("TOURNAMENT_ANNOUNCEMENT")
-        embed = build_embed_from_template(template)
-        await interaction.response.send_message(embed=embed)
-
-        # ➔ Umfrage starten
-        from modules.dataStorage import (  # Lokal importieren, damit oben sauber bleibt
-            load_games,
-        )
-
-        poll_options = load_games()
-        await poll.start_poll(
-            interaction.channel,
-            poll_options,
-            registration_hours if poll_duration_hours is None else poll_duration_hours,
-        )
-
-        # Jetzt Timer starten
-        duration = poll_duration_hours if poll_duration_hours is not None else 48
-        add_task(
-            "auto_end_poll",
-            asyncio.create_task(auto_end_poll(interaction.client, interaction.channel, duration * 3600)),
-        )
-
-        logger.info("[TOURNAMENT] Umfrage gestartet. Automatischer Poll-Ende-Timer läuft.")
-
-    @app_commands.command(
-        name="list_matches",
-        description="Zeigt alle geplanten Matches oder die eines bestimmten Teams.",
-    )
-    @app_commands.describe(team="Optional: Name des Teams oder 'meine' für eigene Matches.")
-    @app_commands.autocomplete(team=autocomplete_teams)
-    async def list_matches(self, interaction: Interaction, team: Optional[str] = None):
-        tournament = load_tournament_data()
-        matches = tournament.get("matches", [])
-
-        user_id = str(interaction.user.id)
-
-        if team:
-            team = team.lower()
-
-            if team == "meine":
-                # Eigene Teamzugehörigkeit herausfinden
-                my_team = get_player_team(tournament, user_id)
-                if not my_team:
-                    await smart_send(
-                        interaction,
-                        content="🚫 Du bist in keinem Team registriert.",
-                        ephemeral=True,
-                    )
-                    return
-
-                matches = [
-                    m
-                    for m in matches
-                    if m.get("team1", "").lower() == my_team.lower() or m.get("team2", "").lower() == my_team.lower()
-                ]
-            else:
-                # Nach spezifischem Team suchen
-                matches = [
-                    m for m in matches if m.get("team1", "").lower() == team or m.get("team2", "").lower() == team
-                ]
-
-        if not matches:
-            await smart_send(
-                interaction,
-                content="⚠️ Keine passenden Matches gefunden.",
-                ephemeral=True,
-            )
-            return
-
-        await send_list_matches(interaction, matches)
-
-        logger.info(f"[MATCHES] {len(matches)} Matches aufgelistet (Filter: '{team or 'alle'}').")
 
 
 # ---------------------------------------
@@ -210,12 +92,12 @@ async def end_tournament_procedure(
     # Archivieren und aufräumen
     try:
         archive_path = archive_current_tournament()
-        logger.info(f"[END] Turnier archiviert unter: {archive_path}")
+        logger.info(f"[TOURNAMENT] Turnier archiviert unter: {archive_path}")
     except Exception as e:
-        logger.error(f"[END] Fehler beim Archivieren: {e}")
+        logger.error(f"[TOURNAMENT] Fehler beim Archivieren: {e}")
 
     backup_current_state()
-    logger.info(f"[END] Backup erfolgreich")
+    logger.info(f"[TOURNAMENT] Backup erfolgreich")
 
     # Gewinner, MVP usw.
     winner_ids = get_winner_ids()
@@ -232,13 +114,13 @@ async def end_tournament_procedure(
             new_champion_id = int(match.group(0))
 
     updated_count = await update_all_participants()
-    logger.info(f"[END] {updated_count} Teilnehmerstatistiken aktualisiert.")
+    logger.info(f"[TOURNAMENT] {updated_count} Teilnehmerstatistiken aktualisiert.")
 
     if winner_ids and chosen_game != "Unbekannt":
         update_player_stats(winner_ids, chosen_game)
-        logger.info(f"[END] Gewinner gespeichert: {winner_ids} für Spiel: {chosen_game}")
+        logger.info(f"[TOURNAMENT] Gewinner gespeichert: {winner_ids} für Spiel: {chosen_game}")
     else:
-        logger.warning("[END] Keine Gewinner oder kein Spielname gefunden.")
+        logger.warning("[TOURNAMENT] Keine Gewinner oder kein Spielname gefunden.")
 
     update_tournament_history(
         winner_ids=winner_ids,
@@ -250,9 +132,9 @@ async def end_tournament_procedure(
 
     try:
         delete_tournament_file()
-        logger.info("[END] Turnierdatei gelöscht.")
+        logger.info("[TOURNAMENT] Turnierdatei gelöscht.")
     except Exception as e:
-        logger.error(f"[END] Fehler beim Löschen der Turnierdatei: {e}")
+        logger.error(f"[TOURNAMENT] Fehler beim Löschen der Turnierdatei: {e}")
 
     # Abschluss-Embed schicken
     mvp_message = f"🏆 MVP des Turniers: **{mvp}**!" if mvp else "🏆 Kein MVP ermittelt."
@@ -266,7 +148,7 @@ async def end_tournament_procedure(
         except Exception as e:
             logger.error(f"[CHAMPION] Fehler beim Aktualisieren der Champion-Rolle: {e}")
 
-    logger.info("[END] Turnier abgeschlossen und System bereit für Neues.")
+    logger.info("[TOURNAMENT] Turnier abgeschlossen und System bereit für Neues.")
 
 
 async def auto_end_poll(bot: discord.Client, channel: discord.TextChannel, delay_seconds: int):

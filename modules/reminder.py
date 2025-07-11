@@ -14,6 +14,7 @@ from modules.logger import logger
 
 REMINDER_PING = os.getenv("REMINDER_PING", "0") == "1"
 
+
 async def match_reminder_loop(channel: TextChannel):
     """
     Hintergrund-Task, der regelmäßig überprüft, ob bald Matches starten

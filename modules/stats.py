@@ -240,82 +240,76 @@ class StatsGroup(app_commands.Group):
     def __init__(self):
         super().__init__(name="stats", description="Statistiken und Auswertungen")
 
-    @app_commands.command(name="leaderboard", description="Zeigt die Bestenliste aller Spieler an.")
-    async def leaderboard(self, interaction: Interaction):
-        if not has_permission(interaction.user, "Moderator", "Admin"):
-            await interaction.response.send_message("🚫 Du hast keine Berechtigung dafür.", ephemeral=True)
-            return
-
-        board = get_leaderboard()
-        embed = Embed(title="🏆 Bestenliste", description=board, color=0xF1C40F)
-        await interaction.response.send_message(embed=embed)
 
     @app_commands.command(
-        name="stats",
-        description="Zeigt deine oder die Statistiken eines anderen Spielers an.",
+    name="overview",
+    description="Zeigt eine Turnierübersicht, Bestenliste oder Matchhistorie.",
     )
-    @app_commands.describe(user="Optional: Spieler auswählen")
-    @app_commands.autocomplete(user=autocomplete_players)
-    async def stats(self, interaction: Interaction, user: str = None):
-        """
-        Zeigt die Statistiken eines Spielers (oder eigene, falls kein Spieler ausgewählt wurde).
-        """
-        global_data = load_global_data()
-
-        if user:
-            user_id = user
-            member = interaction.guild.get_member(int(user_id))
-            if member:
-                target_user = member
-            else:
-                # Fallback, falls User nicht mehr auf dem Server ist
-                target_user = discord.Object(id=int(user_id))
-        else:
-            target_user = interaction.user
-            user_id = str(interaction.user.id)
-
-        player_stats = global_data.get("player_stats", {}).get(user_id)
-
-        if not player_stats:
-            await interaction.response.send_message(
-                "⚠ Es gibt noch keine Statistiken für diesen Spieler.", ephemeral=True
-            )
-            return
-
-        embed = build_stats_embed(target_user, player_stats)
-        await interaction.response.send_message(embed=embed)
-
-    @app_commands.command(name="tournament_stats", description="Zeigt allgemeine Turnierstatistiken an.")
-    async def tournament_stats(self, interaction: Interaction):
+    @app_commands.describe(view="Was möchtest du anzeigen?")
+    @app_commands.choices(view=[
+        Choice(name="🏆 Bestenliste", value="leaderboard"),
+        Choice(name="📊 Turnierstatistik", value="summary"),
+        Choice(name="📜 Match-Historie", value="history"),
+    ])
+    async def stats_overview(self, interaction: Interaction, view: Choice[str]):
         if not has_permission(interaction.user, "Moderator", "Admin"):
-            await interaction.response.send_message("🚫 Du hast keine Berechtigung dafür.", ephemeral=True)
+            await interaction.response.send_message("🚫 Keine Berechtigung.", ephemeral=True)
             return
 
-        global_data = load_global_data()
-        player_stats = global_data.get("player_stats", {})
-        tournament_history = global_data.get("tournament_history", [])
+        if view.value == "leaderboard":
+            # Zeige Bestenliste
+            board = get_leaderboard()
+            embed = Embed(title="🏆 Bestenliste", description=board, color=0xF1C40F)
+            await interaction.response.send_message(embed=embed)
 
-        # Berechnungen
-        total_players = len(player_stats)
-        total_wins = sum(player.get("wins", 0) for player in player_stats.values())
+        elif view.value == "summary":
+            # Zeige Turnierstatistik
+            global_data = load_global_data()
+            player_stats = global_data.get("player_stats", {})
+            tournament_history = global_data.get("tournament_history", [])
 
-        best_player_entry = max(player_stats.items(), key=lambda kv: kv[1].get("wins", 0), default=None)
-        if best_player_entry:
-            best_player = f"{best_player_entry[1]['display_name']} ({best_player_entry[1]['wins']} Siege)"
-        else:
-            best_player = "Niemand"
+            total_players = len(player_stats)
+            total_wins = sum(player.get("wins", 0) for player in player_stats.values())
 
-        game_counter = Counter(entry["game"] for entry in tournament_history if "game" in entry)
-        if game_counter:
-            most_played_game, count = game_counter.most_common(1)[0]
-            favorite_game = f"{most_played_game} ({count}x)"
-        else:
-            favorite_game = "Keine Spiele gespielt."
+            best_player_entry = max(player_stats.items(), key=lambda kv: kv[1].get("wins", 0), default=None)
+            best_player = f"{best_player_entry[1]['display_name']} ({best_player_entry[1]['wins']} Siege)" if best_player_entry else "Niemand"
 
-        # Embed verschicken
-        await send_tournament_stats(interaction, total_players, total_wins, best_player, favorite_game)
+            game_counter = Counter(entry["game"] for entry in tournament_history if "game" in entry)
+            favorite_game = f"{game_counter.most_common(1)[0][0]} ({game_counter.most_common(1)[0][1]}x)" if game_counter else "Keine Spiele gespielt"
 
-    @app_commands.command(name="team_stats", description="Zeigt Statistiken eines bestimmten Teams.")
+            await send_tournament_stats(interaction, total_players, total_wins, best_player, favorite_game)
+
+        elif view.value == "history":
+            # Zeige Match-Historie
+            tournament = load_tournament_data()
+            matches = tournament.get("matches", [])
+
+            if not matches:
+                await interaction.response.send_message("⚠️ Keine Matches gefunden.", ephemeral=True)
+                return
+
+            embed = Embed(
+                title="🏛️ Turnier-Match-Historie",
+                description="Hier sind die bisherigen Matches:",
+                color=0x7289DA,
+            )
+
+            for match in matches[:25]:  # Discord Limit
+                result = match.get("result", "Unbekannt").upper()
+                team_name = match.get("team", "Unbekannt")
+                opponent = match.get("opponent", "Unbekannt")
+                timestamp = match.get("timestamp", "Keine Zeitangabe")
+                outcome_symbol = "✅" if result == "WIN" else "❌"
+
+                embed.add_field(
+                    name=f"{team_name} vs {opponent}",
+                    value=f"{outcome_symbol} Ergebnis: **{result}**\n🕑 {timestamp}",
+                    inline=False,
+                )
+
+            await interaction.response.send_message(embed=embed)
+
+    """@app_commands.command(name="team_stats", description="Zeigt Statistiken eines bestimmten Teams.")
     @app_commands.describe(team="Wähle ein Team aus")
     @app_commands.autocomplete(team=autocomplete_teams)
     async def team_stats(self, interaction: Interaction, team: str):
@@ -334,53 +328,61 @@ class StatsGroup(app_commands.Group):
         embed.add_field(name="🎯 Gespielte Matches", value=matches_played, inline=True)
         embed.set_footer(text="Turnierauswertung")
 
-        await interaction.response.send_message(embed=embed)
-
-    @app_commands.command(
-        name="match_history",
-        description="Zeigt die Turnier-Matchhistorie an. Optional für ein bestimmtes Team.",
-    )
-    @app_commands.describe(team="Optional: Filtere nach einem bestimmten Team")
-    @app_commands.autocomplete(team=autocomplete_teams)
-    async def match_history(self, interaction: Interaction, team: str = None):
+        await interaction.response.send_message(embed=embed)"""
+    @app_commands.command(name="stats", description="Zeigt deine oder die Stats eines Spielers oder Teams.")
+    @app_commands.describe(target="Spieler (Mention oder Name) oder Teamname")
+    async def stats_smart(self, interaction: Interaction, target: Optional[str] = None):
+        global_data = load_global_data()
         tournament = load_tournament_data()
-        matches = tournament.get("matches", [])
 
-        # Filter anwenden, falls Team angegeben
-        if team:
-            matches = [match for match in matches if match.get("team") == team or match.get("opponent") == team]
+        # 1. Keine Eingabe → eigene Stats
+        if not target:
+            user_id = str(interaction.user.id)
+            stats = global_data.get("player_stats", {}).get(user_id)
 
-        if not matches:
-            if team:
-                await interaction.response.send_message(
-                    f"⚠️ Keine Matches für Team **{team}** gefunden.", ephemeral=True
-                )
-            else:
-                await interaction.response.send_message("⚠️ Keine Matches gefunden.", ephemeral=True)
+            if not stats:
+                await interaction.response.send_message("⚠️ Du hast noch keine Statistiken.", ephemeral=True)
+                return
+
+            embed = build_stats_embed(interaction.user, stats)
+            await interaction.response.send_message(embed=embed, ephemeral=True)
             return
 
-        embed = Embed(
-            title="🏛️ Turnier-Match-Historie" if not team else f"🏛️ Matches von {team}",
-            description="Hier sind die bisherigen Matches:",
-            color=0x7289DA,
-        )
+        # 2. Ist es ein Spieler? (ID, Mention oder Displayname)
+        for user_id, stats in global_data.get("player_stats", {}).items():
+            name_match = stats.get("display_name", "").lower()
+            mention_match = stats.get("mention", "").replace("<@", "").replace(">", "")
 
-        for match in matches:
-            result = match.get("result", "Unbekannt").upper()
-            team_name = match.get("team", "Unbekannt")
-            opponent = match.get("opponent", "Unbekannt")
-            timestamp = match.get("timestamp", "Keine Zeitangabe")
-            outcome_symbol = "✅" if result == "WIN" else "❌"
+            if (
+                target.lower() in name_match
+                or target in stats.get("mention", "")
+                or target == mention_match
+            ):
+                # Versuche echten Member zu finden
+                member = interaction.guild.get_member(int(user_id))
+                fake_user = discord.Object(id=int(user_id)) if not member else member
+                embed = build_stats_embed(fake_user, stats)
+                await interaction.response.send_message(embed=embed, ephemeral=True)
+                return
 
-            embed.add_field(
-                name=f"{team_name} vs {opponent}",
-                value=f"{outcome_symbol} Ergebnis: **{result}**\n🕑 {timestamp}",
-                inline=False,
-            )
+        # 3. Ist es ein Teamname?
+        team_data = tournament.get("teams", {}).get(target)
+        if team_data:
+            wins = team_data.get("wins", 0)
+            matches_played = team_data.get("matches_played", 0)
 
-        await interaction.response.send_message(embed=embed)
+            embed = discord.Embed(title=f"📊 Teamstatistik: {target}", color=0x1ABC9C)
+            embed.add_field(name="🏆 Siege", value=wins, inline=True)
+            embed.add_field(name="🎯 Gespielte Matches", value=matches_played, inline=True)
+            embed.set_footer(text="Turnierauswertung")
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+            return
 
-    @app_commands.command(name="status", description="Zeigt den aktuellen Turnierstatus an.")
+        # 4. Nichts gefunden
+        await interaction.response.send_message("❌ Kein Spieler oder Team gefunden.", ephemeral=True)
+
+
+    @app_commands.command(name="tournament", description="Zeigt den aktuellen Turnierstatus an.")
     async def status(self, interaction: Interaction):
         tournament = load_tournament_data()
         now = datetime.now()

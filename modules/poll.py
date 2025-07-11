@@ -34,12 +34,13 @@ async def start_poll(
     description = ""
     poll_options = {}
 
-    for idx, option in enumerate(options):
+    for idx, (game_id, game_data) in enumerate(options.items()):
         if idx >= len(emoji_list):
-            break  # Nur so viele Emojis wie verfügbar
+            break  # Maximal verfügbare Emojis nutzen
         emoji = emoji_list[idx]
-        description += f"{emoji} {option}\n"
-        poll_options[emoji] = option
+        game_name = game_data.get("name", game_id)  # Fallback: Key, falls kein name existiert
+        description += f"{emoji} {game_name}\n"
+        poll_options[emoji] = game_id  # Wichtig: Weiterhin den ID als Referenz speichern
 
     # Ablaufzeit berechnen
     poll_end_time = datetime.now(ZoneInfo("Europe/Berlin")) + timedelta(hours=registration_hours)

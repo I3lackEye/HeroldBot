@@ -16,6 +16,7 @@ from modules.dataStorage import (
     load_games,
     load_tournament_data,
     save_tournament_data,
+    DEBUG_MODE
 )
 from modules.embeds import build_embed_from_template, load_embed_template
 from modules.logger import logger
@@ -49,7 +50,7 @@ class DevGroup(app_commands.Group):
         solo_players = []
         for i in range(num_solo):
             player_name = f"<@{222220000000000 + i*2}>"
-            availability= generate_random_availability()
+            availability = generate_random_availability()
 
             player_entry = {"player": player_name, "verfügbarkeit": availability}
             solo_players.append(player_entry)
@@ -256,7 +257,7 @@ class DevGroup(app_commands.Group):
         asyncio.create_task(auto_end_poll(interaction.client, interaction.channel, delay_seconds=10))
 
         # Anmeldungsschluss simulieren
-        #asyncio.create_task(close_registration_after_delay(delay_seconds=20, channel=interaction.channel))
+        # asyncio.create_task(close_registration_after_delay(delay_seconds=20, channel=interaction.channel))
 
     @app_commands.command(
         name="health_check",
@@ -386,7 +387,6 @@ class DevGroup(app_commands.Group):
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
 
-
 class DevCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -394,4 +394,8 @@ class DevCog(commands.Cog):
 
 
 async def setup(bot):
-    await bot.add_cog(DevCog(bot))
+    if DEBUG_MODE:
+        await bot.add_cog(DevCog(bot))
+    else:
+        from modules.logger import logger
+        logger.info("[DEV] Dev-Befehle deaktiviert (DEBUG_MODE ist 0)")

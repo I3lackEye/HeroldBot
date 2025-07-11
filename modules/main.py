@@ -12,19 +12,20 @@ from dotenv import load_dotenv
 # Lokale Module
 from modules import poll, tournament
 from modules.dataStorage import (
+    DEBUG_MODE,
+    TOKEN,
     load_config,
     load_global_data,
     load_tournament_data,
     validate_channels,
     validate_permissions,
-    DEBUG_MODE,
-    TOKEN
 )
 from modules.logger import logger
 from modules.reminder import match_reminder_loop
 from modules.task_manager import add_task, cancel_all_tasks, get_all_tasks
 
 load_dotenv()
+
 
 def debug_dump_configs():
     """
@@ -60,8 +61,6 @@ def debug_dump_configs():
     logger.info("[DEBUG] Dump der Dateien abgeschlossen.")
 
 
-TOKEN = os.getenv("DISCORD_TOKEN")
-
 intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
@@ -76,6 +75,7 @@ EXTENSIONS = [
     "modules.dev_tools",
     "modules.stats",
 ]
+
 
 # ========== EVENTS ==========
 @bot.event
@@ -135,6 +135,11 @@ async def on_ready():
         synced = await bot.tree.sync()
         debug_dump_configs()
         logger.info(f"[STARTUP] {len(synced)} Slash-Commands synchronisiert.")
+        commands = bot.tree.get_commands()
+        for cmd in commands:
+            if cmd.name == "start_tournament" and cmd.parent is None:
+                bot.tree.remove_command(cmd.name, type=discord.AppCommandType.chat_input)
+                logger.info("[STARTUP] Entferne alter slash commands")
     except Exception as e:
         logger.error(f"[STARTUP] Fehler beim Synchronisieren der Commands: {e}")
 

@@ -2,25 +2,31 @@
 
 import os
 import zipfile
-from datetime import datetime
+from datetime import datetime, timedelta
+from typing import Optional
+from zoneinfo import ZoneInfo
+import asyncio
+
 
 import discord
 from discord import Interaction, app_commands
 from discord.ext import commands
 
+# Lokale Module
+from modules import poll
 from modules.archive import archive_current_tournament
 from modules.dataStorage import (
-    add_game,
-    remove_game,
     load_global_data,
     load_tournament_data,
+    add_game,
     remove_game,
     save_global_data,
     save_tournament_data,
+    load_games
 )
-from modules.embeds import send_match_schedule
+from modules.embeds import send_match_schedule, load_embed_template, build_embed_from_template
 from modules.logger import logger
-from modules.modals import AddGameModal, TestModal
+from modules.task_manager import add_task
 from modules.matchmaker import (
     auto_match_solo,
     cleanup_orphan_teams,
@@ -28,11 +34,15 @@ from modules.matchmaker import (
     generate_and_assign_slots,
     generate_schedule_overview,
 )
+from modules.modals import (
+    AddGameModal,
+    TestModal,
+    StartTournamentModal
+)
 
-# Lokale Module
 from modules.poll import end_poll
 from modules.shared_states import pending_reschedules
-from modules.tournament import end_tournament_procedure
+from modules.tournament import end_tournament_procedure, auto_end_poll
 from modules.utils import (
     autocomplete_teams,
     games_autocomplete,
@@ -102,6 +112,92 @@ async def pending_match_autocomplete(interaction: Interaction, current: str):
 
     return choices[:25]  # Maximal 25 Einträge zurückgeben
 
+async def handle_start_tournament_modal(
+    interaction: Interaction,
+    poll_duration: int,
+    registration_duration: int,
+    tournament_weeks: int,
+    team_size: int,
+):
+    logger.debug("[MODAL] handle_start_tournament_modal() wurde aufgerufen")
+
+    if not has_permission(interaction.user, "Moderator", "Admin"):
+        await interaction.followup.send("🚫 Keine Berechtigung.", ephemeral=True)
+        return
+
+    try:
+        tournament = load_tournament_data()
+        if tournament.get("running", False):
+            await interaction.followup.send(
+                "🚫 Es läuft bereits ein Turnier! Bitte beende es zuerst mit `/admin end_tournament`.",
+                ephemeral=True,
+            )
+            return
+
+        now = datetime.now(ZoneInfo("Europe/Berlin"))
+        registration_end = now + timedelta(hours=registration_duration)
+        tournament_end = registration_end + timedelta(weeks=max(tournament_weeks, 1))
+
+        tournament = {
+            "registration_open": False,
+            "running": True,
+            "teams": {},
+            "solo": [],
+            "registration_end": registration_end.astimezone(ZoneInfo("UTC")).isoformat(),
+            "tournament_end": tournament_end.isoformat(),
+            "matches": [],
+            "team_size": team_size,
+        }
+        save_tournament_data(tournament)
+
+        logger.info(
+            f"[TOURNAMENT] Turnier gestartet: "
+            f"Poll {poll_duration}h, Registrierung {registration_duration}h, Laufzeit {tournament_weeks} Woche(n), Teamgröße {team_size}"
+        )
+
+        # Embed senden
+        template = load_embed_template("tournament_start", category="default").get("TOURNAMENT_ANNOUNCEMENT")
+        embed = build_embed_from_template(template) if template else Embed(
+            title="🎮 Turnier gestartet!",
+            description=f"Die Spielumfrage läuft jetzt für {poll_duration} Stunden.",
+            color=discord.Color.green(),
+        )
+        await interaction.followup.send(embed=embed, ephemeral=False)
+
+        # Spiele laden
+        poll_options = load_games()
+        visible_games = {
+            k: v for k, v in poll_options.items() if v.get("visible_in_poll", True)
+        }
+        if not visible_games:
+            await interaction.followup.send("⚠️ Keine Spiele verfügbar für die Umfrage.", ephemeral=True)
+            logger.warning("[MODAL] Keine Spiele mit visible_in_poll=True gefunden.")
+            return
+
+        logger.info(f"[MODAL] {len(visible_games)} Spiele geladen: {list(visible_games.keys())}")
+
+        # Poll starten
+        await poll.start_poll(
+            interaction.channel,
+            visible_games,
+            registration_hours=registration_duration,
+            poll_duration_hours=poll_duration,
+        )
+
+        # Timer setzen
+        duration_seconds = poll_duration * 3600
+        add_task(
+            "auto_end_poll",
+            asyncio.create_task(auto_end_poll(interaction.client, interaction.channel, duration_seconds)),
+        )
+
+    except Exception as e:
+        logger.error(f"[MODAL] Fehler beim Start des Turniers: {e}")
+        await interaction.followup.send(
+            f"❌ Fehler beim Starten des Turniers: {e}", ephemeral=True
+        )
+
+
 
 # ----------------------------------------
 # Slash Functions
@@ -149,6 +245,19 @@ class AdminGroup(app_commands.Group):
         )
         logger.info(f"[ADMIN] {user.display_name} wurde manuell ein Sieg hinzugefügt.")
 
+
+    @app_commands.command(
+        name="start_tournament",
+        description="Startet ein neues Turnier über ein Eingabeformular.",
+    )
+    async def start_tournament(self, interaction: Interaction):
+        if not has_permission(interaction.user, "Moderator", "Admin"):
+            await interaction.response.send_message("🚫 Keine Berechtigung.", ephemeral=True)
+            return
+
+        await interaction.response.send_modal(StartTournamentModal(interaction))
+
+
     @app_commands.command(name="end_tournament", description="Admin-Befehl: Beendet das aktuelle Turnier.")
     async def end_tournament(self, interaction: Interaction):
         if not has_permission(interaction.user, "Moderator", "Admin"):
@@ -164,13 +273,19 @@ class AdminGroup(app_commands.Group):
 
         await end_tournament_procedure(interaction.channel, manual_trigger=True)
 
-    @app_commands.command(name="add_game", description="Admin-Befehl: Fügt ein neues Spiel zur Spielauswahl hinzu.",)
+
+    @app_commands.command(
+        name="add_game",
+        description="Admin-Befehl: Fügt ein neues Spiel zur Spielauswahl hinzu.",
+    )
     async def add_game_command(self, interaction: Interaction):
         if not has_permission(interaction.user, "Moderator", "Admin"):
             await interaction.response.send_message("🚫 Du hast keine Berechtigung für diesen Befehl.", ephemeral=True)
             return
 
+        logger.debug("🧪 Slash-Command /admin add_game wurde ausgeführt")
         await interaction.response.send_modal(AddGameModal())
+
 
     @app_commands.command(name="remove_game", description="Entfernt ein Spiel aus der globalen Spielesammlung.")
     @app_commands.describe(game="Spiel-ID oder Name des Spiels")
@@ -185,6 +300,7 @@ class AdminGroup(app_commands.Group):
             await interaction.response.send_message(f"🗑 Spiel `{game}` wurde entfernt.", ephemeral=True)
         except ValueError as e:
             await interaction.response.send_message(f"⚠️ {str(e)}", ephemeral=True)
+
 
     @app_commands.command(
         name="award_overall_winner",
@@ -263,6 +379,7 @@ class AdminGroup(app_commands.Group):
         )
 
         logger.info(f"[MATCH REPORT] {team} vs {opponent} – Ergebnis: {result.lower()}")
+
 
     @app_commands.command(name="reload", description="Synchronisiert alle Slash-Commands neu.")
     async def reload_commands(self, interaction: Interaction):

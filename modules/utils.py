@@ -495,7 +495,9 @@ async def games_autocomplete(interaction: discord.Interaction, current: str):
         app_commands.Choice(name=cfg["name"], value=gid)
         for gid, cfg in games.items()
         if current.lower() in gid.lower() or current.lower() in cfg.get("name", "").lower()
-    ][:25]  # Discord API max 25
+    ][
+        :25
+    ]  # Discord API max 25
 
 
 def all_matches_completed() -> bool:
@@ -576,3 +578,11 @@ def generate_random_availability() -> dict[str, str]:
         special[tag] = f"{start_hour:02d}:00-{end_hour:02d}:00"
 
     return special
+
+def get_active_days_config():
+    """
+    Lädt die Tage an welchen Matches stattfinden können aus config.json
+    Jeder Tag als Zahl von 1-7 mit Start und Endzeit
+    """
+    config = load_config()
+    return config.get("ACTIVE_DAYS", {})

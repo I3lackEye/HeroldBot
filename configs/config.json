@@ -12,6 +12,11 @@
       "REMINDER": "1363020796850737264",
       "RESCHEDULE_CHANNEL_ID": "1363005262868385833"
     },
+    "ACTIVE_DAYS": {
+      "4": {"start": "16:00", "end": "22:00"},
+      "5": {"start": "10:00", "end": "22:00"},
+      "6": {"start": "10:00", "end": "22:00"}
+    },
     "STR_MAX_LENGTH": 50,
     "RESCHEDULE_TIMEOUT_HOURS": 24,
     "TIMEZONE": "Europe/Berlin"

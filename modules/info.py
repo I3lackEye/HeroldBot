@@ -106,6 +106,51 @@ class InfoGroup(app_commands.Group):
         """
         await send_help(interaction)
 
+    @app_commands.command(name="list_games", description="Zeigt alle öffentlich wählbaren Spiele an.")
+    async def list_games(self, interaction: Interaction):
+        from modules.dataStorage import load_games
+
+        games = load_games()
+        if not games:
+            await interaction.response.send_message("⚠️ Es sind aktuell keine Spiele eingetragen.", ephemeral=True)
+            return
+
+        # Nur Spiele anzeigen, die sichtbar geschaltet sind
+        public_games = {
+            gid: g for gid, g in games.items()
+            if g.get("visible_in_poll", True) is True  # Default: sichtbar
+        }
+
+        if not public_games:
+            await interaction.response.send_message("⚠️ Keine Spiele sind derzeit öffentlich sichtbar.", ephemeral=True)
+            return
+
+        embed = Embed(
+            title="🎮 Verfügbare Spiele",
+            description="Hier findest du alle aktuell zur Wahl stehenden Spiele:",
+            color=discord.Color.green(),
+        )
+
+        for game_id, game in public_games.items():
+            name = game.get("name", "Unbenannt")
+            genre = game.get("genre", "–")
+            platform = game.get("platform", "–")
+            emoji = game.get("emoji", "🎮")
+            team_size = game.get("team_size", game.get("min_players_per_team", 1))
+            duration = game.get("match_duration_minutes", 60)
+            pause = game.get("pause_minutes", 30)
+
+            field_text = (
+                f"• Genre: **{genre}**\n"
+                f"• Plattform: **{platform}**\n"
+                f"• Teamgröße: **{team_size}v{team_size}**\n"
+                f"• Matchdauer: **~{duration} Min** (+{pause} Min Pause)"
+            )
+
+            embed.add_field(name=f"{emoji} {name}", value=field_text, inline=False)
+
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
 
 class InfoCog(commands.Cog):
     def __init__(self, bot):

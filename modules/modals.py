@@ -5,7 +5,7 @@ from discord import Interaction
 from discord.ui import Modal, Select, TextInput, View
 
 # Lokale Modules
-from modules.dataStorage import load_tournament_data, save_tournament_data, add_game
+from modules.dataStorage import add_game, load_tournament_data, save_tournament_data
 from modules.logger import logger
 from modules.utils import (
     generate_team_name,
@@ -172,20 +172,37 @@ class TeamFullJoinModal(Modal):
                 f"Blockierte Tage: {', '.join(unavailable_list) if unavailable_list else 'Keine'}",
                 ephemeral=True,
             )
-class AddGameModal(discord.ui.Modal, title="Neues Spiel hinzufügen"):
-    name = discord.ui.TextInput(label="Anzeigename", max_length=50)
-    genre = discord.ui.TextInput(label="Genre (z.B. MOBA, Denkspiel)", max_length=30)
-    platform = discord.ui.TextInput(label="Plattform (z.B. PC, Offline)", default="PC", max_length=20)
-    team_size = discord.ui.TextInput(label="Teamgröße pro Team (z.B. 1 oder 5)", default="1")
-    match_duration = discord.ui.TextInput(label="Matchdauer in Minuten", default="60")
+
+
+class AddGameModal(discord.ui.Modal):
+    def __init__(self):
+        super().__init__(title="Neues Spiel hinzufügen")
+
+        self.name = discord.ui.TextInput(label="Anzeigename", max_length=50)
+        self.genre = discord.ui.TextInput(label="Genre (z.B. MOBA, Denkspiel)", max_length=30)
+        self.platform = discord.ui.TextInput(label="Plattform", placeholder="PC", max_length=20)
+        self.team_size = discord.ui.TextInput(label="Teamgröße pro Team", placeholder="1")
+        self.match_duration = discord.ui.TextInput(label="Matchdauer in Minuten", placeholder="60")
+
+        self.add_item(self.name)
+        self.add_item(self.genre)
+        self.add_item(self.platform)
+        self.add_item(self.team_size)
+        self.add_item(self.match_duration)
+
+    async def validate_input(self, interaction: discord.Interaction):
+        is_valid, error_message = validate_time_range(self.time_range.value)
+        if not is_valid:
+            await interaction.response.send_message(f"❌ {error_message}", ephemeral=True)
+            raise ValueError(error_message)
+
 
     async def on_submit(self, interaction: discord.Interaction):
+        logger.debug(f"[DEBUG] Eingaben: {self.name.value}, {self.genre.value}, {self.platform.value}, {self.team_size.value}, {self.match_duration.value}")
         try:
-            tournament = load_tournament_data()
             team_size_int = int(self.team_size.value)
             duration = int(self.match_duration.value)
 
-            # Spiel-ID automatisch generieren (z. B. "League of Legends" → "League_of_Legends")
             game_id = self.name.value.strip().replace(" ", "_")
 
             add_game(
@@ -194,13 +211,14 @@ class AddGameModal(discord.ui.Modal, title="Neues Spiel hinzufügen"):
                 genre=self.genre.value.strip(),
                 platform=self.platform.value.strip(),
                 match_duration_minutes=duration,
-                pause_minutes=30,  # Default-Wert für Pause
+                pause_minutes=30,
                 min_players_per_team=team_size_int,
                 max_players_per_team=team_size_int,
-                emoji="🎮"  # Default-Emoji
+                emoji="🎮"
             )
 
-            save_tournament_data(tournament)
+            logger.debug(f"[DEBUG] Spiel wurde erfolgreich verarbeitet.")
+
             await interaction.response.send_message(
                 f"✅ Spiel **{self.name.value}** wurde gespeichert als `{game_id}`.",
                 ephemeral=True
@@ -209,3 +227,70 @@ class AddGameModal(discord.ui.Modal, title="Neues Spiel hinzufügen"):
         except Exception as e:
             logger.error(f"[ADD_GAME_MODAL] Fehler im on_submit: {e}")
             await interaction.response.send_message(f"❌ Fehler beim Speichern: {e}", ephemeral=True)
+
+
+class StartTournamentModal(discord.ui.Modal, title="Turnier starten"):
+    poll_duration = TextInput(
+        label="Dauer der Umfrage (in Stunden)",
+        placeholder="z. B. 48",
+        required=True,
+        default="48",
+        max_length=3,
+    )
+
+    registration_duration = TextInput(
+        label="Dauer der Anmeldung (in Stunden)",
+        placeholder="z. B. 72",
+        required=True,
+        default="72",
+        max_length=3,
+    )
+
+    tournament_weeks = TextInput(
+        label="Turnierlaufzeit (in Wochen)",
+        placeholder="z. B. 1",
+        required=True,
+        default="1",
+        max_length=2,
+    )
+
+    team_size = TextInput(
+        label="Spieler pro Team",
+        placeholder="z. B. 2",
+        required=True,
+        default="2",
+        max_length=2,
+    )
+
+    def __init__(self, interaction: discord.Interaction):
+        super().__init__()
+        self.interaction = interaction
+
+    async def on_submit(self, interaction: discord.Interaction):
+        try:
+            await interaction.response.defer(ephemeral=True)
+
+            # Werte parsen
+            poll_h = int(self.poll_duration.value)
+            reg_h = int(self.registration_duration.value)
+            weeks = int(self.tournament_weeks.value)
+            team_size = int(self.team_size.value)
+
+            # Weiterleitung zur Start-Logik
+            from modules.admin_tools import handle_start_tournament_modal
+
+            await handle_start_tournament_modal(
+                interaction,
+                poll_duration=poll_h,
+                registration_duration=reg_h,
+                tournament_weeks=weeks,
+                team_size=team_size,
+            )
+
+        except ValueError:
+            await interaction.response.send_message(
+                "❌ Ungültige Eingabe. Bitte gib überall ganze Zahlen ein.",
+                ephemeral=True,
+            )
+
+
