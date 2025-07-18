@@ -6,20 +6,41 @@
 
 ## 🛠️ Funktionen
 
-- 🎮 Intelligente Match-Verteilung auf freie Slots
-- 🔔 Automatische Erinnerungen an bevorstehende Matches
-- 🔄 Reschedule-Anfragen per DM oder im Channel
-- 🏆 MVP- und Bestenlisten-Tracking
-- 📦 Vollständige Archivierung abgeschlossener Turniere
-- 📈 Match- und Turnierstatistiken auf Knopfdruck
-- 🛡️ Umfassende Admin-Tools für maximale Kontrolle
+- 🗳️ **Abstimmungen & Spielauswahl**: Umfragen mit Emoji-Reaktionen zur Wahl des Turnierspiels
+- 📥 **Solo- & Team-Anmeldung**: Anmeldung mit Verfügbarkeiten und Blockiertagen
+- 🎮 **Automatisches Matchmaking**:
+  - Intelligente Paarung von Solo-Spielern
+  - Erstellung von Round-Robin-Spielplänen
+  - Verfügbarkeitsbasierte Slot-Zuweisung mit Pausenregelung
+- 🔄 **Reschedule-System**:
+  - Slash-Befehl für Matchverschiebung
+  - Dynamische Slot-Suche & Turnierverlängerung
+  - Abstimmung über neue Termine per Buttons
+- 🔔 **Match-Reminder**:
+  - Automatische Erinnerungen 1h vor Matchbeginn
+  - Mentions der betroffenen Spieler
+- 📊 **Statistiken & MVP-Auswertung**:
+  - Siege, Teilnahmen, Lieblingsspiel, Winrate
+  - Globales MVP-Ranking und Turnier-Historie
+- 📦 **Turnierarchiv & Export**:
+  - Abschluss-Backups und JSON-Archiv
+  - ZIP-Export via DM
+- 🧠 **Intelligente Autocomplete-Eingaben** bei IDs, Teams und Zeitfenstern
+- 🧪 **Entwickler-Tools**:
+  - Simuliere ganze Testdurchläufe
+  - Diagnose aller Channel, Rollen & Tasks
+- 🛡️ **Admin-Tools**:
+  - Manuelles Eintragen von Siegen
+  - Force-Abmeldungen
+  - Direktes Starten & Beenden von Turnieren
+  - Spielverwaltung (Add/Remove)
+  - Dynamischer /stop-Befehl zur sicheren Beendigung
 
 ---
 
 ## 🚀 Installation
 
-```
-bash
+```bash
 git clone https://github.com/dein-benutzername/HeroldBot.git
 cd HeroldBot
 python3.13 -m venv .venv
@@ -31,81 +52,82 @@ pip install -r requirements.txt
 
 ## ⚙️ Konfiguration
 
-- Lege eine `.env` Datei an basierend auf `.env.example`.
-- Passe die `config.json` an deine Bedürfnisse an.
-- Embeds und Texte befinden sich in `/configs/` und können angepasst werden.
-- Sprachpakete (Deutsch/Englisch) findest du unter `/langs/`.
+- `.env` Datei anlegen (siehe `.env.example`)
+- `config.json` anpassen (Pfadangaben, Rollen, Channels etc.)
+- Embeds & Texte in `/configs/` bzw. `/locale/` editieren
+- Sprachpakete für `de` und `en` verfügbar (einfach erweiterbar)
 
 ---
 
 ## 📚 Slash-Commands Übersicht
 
-### 📥 Anmeldung & Verfügbarkeit
-- `/anmelden` – Spieler anmelden
-- `/update_availability` – Verfügbarkeit aktualisieren
-- `/sign_out` – Abmelden vom Turnier
-- `/participants` – Teilnehmerliste anzeigen
+### 🧍 Anmeldung & Verfügbarkeit
+- `/player join` – Anmelden (Solo oder mit Partner)
+- `/player leave` – Vom Turnier abmelden
+- `/player update_availability` – Verfügbarkeiten aktualisieren
+- `/player participants` – Zeigt aktuelle Teilnehmer
 
-### ❓ Hilfe
-- `/help` – Übersicht aller verfügbaren Befehle
+### 📜 Turnierinfos
+- `/info help` – Übersicht der Bot-Befehle
+- `/info match_schedule` – Aktueller Spielplan
+- `/info team` – Zeigt eigenes Team & Verfügbarkeit
+- `/info list_games` – Wählbare Spiele anzeigen
 
-### 📜 Matchorganisation
-- `/list_matches` – Alle geplanten Matches anzeigen
-- `/request_reschedule` – Anfrage zur Matchverschiebung stellen
-- `/test_reminder` – Testet einen Match-Reminder
+### 🔄 Matchorganisation
+- `/player request_reschedule` – Matchverschiebung beantragen
+- `/test_reminder` – Reminder manuell testen (nur Dev)
 
 ### 📊 Statistiken
-- `/leaderboard` – Bestenliste anzeigen
-- `/stats` – Eigene Turnierstatistik abrufen
-- `/tournament_stats` – Turnierstatistiken anzeigen
-- `/status` – Statusübersicht des Turniers
+- `/stats stats` – Eigene oder fremde Stats anzeigen
+- `/stats overview` – Bestenliste, Turnierübersicht, Match-Historie
+- `/stats status` – Aktueller Zustand des Turniers
 
-### 🎮 Turniermanagement
-- `/report_match` – Match-Ergebnis eintragen
-- `/match_history` – Match-Historie anzeigen
-- `/team_stats` – Teamstatistiken anzeigen
-- `/match_schedule` – Spielplan anzeigen
-
-### 🛡️ Adminbefehle
-- `/admin_abmelden` – Spieler administrativ abmelden
-- `/admin_add_win` – Spieler administrativ einen Sieg hinzufügen
-- `/start_tournament` – Neues Turnier starten
-- `/end_tournament` – Turnier abschließen
-- `/add_game` – Spiel hinzufügen
-- `/remove_game` – Spiel entfernen
-- `/award_overall_winner` – Gesamtsieger auszeichnen
-- `/reload_commands` – Slash-Commands neu laden
-- `/close_registration` – Anmeldung schließen
-- `/generate_dummy_teams` – Dummy-Teams generieren
-- `/archive_tournament` – Turnier archivieren
+### 🛡️ Admin & Dev
+- `/admin start_tournament` – Neues Turnier starten (mit Modal)
+- `/admin end_tournament` – Turnier beenden & archivieren
+- `/admin close_registration` – Anmeldung manuell schließen
+- `/admin archive_tournament` – Turnier archivieren
+- `/admin sign_out` – Spieler zwangsweise abmelden
+- `/admin add_win` – Sieg manuell vergeben
+- `/admin award_overall_winner` – Gesamtsieger eintragen
+- `/admin manage_game` – Spiele verwalten (hinzufügen/löschen)
+- `/admin end_poll` – Umfrage manuell beenden
+- `/admin reload` – Slash-Commands neu laden
+- `/admin reset_reschedule` – Reschedule-Anfrage zurücksetzen
+- `/admin export_data` – Turnierdaten als ZIP exportieren (DM)
+- `/dev simulate_full_flow` – Kompletten Testdurchlauf starten
+- `/dev diagnose` – Systemdiagnose (Channel, Rollen, Tasks)
+- `/dev stop` – Bot beenden (nur Dev)
 
 ---
 
-## 🛡️ Sicherheitshinweis
+## 🔐 Sicherheit
 
-- Speichere deine `.env` Datei niemals öffentlich ab!
-- Nutze `.gitignore`, um sensible Daten zuverlässig auszuschließen.
+- `.env` niemals öffentlich machen!
+- `.gitignore` schützt `.env`, `/data/`, `/backups/`, `/logs/` und Debug-Dateien
+- Alle kritischen Adminfunktionen sind rollenbasiert geschützt
 
 ---
 
 ## 🛣️ Roadmap V3 (geplant)
 
-- 🌍 Mehrsprachige Unterstützung (erweiterte Sprachpakete)
-- 🛡️ Erweiterte Turniermodi (Double Elimination etc.)
-- 🎯 Voting-System für Sonderpreise
-- 🛠️ Anpassbare Regeln pro Spiel
-- 🏆 Saisonale Bestenlisten
-- 🚀 Dynamische Slotgenerierung je nach Teilnehmerzahl
+- 🌀 Flexible Turniermodi (Double Elimination, Gruppenphase)
+- 🌐 Mehrsprachigkeit & bessere Sprachumschaltung
+- 📆 Benutzerdefinierte Spieltage & Blockzeiten
+- 🎁 Key-Vergabe-System (für Gewinnspiele oder Belohnungen)
+- 📅 Kalenderintegration (iCal-Export)
+- 🧪 Unit Tests & CI/CD mit GitHub Actions
 
 ---
 
 ## ✨ Credits
 
-- **BlackEye**
+- **BlackEye** – Code, Ideen, Kaffee
 
 ---
 
-## 🔗 Weitere Ressourcen
+## 🔗 Ressourcen
 
-- [discord.py auf GitHub](https://github.com/Rapptz/discord.py) – Offizielle Python-Bibliothek für Discord-Bots
-- [discord.py Dokumentation](https://discordpy.readthedocs.io/en/stable/) – Ausführliche API-Dokumentation
+- [discord.py auf GitHub](https://github.com/Rapptz/discord.py)
+- [discord.py Doku](https://discordpy.readthedocs.io/en/stable/)
+- [Python-Zoneninfos](https://docs.python.org/3/library/zoneinfo.html)
