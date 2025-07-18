@@ -167,11 +167,7 @@ class TeamFullJoinModal(Modal):
             solo_list.append(solo_entry)
             save_tournament_data(tournament)
             await interaction.response.send_message(
-                f"✅ Solo-Anmeldung gespeichert!\n"
-                f"Samstag: {samstag}\nSonntag: {sonntag}\n"
-                f"Blockierte Tage: {', '.join(unavailable_list) if unavailable_list else 'Keine'}",
-                ephemeral=True,
-            )
+                f"✅ Solo-Anmeldung gespeichert!\n", ephemeral=True,)
 
 
 class AddGameModal(discord.ui.Modal):
@@ -232,7 +228,7 @@ class AddGameModal(discord.ui.Modal):
 class StartTournamentModal(discord.ui.Modal, title="Turnier starten"):
     poll_duration = TextInput(
         label="Dauer der Umfrage (in Stunden)",
-        placeholder="z. B. 48",
+        placeholder="z.B. 48",
         required=True,
         default="48",
         max_length=3,
@@ -240,7 +236,7 @@ class StartTournamentModal(discord.ui.Modal, title="Turnier starten"):
 
     registration_duration = TextInput(
         label="Dauer der Anmeldung (in Stunden)",
-        placeholder="z. B. 72",
+        placeholder="z.B. 72",
         required=True,
         default="72",
         max_length=3,
@@ -248,7 +244,7 @@ class StartTournamentModal(discord.ui.Modal, title="Turnier starten"):
 
     tournament_weeks = TextInput(
         label="Turnierlaufzeit (in Wochen)",
-        placeholder="z. B. 1",
+        placeholder="z.B. 1",
         required=True,
         default="1",
         max_length=2,
@@ -256,7 +252,7 @@ class StartTournamentModal(discord.ui.Modal, title="Turnier starten"):
 
     team_size = TextInput(
         label="Spieler pro Team",
-        placeholder="z. B. 2",
+        placeholder="z.B. 2",
         required=True,
         default="2",
         max_length=2,

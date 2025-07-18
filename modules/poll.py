@@ -8,7 +8,7 @@ import discord
 from discord.ext import commands
 
 # Lokale Modules
-from modules.dataStorage import load_tournament_data, save_tournament_data
+from modules.dataStorage import load_tournament_data, save_tournament_data, load_games
 from modules.embeds import send_poll_results, send_registration_open
 from modules.logger import logger
 from modules.task_manager import add_task
@@ -89,12 +89,23 @@ async def end_poll(bot: discord.Client, channel: discord.TextChannel):
                     real_votes[game] = real_votes.get(game, 0) + 1
 
     if not real_votes:
-        chosen_game = "Keine Stimmen abgegeben"
+        all_games = load_games()
+        visible_games = [
+            g["name"] for g in all_games.values() if g.get("visible_in_poll", True)
+        ]
+
+        if visible_games:
+            chosen_game = random.choice(visible_games)
+            logger.warning(f"[POLL] ⚠️ Keine Stimmen abgegeben – Zufällig gewählt: {chosen_game}")
+        else:
+            chosen_game = "Keine Spiele verfügbar"
+            logger.error("[POLL] ❌ Keine Spiele verfügbar – Umfrage leer")
     else:
         sorted_votes = sorted(real_votes.items(), key=lambda kv: kv[1], reverse=True)
         max_votes = sorted_votes[0][1]
         top_options = [option for option, votes in sorted_votes if votes == max_votes]
-        chosen_game = top_options[0]  # Falls Gleichstand: einfach erstes nehmen (könnte man randomisieren)
+        chosen_game = top_options[0]  # oder random.choice(top_options)
+
 
     # Speichern ins Turnier
     tournament = load_tournament_data()

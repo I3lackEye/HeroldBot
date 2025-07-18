@@ -10,7 +10,7 @@ from zoneinfo import ZoneInfo
 import discord
 from discord import Embed, Interaction, TextChannel
 
-from modules.dataStorage import REMINDER_PING, load_tournament_data
+from modules.dataStorage import REMINDER_ENABLED, load_tournament_data
 from modules.logger import logger
 
 # Lokale Module
@@ -18,25 +18,37 @@ from modules.utils import load_config, smart_send
 from views.reschedule_view import RescheduleView
 
 
-def load_embed_template(template_name: str, category: str = "default") -> dict:
+def load_embed_template(template_name: str, language: str = None) -> dict:
     """
-    Lädt ein Embed-Template aus configs/embeds/{category}/{template_name}.json
-    """
-    base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "configs", "embeds", category))
-    embed_path = os.path.join(base_dir, f"{template_name}.json")
+    Lädt ein sprachsensitives Embed-Template aus:
+    locale/{language}/embeds/{template_name}.json
 
-    try:
-        with open(embed_path, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except FileNotFoundError:
-        logger.warning(f"[EMBED LOADER] Template '{template_name}' in Kategorie '{category}' nicht gefunden.")
-        return {}
-    except json.JSONDecodeError as e:
-        logger.error(f"[EMBED LOADER] Fehler beim Parsen von {embed_path}: {e}")
-        return {}
+    Fallback bei Fehler: locale/default/embeds/{template_name}.json
+    """
+    if not language:
+        language = load_config().get("language", "de")
+
+    paths_to_try = [
+        os.path.join("locale", language, "embeds", f"{template_name}.json"),
+        os.path.join("locale", "default", "embeds", f"{template_name}.json")  # optionaler Fallback
+    ]
+
+    for path in paths_to_try:
+        if os.path.isfile(path):
+            try:
+                with open(path, "r", encoding="utf-8") as f:
+                    return json.load(f)
+            except json.JSONDecodeError as e:
+                logger.error(f"[EMBED LOADER] Fehler beim Parsen von {path}: {e}")
+                return {}
+
+    logger.warning(f"[EMBED LOADER] Template '{template_name}' für Sprache '{language}' nicht gefunden.")
+    return {}
 
 
 def build_embed_from_template(template: dict, placeholders: dict = None) -> Embed:
+    if not isinstance(template, dict):
+        raise TypeError(f"❌ Embed-Template muss ein dict sein, aber war: {type(template)}")
     # Farbe sicher verarbeiten
     color_value = template.get("color", 0x3498DB)
     if isinstance(color_value, str):
@@ -78,7 +90,7 @@ def build_embed_from_template(template: dict, placeholders: dict = None) -> Embe
 
 
 async def send_registration_open(channel: TextChannel, placeholders: dict):
-    template = load_embed_template("registration_open", category="default").get("REGISTRATION_OPEN_ANNOUNCEMENT")
+    template = load_embed_template("registration_open").get("REGISTRATION_OPEN_ANNOUNCEMENT")
     if not template:
         logger.error("[EMBED] REGISTRATION_OPEN_ANNOUNCEMENT Template fehlt.")
         return
@@ -90,7 +102,7 @@ async def send_registration_confirmation(interaction: Interaction, placeholders:
     """
     Sendet ein Bestätigungs-Embed nach erfolgreicher Anmeldung.
     """
-    template_data = load_embed_template("registration", category="default")
+    template_data = load_embed_template("registration")
     template = template_data.get("REGISTRATION_CONFIRMATION")
 
     if not template:
@@ -102,7 +114,7 @@ async def send_registration_confirmation(interaction: Interaction, placeholders:
 
 
 async def send_tournament_announcement(channel: TextChannel, placeholders: dict):
-    template = load_embed_template("tournament_start", category="default").get("TOURNAMENT_ANNOUNCEMENT")
+    template = load_embed_template("tournament_start").get("TOURNAMENT_ANNOUNCEMENT")
     if not template:
         logger.error("[EMBED] TOURNAMENT_ANNOUNCEMENT Template fehlt.")
         return
@@ -120,7 +132,7 @@ async def send_tournament_end_announcement(
     Sendet ein Abschluss-Embed für das Turnier basierend auf tournament_end.json.
     """
 
-    template = load_embed_template("tournament_end", category="default").get("TOURNAMENT_END")
+    template = load_embed_template("tournament_end").get("TOURNAMENT_END")
     if not template:
         logger.error("[EMBED] TOURNAMENT_END Template fehlt.")
         return
@@ -176,7 +188,7 @@ async def send_tournament_stats(
     }
 
     # Template laden
-    template = load_embed_template("tournament_stats", category="default").get("TOURNAMENT_STATS")
+    template = load_embed_template("tournament_stats").get("TOURNAMENT_STATS")
     if not template:
         logger.error("[EMBED] TOURNAMENT_STATS Template fehlt.")
         return
@@ -189,7 +201,7 @@ async def send_tournament_stats(
 
 
 async def send_match_reminder(channel: TextChannel, placeholders: dict):
-    template = load_embed_template("reminder", category="default").get("REMINDER")
+    template = load_embed_template("reminder").get("REMINDER")
     if not template:
         logger.error("[EMBED] REMINDER Template fehlt.")
         return
@@ -198,16 +210,31 @@ async def send_match_reminder(channel: TextChannel, placeholders: dict):
 
     # Optional ping der Spieler
     ping_text = ""
-    if REMINDER_PING:
+
+    # 1. Explizite Mentions übergeben?
+    if "mentions" in placeholders:
+        ping_text = placeholders["mentions"]
+        logger.debug("[REMINDER] Mentions direkt aus placeholders übernommen.")
+
+    # 2. Fallback über Team-Mitglieder (nur wenn REMINDER_ENABLED)
+    elif REMINDER_ENABLED:
         tournament = load_tournament_data()
         team1 = placeholders.get("team1")
         team2 = placeholders.get("team2")
+
         members1 = tournament.get("teams", {}).get(team1, {}).get("members", [])
         members2 = tournament.get("teams", {}).get(team2, {}).get("members", [])
+
+        if not members1 and not members2:
+            logger.warning(f"[REMINDER] ⚠️ Keine Mitglieder für Teams '{team1}' oder '{team2}' gefunden.")
+
         mentions = members1 + members2
         ping_text = " ".join(mentions)
+        logger.debug(f"[REMINDER] Mentions automatisch generiert: {ping_text}")
 
-    await channel.send(content=ping_text if ping_text else None, embed=embed)
+    # 3. Senden
+    await channel.send(embed=embed)
+
 
 
 async def send_notify_team_members(
@@ -232,7 +259,7 @@ async def send_notify_team_members(
 
         if user:
             try:
-                template = load_embed_template("reschedule", category="default").get("RESCHEDULE")
+                template = load_embed_template("reschedule").get("RESCHEDULE")
                 if not template:
                     logger.error("[EMBED] RESCHEDULE Template fehlt.")
                     continue
@@ -259,7 +286,7 @@ async def send_status(interaction: Interaction, placeholders: dict):
     """
     Sendet ein Status-Embed basierend auf den Platzhaltern.
     """
-    template = load_embed_template("status", category="default").get("STATUS")
+    template = load_embed_template("status").get("STATUS")
     if not template:
         logger.error("[EMBED] STATUS Template fehlt.")
         return
@@ -269,7 +296,7 @@ async def send_status(interaction: Interaction, placeholders: dict):
 
 
 async def send_match_schedule(interaction: Interaction, description_text: str):
-    template = load_embed_template("match_schedule", category="default").get("MATCH_SCHEDULE")
+    template = load_embed_template("match_schedule").get("MATCH_SCHEDULE")
     if not template:
         logger.error("[EMBED] MATCH_SCHEDULE Template fehlt.")
         return
@@ -294,7 +321,7 @@ async def send_match_schedule(interaction: Interaction, description_text: str):
 
 
 async def send_match_schedule_for_channel(channel: discord.TextChannel, description_text: str):
-    template = load_embed_template("match_schedule", category="default").get("MATCH_SCHEDULE")
+    template = load_embed_template("match_schedule").get("MATCH_SCHEDULE")
     if not template:
         logger.error("[EMBED] MATCH_SCHEDULE Template fehlt.")
         return
@@ -315,10 +342,13 @@ async def send_match_schedule_for_channel(channel: discord.TextChannel, descript
 
 
 async def send_poll_results(channel: TextChannel, placeholders: dict, poll_results: dict):
-    template = load_embed_template("poll", category="default").get("POLL_RESULT")
+    template = load_embed_template("poll").get("POLL_RESULT")
     if not template:
         logger.error("[EMBED] POLL_RESULT Template fehlt.")
         return
+
+    from modules.dataStorage import load_games
+    games = load_games()
 
     embed = build_embed_from_template(template, placeholders)
 
@@ -327,17 +357,20 @@ async def send_poll_results(channel: TextChannel, placeholders: dict, poll_resul
 
     sorted_games = sorted(real_votes.items(), key=lambda kv: kv[1], reverse=True)
 
-    for game, votes in sorted_games:
-        embed.add_field(name=game, value=f"**{votes} Stimmen**", inline=False)
+    for game_id, votes in sorted_games:
+        game_name = games.get(game_id, {}).get("name", game_id)
+        embed.add_field(name=game_name, value=f"**{votes} Stimmen**", inline=False)
 
     if "chosen_game" in poll_results:
-        embed.add_field(name="🏆 Gewonnen", value=f"**{poll_results['chosen_game']}**", inline=False)
+        winner_id = poll_results["chosen_game"]
+        winner_name = games.get(winner_id, {}).get("name", winner_id)
+        embed.add_field(name="🏆 Gewonnen", value=f"**{winner_name}**", inline=False)
 
     await channel.send(embed=embed)
 
 
 async def send_help(interaction: Interaction):
-    template = load_embed_template("help", category="default").get("HELP")
+    template = load_embed_template("help").get("HELP")
     if not template:
         logger.error("[EMBED] HELP Template fehlt.")
         return
@@ -348,7 +381,7 @@ async def send_help(interaction: Interaction):
 
 
 async def send_global_stats(interaction: Interaction, description_text: str):
-    template = load_embed_template("global_stats", category="default").get("GLOBAL_STATS")
+    template = load_embed_template("global_stats").get("GLOBAL_STATS")
     if not template:
         logger.error("[EMBED] GLOBAL_STATS Template fehlt.")
         return
@@ -358,7 +391,7 @@ async def send_global_stats(interaction: Interaction, description_text: str):
 
 async def send_list_matches(interaction: Interaction, matches: list):
 
-    template_data = load_embed_template("list_matches", category="default")
+    template_data = load_embed_template("list_matches")
     template = template_data.get("LIST_MATCHES")
 
     if not template:
@@ -420,7 +453,7 @@ async def send_list_matches(interaction: Interaction, matches: list):
 
 
 async def send_cleanup_summary(channel: discord.TextChannel, teams_deleted: list, players_rescued: list):
-    template = load_embed_template("cleanup", category="default").get("CLEANUP_SUMMARY")
+    template = load_embed_template("cleanup").get("CLEANUP_SUMMARY")
     if not template:
         logger.error("[EMBED] CLEANUP_SUMMARY Template fehlt.")
         return
@@ -450,7 +483,7 @@ async def send_participants_overview(interaction: Interaction, participants_text
     """
     Sendet eine Übersicht aller Teilnehmer als Embed.
     """
-    template = load_embed_template("participants", category="default").get("PARTICIPANTS_OVERVIEW")
+    template = load_embed_template("participants").get("PARTICIPANTS_OVERVIEW")
 
     if not template:
         logger.error("[EMBED] PARTICIPANTS_OVERVIEW Template fehlt.")
@@ -494,7 +527,7 @@ async def send_request_reschedule(
 
 
 async def send_wrong_channel(interaction: Interaction):
-    template = load_embed_template("wrong_channel", category="default").get("WRONG_CHANNEL")
+    template = load_embed_template("wrong_channel").get("WRONG_CHANNEL")
     if not template:
         logger.error("[EMBED] WRONG_CHANNEL Template fehlt.")
         return
@@ -503,7 +536,7 @@ async def send_wrong_channel(interaction: Interaction):
 
 
 async def send_registration_closed(channel: discord.TextChannel):
-    template = load_embed_template("close", category="default").get("REGISTRATION_CLOSED_ANNOUNCEMENT")
+    template = load_embed_template("close").get("REGISTRATION_CLOSED_ANNOUNCEMENT")
     if not template:
         logger.error("[EMBED] REGISTRATION_CLOSED_ANNOUNCEMENT Template fehlt.")
         return

@@ -328,13 +328,23 @@ def finalize_tournament(winning_team: str, winners: list[int], game: str, points
     logger.info(f"[TOURNAMENT] Abschluss gespeichert für Team '{winning_team}' mit Spiel: {game}")
 
 
-def generate_team_name() -> str:
+def generate_team_name(language: str = None) -> str:
     """
-    Erzeugt einen zufälligen Teamnamen aus einer Adjektiv- und einer Substantivliste.
+    Erzeugt einen zufälligen Teamnamen aus Adjektiv- und Substantivlisten.
+    Falls keine Namen gefunden werden, wird ein generischer Name zurückgegeben.
 
-    :return: Der generierte Teamname als String.
+    :param language: Sprache (optional); Standard: aus config.json
+    :return: Teamname als String
     """
-    names = load_names()
+    if not language:
+        language = load_config().get("language", "de")
+
+    names = load_names(language)
+
+    # Safetycheck: Falls Datei fehlt oder leer ist
+    if not names or "adjektive" not in names or "substantive" not in names:
+        return "Team_X"
+
     adjektiv = random.choice(names["adjektive"])
     substantiv = random.choice(names["substantive"])
     return f"{adjektiv} {substantiv}"

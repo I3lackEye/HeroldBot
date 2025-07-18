@@ -6,6 +6,7 @@ import random
 from collections import defaultdict
 from datetime import datetime, time, timedelta
 from itertools import combinations
+from zoneinfo import ZoneInfo
 from math import ceil
 from typing import Dict, List, Optional, Tuple
 
@@ -26,81 +27,14 @@ MAX_TIME_BUDGET = timedelta(hours=2)
 # ---------------------------------------
 # Hilfsfunktion
 # ---------------------------------------
-def auto_match_solo():
-    """
-    Paart Solo-Spieler in zufällige Teams und weist automatisch Teamnamen zu.
-    """
-    tournament = load_tournament_data()
-    solo_players = tournament.get("solo", [])
-
-    if len(solo_players) < 2:
-        logger.info("[MATCHMAKER] Nicht genügend Solo-Spieler zum Paaren.")
-        return  # Nicht genug Spieler zum Paaren
-
-    random.shuffle(solo_players)  # Mischen für Zufälligkeit
-    new_teams = {}
-
-    while len(solo_players) >= 2:
-        player1 = solo_players.pop()
-        player2 = solo_players.pop()
-
-        team_name = generate_team_name()
-
-        # Stelle sicher, dass der Teamname noch nicht existiert
-        existing_teams = tournament.get("teams", {}).keys()
-        while team_name in existing_teams:
-            team_name = generate_team_name()
-
-        new_teams[team_name] = {
-            "members": [player1["player"], player2["player"]],
-            "verfügbarkeit": calculate_overlap(
-                player1.get("verfügbarkeit", "00:00-23:59"),
-                player2.get("verfügbarkeit", "00:00-23:59"),
-            ),
-        }
-
-    # Update Turnierdaten
-    tournament.setdefault("teams", {}).update(new_teams)
-    tournament["solo"] = solo_players  # Restliche übriggebliebene Solospieler
-
-    save_tournament_data(tournament)
-
-    logger.info(f"[MATCHMAKER] {len(new_teams)} neue Teams aus Solo-Spielern erstellt: {', '.join(new_teams.keys())}")
-
-    return new_teams
-
-
-def create_round_robin_schedule():
-    """
-    Erstellt ein Round-Robin-Spielplan basierend auf den aktuellen Teams.
-    """
-    tournament = load_tournament_data()
-    teams = list(tournament.get("teams", {}).keys())
-
-    if len(teams) < 2:
-        logger.warning("[MATCHMAKER] Nicht genügend Teams für einen Spielplan.")
-        return []
-
-    matches = []
-    match_id = 1
-
-    for team1, team2 in combinations(teams, 2):
-        matches.append(
-            {
-                "match_id": match_id,
-                "team1": team1,
-                "team2": team2,
-                "status": "offen",  # noch nicht gespielt
-                "scheduled_time": None,
-            }
-        )
-        match_id += 1
-
-    tournament["matches"] = matches
-    save_tournament_data(tournament)
-
-    logger.info(f"[MATCHMAKER] {len(matches)} Matches für {len(teams)} Teams erstellt.")
-    return matches
+def merge_weekend_availability(avail1: dict, avail2: dict) -> dict:
+    result = {}
+    for day in ["samstag", "sonntag"]:
+        slot1 = avail1.get(day, "00:00-00:00")
+        slot2 = avail2.get(day, "00:00-00:00")
+        overlap = calculate_overlap(slot1, slot2)
+        result[day] = overlap
+    return result
 
 
 def calculate_overlap(zeitraum1: str, zeitraum2: str) -> str:
@@ -128,6 +62,99 @@ def calculate_overlap(zeitraum1: str, zeitraum2: str) -> str:
         return "00:00-00:00"  # Keine Überschneidung
 
     return f"{latest_start.strftime('%H:%M')}-{earliest_end.strftime('%H:%M')}"
+
+
+def auto_match_solo():
+    """
+    Paart Solo-Spieler basierend auf gemeinsamer Verfügbarkeit für Samstag/Sonntag.
+    Speichert nur funktionierende Teams.
+    """
+    tournament = load_tournament_data()
+    solo_players = tournament.get("solo", [])
+
+    if len(solo_players) < 2:
+        logger.info("[MATCHMAKER] Nicht genügend Solo-Spieler zum Paaren.")
+        return []
+
+    logger.debug(f"[MATCHMAKER] Solo-Spieler (Rohdaten): {solo_players}")
+
+    random.shuffle(solo_players)
+    new_teams = {}
+    used_names = set(tournament.get("teams", {}).keys())
+
+    while len(solo_players) >= 2:
+        p1 = solo_players.pop()
+        p2 = solo_players.pop()
+        name1 = p1.get("player", "???")
+        name2 = p2.get("player", "???")
+
+        logger.debug(f"[MATCHMAKER] Paarung: {name1} + {name2}")
+
+        avail1 = p1.get("verfügbarkeit", {})
+        avail2 = p2.get("verfügbarkeit", {})
+
+        overlap = merge_weekend_availability(avail1, avail2)
+
+        if all(val == "00:00-00:00" for val in overlap.values()):
+            logger.warning(f"[MATCHMAKER] ❌ Keine gemeinsame Verfügbarkeit für {name1} und {name2} – Team wird nicht erstellt.")
+            continue
+
+        team_name = generate_team_name()
+        attempts = 0
+        while team_name in used_names or team_name in new_teams:
+            team_name = generate_team_name()
+            attempts += 1
+            if attempts > 10:
+                logger.error("[MATCHMAKER] ❌ Kein eindeutiger Teamname gefunden – Abbruch.")
+                break
+        used_names.add(team_name)
+
+        new_teams[team_name] = {
+            "members": [name1, name2],
+            "verfügbarkeit": overlap,
+        }
+
+    if new_teams:
+        tournament.setdefault("teams", {}).update(new_teams)
+        tournament["solo"] = solo_players
+        save_tournament_data(tournament)
+        logger.info(f"[MATCHMAKER] ✅ {len(new_teams)} Teams erstellt: {', '.join(new_teams.keys())}")
+    else:
+        logger.warning("[MATCHMAKER] ❌ Keine Teams erstellt – nichts gespeichert.")
+
+    return list(new_teams.keys())
+
+
+def create_round_robin_schedule(tournament: dict):
+    """
+    Erstellt ein Round-Robin-Spielplan basierend auf den aktuellen Teams.
+    """
+    teams = list(tournament.get("teams", {}).keys())
+
+    if len(teams) < 2:
+        logger.warning("[MATCHMAKER] Nicht genügend Teams für einen Spielplan.")
+        return []
+
+    matches = []
+    match_id = 1
+
+    for team1, team2 in combinations(teams, 2):
+        matches.append(
+            {
+                "match_id": match_id,
+                "team1": team1,
+                "team2": team2,
+                "status": "offen",  # noch nicht gespielt
+                "scheduled_time": None,
+            }
+        )
+        match_id += 1
+
+    tournament["matches"] = matches
+    save_tournament_data(tournament)
+
+    logger.info(f"[MATCHMAKER] {len(matches)} Matches für {len(teams)} Teams erstellt.")
+    return matches
 
 
 def generate_schedule_overview(matches: list) -> str:
@@ -298,6 +325,39 @@ def is_team_available_at_time(team_data: dict, slot_datetime: datetime) -> bool:
         return True  # Bei Fehlern lieber zulassen
 
 
+def get_compatible_slots(team1: dict, team2: dict, global_slots: list) -> list:
+    """
+    Gibt eine Liste von Slots zurück, die innerhalb der gemeinsamen Verfügbarkeit beider Teams liegen.
+    Erwartet Slot-Times als UTC (ISO), Team-Verfügbarkeit als { "samstag": "HH:MM-HH:MM", ... }
+    """
+    compatible = []
+
+    # hole die Teamverfügbarkeit
+    avail1 = team1.get("verfügbarkeit", {})
+    avail2 = team2.get("verfügbarkeit", {})
+
+    for slot_str in global_slots:
+        try:
+            slot_dt = datetime.fromisoformat(slot_str).astimezone(ZoneInfo("Europe/Berlin"))
+            tag = slot_dt.strftime("%A").lower()  # z. B. "samstag"
+            uhrzeit = slot_dt.strftime("%H:%M")
+
+            # nur wenn Tag in beiden vorhanden
+            if tag not in avail1 or tag not in avail2:
+                continue
+
+            start1, end1 = avail1[tag].split("-")
+            start2, end2 = avail2[tag].split("-")
+
+            # Slot muss in beiden Zeiträumen liegen
+            if start1 <= uhrzeit <= end1 and start2 <= uhrzeit <= end2:
+                compatible.append(slot_str)
+        except Exception as e:
+            logger.warning(f"[SLOTS] Fehler beim Verarbeiten von Slot {slot_str}: {e}")
+
+    return compatible
+
+
 # ---------------------------------------
 # Main Matchmaker
 # ---------------------------------------
@@ -341,7 +401,7 @@ def generate_slot_matrix(tournament: dict, slot_interval: int = 2) -> dict:
         current += timedelta(days=1)
 
     # Optional: JSON-Debug speichern
-    if DEBUG_MODE >= 1:
+    if DEBUG_MODE:
         try:
             os.makedirs("debug", exist_ok=True)
 
@@ -508,7 +568,7 @@ def assign_rescue_slots(unassigned_matches, matches, slot_matrix, teams):
     logger.info(f"[RESCUE] Insgesamt {rescue_assigned} Matches im Rescue-Modus zugewiesen.")
     return matches
 
-
+d
 # ------------------
 # Alles zusammenbauen
 # ------------------

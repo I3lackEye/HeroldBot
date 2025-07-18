@@ -75,8 +75,6 @@ class TournamentCog(commands.Cog):
 # ---------------------------------------
 # Hilfsfunktion
 # ---------------------------------------
-
-
 async def end_tournament_procedure(
     channel: discord.TextChannel,
     manual_trigger: bool = False,
@@ -238,6 +236,7 @@ async def close_registration_after_delay(delay_seconds: int, channel: discord.Te
     auto_match_solo()
 
     # Matchplan erstellen
+    tournament = load_tournament_data()
     create_round_robin_schedule()
 
     # Alle übrig gebliebenen Solo-Spieler entfernen

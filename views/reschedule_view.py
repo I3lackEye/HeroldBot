@@ -3,6 +3,7 @@ from typing import List
 from datetime import datetime
 import asyncio
 import logging
+from zoneinfo import ZoneInfo
 
 
 # Lokale Module
@@ -79,7 +80,9 @@ class RescheduleView(ui.View):
 
         match = next((m for m in tournament.get("matches", []) if m.get("match_id") == self.match_id), None)
         if match:
-            match["scheduled_time"] = self.new_datetime.isoformat()
+            match["scheduled_time"] = self.new_datetime.astimezone(ZoneInfo("UTC")).isoformat()
+            match["rescheduled_once"] = True
+            logger.debug(f"[RESCHEDULE] UTC gespeichert: {match['scheduled_time']}")
             save_tournament_data(tournament)
             logger.info(f"[RESCHEDULE] Match {self.match_id} erfolgreich auf {self.new_datetime} verschoben.")
 

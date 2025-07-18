@@ -156,7 +156,7 @@ async def handle_start_tournament_modal(
         )
 
         # Embed senden
-        template = load_embed_template("tournament_start", category="default").get("TOURNAMENT_ANNOUNCEMENT")
+        template = load_embed_template("tournament_start").get("TOURNAMENT_ANNOUNCEMENT")
         embed = build_embed_from_template(template) if template else Embed(
             title="🎮 Turnier gestartet!",
             description=f"Die Spielumfrage läuft jetzt für {poll_duration} Stunden.",
@@ -274,32 +274,27 @@ class AdminGroup(app_commands.Group):
         await end_tournament_procedure(interaction.channel, manual_trigger=True)
 
 
-    @app_commands.command(
-        name="add_game",
-        description="Admin-Befehl: Fügt ein neues Spiel zur Spielauswahl hinzu.",
-    )
-    async def add_game_command(self, interaction: Interaction):
-        if not has_permission(interaction.user, "Moderator", "Admin"):
-            await interaction.response.send_message("🚫 Du hast keine Berechtigung für diesen Befehl.", ephemeral=True)
-            return
-
-        logger.debug("🧪 Slash-Command /admin add_game wurde ausgeführt")
-        await interaction.response.send_modal(AddGameModal())
-
-
-    @app_commands.command(name="remove_game", description="Entfernt ein Spiel aus der globalen Spielesammlung.")
-    @app_commands.describe(game="Spiel-ID oder Name des Spiels")
+    @app_commands.command(name="manage_game", description="Füge ein Spiel hinzu oder entferne eines.")
+    @app_commands.describe(action="hinzufügen oder entfernen", game="Spiel-ID oder Name")
+    @app_commands.choices(action=[
+        app_commands.Choice(name="Hinzufügen", value="add"),
+        app_commands.Choice(name="Entfernen", value="remove")
+    ])
     @app_commands.autocomplete(game=games_autocomplete)
-    async def remove_game_command(self, interaction: Interaction, game: str):
+    async def manage_game(self, interaction: Interaction, action: str, game: str):
         if not has_permission(interaction.user, "Moderator", "Admin"):
             await interaction.response.send_message("🚫 Keine Berechtigung.", ephemeral=True)
             return
 
-        try:
-            remove_game(game)
-            await interaction.response.send_message(f"🗑 Spiel `{game}` wurde entfernt.", ephemeral=True)
-        except ValueError as e:
-            await interaction.response.send_message(f"⚠️ {str(e)}", ephemeral=True)
+        if action == "add":
+            await interaction.response.send_modal(AddGameModal())
+        elif action == "remove":
+            try:
+                remove_game(game)
+                await interaction.response.send_message(f"🗑 Spiel `{game}` wurde entfernt.", ephemeral=True)
+            except ValueError as e:
+                await interaction.response.send_message(f"⚠️ {str(e)}", ephemeral=True)
+
 
 
     @app_commands.command(
@@ -399,57 +394,66 @@ class AdminGroup(app_commands.Group):
 
     @app_commands.command(
         name="close_registration",
-        description="(Admin) Schließt die Anmeldung und startet die Matchgenerierung.",
+        description="Schließt die Anmeldung und startet die Matchgenerierung.",
     )
     async def close_registration(self, interaction: Interaction):
-        if not has_permission(interaction.user, "Moderator", "Admin"):
-            await interaction.response.send_message("🚫 Du hast keine Berechtigung.", ephemeral=True)
-            return
+        try:
+            await interaction.response.defer(thinking=True, ephemeral=True)
+        except Exception as e:
+            logger.warning(f"[DEBUG] Konnte nicht deferren: {e}")
 
         tournament = load_tournament_data()
+        logger.debug(f"[DEBUG] registration_open: {tournament.get('registration_open')} (running: {tournament.get('running')})")
 
-        if not tournament.get("running", False) or not tournament.get("registration_open", False):
-            await interaction.response.send_message(
-                "⚠️ Die Anmeldung ist bereits geschlossen oder es läuft kein Turnier.",
-                ephemeral=True,
-            )
+        if not tournament.get("running", False):
+            await interaction.followup.send("🚫 Kein Turnier aktiv.", ephemeral=True)
             return
 
-        # Anmeldung schließen
+        if not tournament.get("registration_open", True):
+            await interaction.followup.send("⚠️ Anmeldung war bereits geschlossen – Ablauf wird erneut ausgeführt.", ephemeral=True)
+
+
         tournament["registration_open"] = False
         save_tournament_data(tournament)
-
-        await smart_send(interaction, content="🚫 **Die Anmeldung wurde geschlossen.**")
         logger.info("[TOURNAMENT] Anmeldung manuell geschlossen.")
 
-        # Verwaiste Teams aufräumen
+        logger.debug("[DEBUG] smart_send wird versucht...")
+        await interaction.followup.send("🚫 **Die Anmeldung wurde geschlossen.**", ephemeral=True)
+        logger.debug("[DEBUG] smart_send abgeschlossen.")
+
         await cleanup_orphan_teams(interaction.channel)
 
-        # Solo-Spieler automatisch matchen
-        auto_match_solo()
-
-        # Matchplan erstellen
-        create_round_robin_schedule()
-
-        # Alle übrig gebliebenen Solo-Spieler entfernen
+        created_teams = auto_match_solo()
         tournament = load_tournament_data()
+
+        # Brich nur ab, wenn es wirklich KEINE Teams gibt
+        if not created_teams and not tournament.get("teams"):
+            await interaction.followup.send("⚠️ Keine Teams vorhanden – Turnier kann nicht gestartet werden.", ephemeral=True)
+            return
+
+        chosen_game = tournament.get("poll_results", {}).get("chosen_game")
+        if not chosen_game or chosen_game in ["Keine Stimmen abgegeben", "Keine Spiele verfügbar"]:
+            await interaction.followup.send("⚠️ Kein gültiges Spiel gewählt.", ephemeral=True)
+            return
+
+        try:
+            create_round_robin_schedule(tournament)
+        except Exception as e:
+            logger.error(f"[CLOSE_REG] Fehler beim Erstellen des Spielplans: {e}")
+            await interaction.followup.send("❌ Fehler beim Erstellen des Spielplans.", ephemeral=True)
+            return
+
+
         tournament["solo"] = []
         save_tournament_data(tournament)
 
-        # Matches laden
-        tournament = load_tournament_data()
-        matches = tournament.get("matches", [])
-
-        # Slots generieren und Matches verteilen
         await generate_and_assign_slots()
 
-        # Nach dem Verteilen neu laden
         tournament = load_tournament_data()
         matches = tournament.get("matches", [])
+        overview = generate_schedule_overview(matches)
+        await send_match_schedule(interaction, overview)
 
-        # Überblick posten
-        description_text = generate_schedule_overview(matches)
-        await send_match_schedule(interaction, description_text)
 
     @app_commands.command(name="archive_tournament", description="Archiviert das aktuelle Turnier.")
     async def archive_tournament(self, interaction: Interaction):

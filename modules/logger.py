@@ -3,9 +3,7 @@
 import logging
 import os
 from datetime import datetime
-
 from dotenv import load_dotenv
-
 
 class ColorFormatter(logging.Formatter):
     COLORS = {
@@ -22,16 +20,16 @@ class ColorFormatter(logging.Formatter):
         record.levelname = f"{color}{record.levelname}{self.RESET}"
         return super().format(record)
 
-
-# Lade .env files
 load_dotenv()
 
-debug_level = int(os.getenv("DEBUG", "0"))
+def to_bool(value):
+    return str(value).lower() in ("1", "true", "yes", "on")
 
+DEBUG_MODE = to_bool(os.getenv("DEBUG", "false"))
 
 def setup_logger(log_folder="logs", level=logging.INFO):
     # Falls DEBUG aktiviert ist, setze level auf DEBUG
-    if level == logging.INFO and debug_level >= 1:
+    if level == logging.INFO and DEBUG_MODE:
         level = logging.DEBUG
 
     # Erstelle das Log-Verzeichnis, falls es nicht existiert

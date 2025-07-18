@@ -7,10 +7,9 @@ import os
 import discord
 from discord import app_commands
 from discord.ext import commands
-from dotenv import load_dotenv
 
 # Lokale Module
-from modules import poll, tournament
+from modules import poll, tournament, task_manager
 from modules.dataStorage import (
     DEBUG_MODE,
     TOKEN,
@@ -19,19 +18,21 @@ from modules.dataStorage import (
     load_tournament_data,
     validate_channels,
     validate_permissions,
+    load_env
 )
 from modules.logger import logger
 from modules.reminder import match_reminder_loop
 from modules.task_manager import add_task, cancel_all_tasks, get_all_tasks
 
-load_dotenv()
+#Wichtig
+load_env()
 
 
 def debug_dump_configs():
     """
     Gibt bei aktivem DEBUG-Modus die Konfigurationsdateien ins Log aus.
     """
-    if DEBUG_MODE < 2:
+    if not DEBUG_MODE:
         return
 
     logger.info("[DEBUG] Starte Dump der Konfigurations- und Datendateien...")
@@ -80,70 +81,77 @@ EXTENSIONS = [
 # ========== EVENTS ==========
 @bot.event
 async def on_ready():
-    # --- Startup-Checks ---
-    tournament._registration_closed = False
-    logger.info("[STARTUP] Flags: Aufgeräumt")
+    config = load_config()
+    language = str(config.get("language", "de")).lower()
 
-    try:
-        cancel_all_tasks()
-        logger.info("[STARTUP] Tasks: Canceled")
-    except Exception as e:
-        logger.warning(f"[STARTUP] Keine Tasks oder Fehler beim Cancelen: {e}")
+    logger.info(f"[STARTUP] Bot ist online als {bot.user.name} (ID: {bot.user.id})")
+    logger.info(f"[STARTUP] Sprache aus config.json: {language}")
+    logger.info(f"[STARTUP] DEBUG-Modus: {'aktiv' if DEBUG_MODE else 'inaktiv'}")
 
-    for folder in ["logs", "backups", "archive", "data", "langs", "configs"]:
+    # Wichtige Ordner prüfen
+    startup_folders = [
+        "logs", "backups", "archive", "data", "locale", "configs",
+        os.path.join("locale", language, "embeds")
+    ]
+
+    for folder in startup_folders:
         if not os.path.exists(folder):
-            os.makedirs(folder)
-            logger.info(f"[STARTUP] Verzeichnis angelegt: {folder}")
+            try:
+                os.makedirs(folder)
+                logger.info(f"[STARTUP] Ordner erstellt: {folder}")
+            except Exception as e:
+                logger.error(f"[STARTUP] Fehler beim Erstellen von {folder}: {e}")
         else:
-            logger.info(f"[STARTUP] Verzeichnis vorhanden: {folder}")
+            logger.info(f"[STARTUP] Ordner vorhanden: {folder}")
 
-    required_files = ["data/data.json", "configs/config.json", "configs/names_de.json"]
-    for f in required_files:
-        if not os.path.exists(f):
-            logger.error(f"[STARTUP] Notwendige Datei fehlt: {f}")
+    # Essenzielle Dateien prüfen
+    required_files = [
+        "configs/config.json",
+        "data/data.json",
+        "data/tournament.json",
+        "data/games.json",
+        f"locale/{language}/names_{language}.json",
+    ]
+
+    logger.info("[STARTUP] Datei-Validierung beginnt...")
+    for path in required_files:
+        if not os.path.exists(path):
+            logger.error(f"[STARTUP] ❌ Datei fehlt: {path}")
         else:
             try:
-                with open(f, encoding="utf-8") as file:
-                    json.load(file)
-                logger.info(f"[STARTUP] Datei OK: {f}")
+                with open(path, "r", encoding="utf-8") as f:
+                    json.load(f)
+                logger.info(f"[STARTUP] Datei OK: {path}")
             except Exception as e:
-                logger.error(f"[STARTUP] Datei beschädigt: {f} – {e}")
+                logger.error(f"[STARTUP] ❌ Fehler beim Parsen von {path}: {e}")
+    logger.info("[STARTUP] Datei-Validierung abgeschlossen.")
 
-    # Check Channels
-    await validate_channels(bot)
-    # Check Permissions
-    for guild in bot.guilds:
-        await validate_permissions(guild)
+    # Alte Tasks beenden
+    task_manager.cancel_all_tasks()
+    logger.info("[STARTUP] Alte Hintergrund-Tasks beendet.")
 
-    config = load_config()
-    if not config.get("CHANNELS", {}):
-        logger.error("[STARTUP] Keine CHANNELS in der Config!")
+    # Reminder-Channel aus der Config holen
+    reminder_channel_id = int(config.get("CHANNELS", {}).get("REMINDER", 0))
+    channel = bot.get_channel(reminder_channel_id)
 
-    # Reminder-Task starten
-    try:
-        reminder_channel_id = int(config.get("CHANNELS", {}).get("REMINDER", 0))
-        channel = bot.get_channel(reminder_channel_id)
-        if channel:
-            add_task("reminder", asyncio.create_task(match_reminder_loop(channel)))
-            logger.info(f"[STARTUP] Match-Reminder gestartet im Channel {channel.name}.")
-        else:
-            logger.error("[STARTUP] Reminder-Channel nicht gefunden oder ungültige ID!")
-    except Exception as e:
-        logger.error(f"[STARTUP] Fehler beim Starten des Reminder-Tasks: {e}")
+    if channel:
+        task_manager.add_task("reminder_loop", bot.loop.create_task(match_reminder_loop(channel)))
+        logger.info("[STARTUP] Reminder Subsystem gestartet")
+    else:
+        logger.error(f"[REMINDER] ❌ Reminder-Channel mit ID {reminder_channel_id} nicht gefunden!")
 
+
+    # Slash-Commands neu synchronisieren
     try:
         synced = await bot.tree.sync()
-        debug_dump_configs()
-        logger.info(f"[STARTUP] {len(synced)} Slash-Commands synchronisiert.")
-        commands = bot.tree.get_commands()
-        for cmd in commands:
-            if cmd.name == "start_tournament" and cmd.parent is None:
-                bot.tree.remove_command(cmd.name, type=discord.AppCommandType.chat_input)
-                logger.info("[STARTUP] Entferne alter slash commands")
+        if len(synced) == 0:
+            logger.warning("[STARTUP] ⚠️ Keine Slash-Commands synchronisiert.")
+        else:
+            logger.info(f"[STARTUP] Slash-Commands synchronisiert ({len(synced)} Befehle).")
     except Exception as e:
-        logger.error(f"[STARTUP] Fehler beim Synchronisieren der Commands: {e}")
+        logger.error(f"[STARTUP] ❌ Slash-Command-Sync fehlgeschlagen: {e}")
 
-    logger.info("[STARTUP] STARTUP Checks abgeschlossen. Bot ist bereit.")
+    logger.info("[STARTUP] ✅ Initialisierung abgeschlossen.\n")
 
 
 # ========== EXTENSIONS LADEN & BOT STARTEN ==========

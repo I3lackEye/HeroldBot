@@ -2,15 +2,14 @@
 
 import asyncio
 import random
-from datetime import datetime, timedelta
-
 import discord
+from datetime import datetime, timedelta
 from discord import Interaction, app_commands
 from discord.ext import commands
 
-from modules import poll
 
 # Hilfsmodule importieren
+from modules import poll
 from modules.dataStorage import (
     load_config,
     load_games,
@@ -31,12 +30,13 @@ from modules.utils import (
 
 
 class DevGroup(app_commands.Group):
-    def __init__(self):
+    def __init__(self, bot):
         super().__init__(name="dev", description="Dev-Befehle")
+        self.bot = bot
 
     @app_commands.command(
         name="generate_dummy",
-        description="(Admin) Erzeugt Dummy-Solos und Dummy-Teams zum Testen.",
+        description="Erzeugt Dummy-Solos und Dummy-Teams zum Testen.",
     )
     @app_commands.describe(num_solo="Anzahl Solo-Spieler", num_teams="Anzahl Teams")
     async def generate_dummy_teams(self, interaction: Interaction, num_solo: int = 4, num_teams: int = 2):
@@ -136,7 +136,7 @@ class DevGroup(app_commands.Group):
         }
 
         # Template laden
-        template = load_embed_template("reminder", category="default").get("REMINDER")
+        template = load_embed_template("reminder").get("REMINDER")
         if not template:
             logger.error("[EMBED] REMINDER Template fehlt.")
             await smart_send(interaction, content="🚫 Reminder-Template fehlt.", ephemeral=True)
@@ -230,6 +230,15 @@ class DevGroup(app_commands.Group):
             "poll_results": {},
         }
 
+        # Optional: Solo-Spieler hinzufügen
+        solo_players = []
+        for i in range(4):
+            player_name = f"<@{222220000000000 + i}>"
+            availability = generate_random_availability()
+            solo_players.append({"player": player_name, "verfügbarkeit": availability})
+
+        tournament_data["solo"] = solo_players
+
         # Dummy-Spieler und Teams hinzufügen
         teams = {}
         for i in range(6):  # Zwei Dummy-Teams
@@ -257,112 +266,100 @@ class DevGroup(app_commands.Group):
         asyncio.create_task(auto_end_poll(interaction.client, interaction.channel, delay_seconds=10))
 
         # Anmeldungsschluss simulieren
-        # asyncio.create_task(close_registration_after_delay(delay_seconds=20, channel=interaction.channel))
+        asyncio.create_task(close_registration_after_delay(delay_seconds=20, channel=interaction.channel))
 
     @app_commands.command(
-        name="health_check",
-        description="Admin-Check: Prüft wichtige Zustände des Systems.",
+    name="diagnose",
+    description="Admin-Diagnose: Zeigt alle relevanten Systeminformationen und Fehlerquellen."
     )
-    async def health_check_command(self, interaction: Interaction):
-        if not has_permission(interaction.user, "Dev"):
-            await interaction.response.send_message("🚫 Du hast keine Berechtigung für diesen Befehl.", ephemeral=True)
-            return
-
-        tournament = load_tournament_data()
-        embed = discord.Embed(title="🩺 System Health Check", color=discord.Color.green())
-
-        # 1. Turnierstatus
-        running = tournament.get("running", False)
-        embed.add_field(name="Turnier läuft", value="✅ Ja" if running else "❌ Nein", inline=True)
-
-        # 2. Poll aktiv?
-        from modules.poll import poll_channel_id, poll_message_id
-
-        embed.add_field(
-            name="Aktive Umfrage",
-            value=f"✅ Ja (ID: {poll_message_id})" if poll_message_id else "❌ Nein",
-            inline=True,
-        )
-
-        # 3. Anmeldung offen
-        reg_open = tournament.get("registration_open", False)
-        reg_end = tournament.get("registration_end")
-        if reg_end:
-            try:
-                dt = datetime.fromisoformat(reg_end)
-                remaining = dt - datetime.utcnow()
-                reg_info = f"✅ Offen (noch {remaining.days}d {remaining.seconds//3600}h)"
-            except Exception:
-                reg_info = "⚠️ Ungültiges Datumsformat"
-        else:
-            reg_info = "❌ Nicht gesetzt"
-
-        embed.add_field(name="Anmeldung", value=reg_info, inline=False)
-
-        # 4. Matches
-        matches = tournament.get("matches", [])
-        embed.add_field(name="Geplante Matches", value=str(len(matches)), inline=True)
-
-        # 5. Teilnehmer
-        embed.add_field(name="Teams", value=str(len(tournament.get("teams", {}))), inline=True)
-        embed.add_field(name="Solo-Spieler", value=str(len(tournament.get("solo", []))), inline=True)
-
-        # Antwort
-        await interaction.response.send_message(embed=embed, ephemeral=True)
-
-    @app_commands.command(
-        name="diagnose_all",
-        description="Führt eine vollständige Diagnose aller Konfigurationen, Channels & Templates durch.",
-    )
-    async def diagnose_all(self, interaction: Interaction):
+    async def diagnose(self, interaction: Interaction):
         if not has_permission(interaction.user, "Dev"):
             await interaction.response.send_message("🚫 Keine Berechtigung.", ephemeral=True)
             return
 
-        from modules.dataStorage import load_config, load_games
+        await interaction.response.defer(ephemeral=True)
+
+        from modules.poll import poll_channel_id, poll_message_id
+        from modules.task_manager import get_all_tasks
+        from modules.dataStorage import load_games
         from modules.embeds import load_embed_template
 
         config = load_config()
-
+        tournament = load_tournament_data()
         report = []
+        language = config.get("language", "de")
 
-        # Games
+        # Turnierstatus
+        running = tournament.get("running", False)
+        report.append(f"🏁 Turnierstatus: {'✅ Läuft' if running else '❌ Inaktiv'}")
+
+        # Anmeldung
+        reg_open = tournament.get("registration_open", False)
+        reg_end = tournament.get("registration_end")
+        if reg_open and reg_end:
+            try:
+                dt = datetime.fromisoformat(reg_end)
+                remaining = dt - datetime.utcnow()
+                report.append(f"📝 Anmeldung: ✅ Offen ({remaining.days}d {remaining.seconds//3600}h verbleibend)")
+            except Exception:
+                report.append("📝 Anmeldung: ⚠️ Ungültiges Datumsformat")
+        else:
+            report.append("📝 Anmeldung: ❌ Nicht offen")
+
+        # Poll
+        poll_status = f"✅ Ja (ID: {poll_message_id})" if poll_message_id else "❌ Nein"
+        report.append(f"📊 Aktive Umfrage: {poll_status}")
+
+        # Matches & Teilnehmer
+        report.append(f"📅 Geplante Matches: {len(tournament.get('matches', []))}")
+        report.append(f"👥 Teams: {len(tournament.get('teams', {}))}")
+        report.append(f"🙋 Solo-Spieler: {len(tournament.get('solo', []))}")
+
+        # Spieleliste
         games = load_games()
         report.append(f"🎮 Spiele geladen: {len(games)} {'✅' if games else '❌ KEINE SPIELE'}")
 
-        # Channels
+        # Channels prüfen
+        report.append("📺 Channel-Zugriffe:")
         channels = config.get("CHANNELS", {})
         for key, id_str in channels.items():
             try:
                 cid = int(id_str)
                 channel = interaction.client.get_channel(cid)
                 if not channel:
-                    report.append(f"❌ Channel {key}: Nicht gefunden (ID: {id_str})")
+                    report.append(f"  ❌ {key}: Channel nicht gefunden (ID {id_str})")
                     continue
                 perms = channel.permissions_for(channel.guild.me)
                 if not perms.send_messages:
-                    report.append(f"⚠️ Channel {key} (#{channel.name}): Keine Schreibrechte")
+                    report.append(f"  ⚠️  {key}: Keine Schreibrechte für #{channel.name}")
                 else:
-                    report.append(f"✅ Channel {key} (#{channel.name}): OK")
+                    report.append(f"  ✅ {key}: #{channel.name}")
             except Exception as e:
-                report.append(f"❌ Channel {key}: Fehler – {e}")
+                report.append(f"  ❌ {key}: Fehler – {e}")
 
-        # Templates
-        templates = [
-            "tournament_start",
-            "poll",
-            "registration",
-            "close",
-            "tournament_end",
-        ]
+        # Templates prüfen
+        report.append("📦 Templates:")
+        templates = ["tournament_start", "poll", "registration", "close", "tournament_end"]
         for tpl in templates:
-            content = load_embed_template(tpl, category="default")
+            content = load_embed_template(tpl, language=language)
             status = "✅" if content else "❌"
-            report.append(f"{status} Template: `{tpl}`")
+            report.append(f"  {status} `{tpl}`")
 
-        # Rückgabe
-        text = "\n".join(report)
-        await interaction.response.send_message(f"🩺 **Diagnosebericht:**\n```{text}```", ephemeral=True)
+        # Tasks
+        report.append("🧵 Hintergrund-Tasks:")
+        tasks = get_all_tasks()
+        if not tasks:
+            report.append("  ❌ Keine aktiven Tasks gefunden")
+        else:
+            for name, entry in tasks.items():
+                task = entry["task"]
+                status = "✅ abgeschlossen" if task.done() else "🟢 läuft"
+                report.append(f"  {name}: {status}")
+
+        # Zusammenfassung schicken
+        report_text = "\n".join(report)
+        await interaction.followup.send(f"🩺 **Systemdiagnose:**\n```{report_text}```", ephemeral=True)
+
 
     @app_commands.command(name="tasks", description="Zeigt alle aktuell laufenden Bot-Tasks an.")
     async def tasks(self, interaction: Interaction):
@@ -387,10 +384,35 @@ class DevGroup(app_commands.Group):
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
 
+    @app_commands.command(name="stop", description="🛑 Stoppt den Bot (nur für Entwickler)")
+    async def stop_command(self, interaction: Interaction):
+        # Berechtigungen prüfen
+        if not has_permission(interaction.user, "Dev"):
+            await interaction.response.send_message("🚫 Du darfst diesen Befehl nicht verwenden.", ephemeral=True)
+            logger.warning(f"[SECURITY] {interaction.user.display_name} ({interaction.user.id}) hat versucht, den Bot zu stoppen.")
+            return
+
+        await interaction.response.send_message("🛑 Der Bot wird jetzt gestoppt...", ephemeral=True)
+        logger.warning(f"[SYSTEM] 🛑 Bot-Stop durch {interaction.user.display_name} ({interaction.user.id}) angefordert.")
+
+        # Laufende Tasks beenden (z. B. Reminder, Background Loops etc.)
+        for name, entry in get_all_tasks().items():
+            task = entry.get("task")
+            if task:
+                task.cancel()
+                logger.debug(f"[SYSTEM] Task '{name}' wurde gestoppt.")
+
+        # Optional: Warten, damit Tasks Zeit zum sauberen Beenden haben
+        await asyncio.sleep(1)
+
+        # Bot schließen
+        await self.bot.close()
+
+
 class DevCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.bot.tree.add_command(DevGroup())
+        self.bot.tree.add_command(DevGroup(bot))
 
 
 async def setup(bot):

@@ -11,48 +11,83 @@ from dotenv import load_dotenv
 # lokale Modules
 from modules.logger import logger
 
-# Lade .env files
-load_dotenv()
+# Vars global define
+_config_cache = None
 
-# load vars from config
-REMINDER_PING = int(os.getenv("REMINDER_PING", "0"))
-TOKEN = os.getenv("DISCORD_TOKEN")
-DEBUG_MODE = int(os.getenv("DEBUG", "0"))
+# ------------------
+# Konfiguration & Umgebungsvariablen
+# ------------------
+def load_env():
+    load_dotenv()
+
+
+def get_env(key, default=None):
+    return os.getenv(key, default)
+
+
+def to_bool(value):
+    """Konvertiert 'true', '1', 'yes' zu Boolean True."""
+    return str(value).lower() in ("1", "true", "yes", "on")
+
+
+def get_config_bool(feature_flag: str, default: bool = False) -> bool:
+    config = load_config()
+    return bool(config.get("features", {}).get(feature_flag, default))
+
+
+def is_debug_mode() -> bool:
+    return to_bool(get_env("DEBUG", "false"))
 
 
 def load_config(config_path="../configs/config.json"):
+    """
+    Lädt die zentrale Bot-Konfiguration aus config.json.
+    Nutzt Caching, um mehrfaches Laden zu vermeiden.
+    """
+    global _config_cache
+    if _config_cache is not None:
+        return _config_cache
+
     try:
         current_dir = os.path.dirname(__file__)
         full_path = os.path.join(current_dir, config_path)
         with open(full_path, "r", encoding="utf-8") as config_file:
-            config = json.load(config_file)
-        return config
+            _config_cache = json.load(config_file)
+        return _config_cache
     except FileNotFoundError:
-        logger.error(f"Config file '{config_path}' not found.")
+        logger.error(f"[CONFIG] Datei nicht gefunden: {config_path}")
         return {}
     except json.JSONDecodeError as e:
-        logger.error(f"Error parsing config file: {e}")
+        logger.error(f"[CONFIG] Fehler beim Parsen von {config_path}: {e}")
         return {}
-
-
-def load_names(language="de"):
-    path = f"langs/{language}/names_{language}.json"
-    with open(path, "r", encoding="utf-8") as f:
-        return json.load(f)
 
 
 # Konfiguration laden
 config = load_config()
 
-# Hole Pfade aus Umgebungsvariablen (mit Fallback auf Standardwerte)
-data_path_env = os.getenv("DATA_PATH", "data/data.json")
-tournament_path_env = os.getenv("TOURNAMENT_PATH", "data/tournament.json")
+# Load Token
+TOKEN = get_env("DISCORD_TOKEN")
+if not TOKEN:
+    raise ValueError("DISCORD_TOKEN fehlt in .env-Datei!")
 
-# Berechne die vollständigen Pfade
+# Debug / Feature Check
+DEBUG_MODE = to_bool(get_env("DEBUG", "false"))
+if not DEBUG_MODE:
+    raise ValueError("DEBUG_MODE fehlt in .env-Datei!")
+REMINDER_ENABLED = config.get("features", {}).get("reminder_enabled", False)
+if not REMINDER_ENABLED:
+    raise ValueError("REMINDER_ENABLED fehlt in config-Datei!")
+try:
+    RESCHEDULE_CHANNEL_ID = int(config.get("CHANNELS", {}).get("RESCHEDULE_CHANNEL_ID", "0"))
+except ValueError:
+    RESCHEDULE_CHANNEL_ID = 0
+    logger.error("[CONFIG] RESCHEDULE_CHANNEL_ID konnte nicht als int interpretiert werden!")
+
+
+# Berechne die vollständigen Pfade aus der config.json
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-
-DATA_FILE_PATH = os.path.join(BASE_DIR, data_path_env)
-TOURNAMENT_FILE_PATH = os.path.join(BASE_DIR, tournament_path_env)
+DATA_FILE_PATH = os.path.join(BASE_DIR, config.get("DATA_PATH", "data/data.json"))
+TOURNAMENT_FILE_PATH = os.path.join(BASE_DIR, config.get("TOURNAMENT_PATH", "data/tournament.json"))
 
 # Standardinhalte für persistente Daten
 DEFAULT_GLOBAL_DATA = {"games": [], "last_tournament_winner": {}, "player_stats": {}}
@@ -67,6 +102,24 @@ DEFAULT_TOURNAMENT_DATA = {
     "poll_results": None,
 }
 
+
+def load_names(language="de"):
+    """
+    Lädt die Namen für die gewünschte Sprache aus locale/{language}/names_{language}.json.
+    Gibt ein Dict zurück oder {} bei Fehler.
+    """
+    path = f"locale/{language}/names_{language}.json"
+
+    if not os.path.isfile(path):
+        logger.warning(f"[NAMEGEN] Sprachdatei nicht gefunden: {path}")
+        return {}
+
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception as e:
+        logger.error(f"[NAMEGEN] Fehler beim Laden der Namensdatei: {e}")
+        return {}
 
 async def validate_channels(bot: discord.Client):
     config = load_config()
@@ -193,7 +246,6 @@ def load_games() -> dict:
         return {}
 
 
-# Funktionen für turnierspezifische Daten (tournament.json)
 def load_tournament_data():
     if os.path.exists(TOURNAMENT_FILE_PATH):
         try:

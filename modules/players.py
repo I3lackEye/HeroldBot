@@ -36,6 +36,14 @@ class PlayerGroup(app_commands.Group):
         super().__init__(name="player", description="Befehle für Spieleranmeldung und Verfügbarkeit.")
 
     @app_commands.command(
+        name="request_reschedule",
+        description="Fordere eine Neuansetzung für ein Match an."
+    )
+    @app_commands.describe(match_id="Match-ID, das du verschieben möchtest")
+    async def request_reschedule(self, interaction: Interaction, match_id: int):
+        await handle_request_reschedule(interaction, match_id)
+
+    @app_commands.command(
         name="update_availability",
         description="Aktualisiere deine Verfügbarkeiten für das Turnier.",
     )
@@ -231,27 +239,14 @@ class PlayerGroup(app_commands.Group):
         modal = TeamFullJoinModal()
         await interaction.response.send_modal(modal)
 
-    """
-    @app_commands.command(name="join", description="Melde dich solo oder als Team zum Turnier an")
-    async def join(self, interaction: Interaction):
-        view = AnmeldungChoiceView()
-        await interaction.response.send_message("Wähle deine Anmeldeart:", view=view, ephemeral=True)
-    """
-
-    @app_commands.command(
-        name="request_reschedule",
-        description="Fordere eine Neuansetzung für ein Match an.",
-    )
-    @app_commands.autocomplete(match_id=match_id_autocomplete, neuer_zeitpunkt=neuer_zeitpunkt_autocomplete)
-    async def request_reschedule(self, interaction: Interaction, match_id: int, neuer_zeitpunkt: str):
-        await handle_request_reschedule(interaction, match_id, neuer_zeitpunkt)
-
 
 class PlayerCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.bot.tree.add_command(PlayerGroup())
+        self.group = PlayerGroup()
+        bot.tree.add_command(self.group)
 
+        self.group.request_reschedule.autocomplete("match_id")(match_id_autocomplete)
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(PlayerCog(bot))
