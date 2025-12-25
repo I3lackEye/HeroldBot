@@ -12,24 +12,28 @@ from typing import Dict, List, Optional, Tuple
 
 from discord import TextChannel
 
-# Lokale Module
+# Local modules
 from modules.dataStorage import DEBUG_MODE, load_tournament_data, save_tournament_data
 from modules.embeds import send_cleanup_summary
 from modules.logger import logger
 from modules.utils import generate_team_name, get_active_days_config
 
-# Helper Variable
+# Helper variables
 MATCH_DURATION = timedelta(minutes=90)
 PAUSE_DURATION = timedelta(minutes=30)
 MAX_TIME_BUDGET = timedelta(hours=2)
 
 
 # ---------------------------------------
-# Hilfsfunktion
+# Helper Functions
 # ---------------------------------------
 def merge_weekend_availability(avail1: dict, avail2: dict) -> dict:
+    """
+    Merges weekend availability of two players/teams.
+    Returns the overlapping time slots for Saturday and Sunday.
+    """
     result = {}
-    for day in ["samstag", "sonntag"]:
+    for day in ["saturday", "sunday"]:
         slot1 = avail1.get(day, "00:00-00:00")
         slot2 = avail2.get(day, "00:00-00:00")
         overlap = calculate_overlap(slot1, slot2)
@@ -37,13 +41,13 @@ def merge_weekend_availability(avail1: dict, avail2: dict) -> dict:
     return result
 
 
-def calculate_overlap(zeitraum1: str, zeitraum2: str) -> str:
+def calculate_overlap(time_range1: str, time_range2: str) -> str:
     """
-    Berechnet die Überschneidung von zwei Zeiträumen im Format 'HH:MM-HH:MM'.
+    Calculates the overlap of two time ranges in format 'HH:MM-HH:MM'.
 
-    :param zeitraum1: Erster Zeitraum als String.
-    :param zeitraum2: Zweiter Zeitraum als String.
-    :return: Der überlappende Zeitraum als String 'HH:MM-HH:MM', oder '00:00-00:00' wenn keine Überschneidung.
+    :param time_range1: First time range as string.
+    :param time_range2: Second time range as string.
+    :return: The overlapping time range as string 'HH:MM-HH:MM', or '00:00-00:00' if no overlap.
     """
 
     def parse_time_range(range_str):
@@ -52,31 +56,31 @@ def calculate_overlap(zeitraum1: str, zeitraum2: str) -> str:
         end = datetime.strptime(end_str, "%H:%M")
         return start, end
 
-    start1, end1 = parse_time_range(zeitraum1)
-    start2, end2 = parse_time_range(zeitraum2)
+    start1, end1 = parse_time_range(time_range1)
+    start2, end2 = parse_time_range(time_range2)
 
     latest_start = max(start1, start2)
     earliest_end = min(end1, end2)
 
     if latest_start >= earliest_end:
-        return "00:00-00:00"  # Keine Überschneidung
+        return "00:00-00:00"  # No overlap
 
     return f"{latest_start.strftime('%H:%M')}-{earliest_end.strftime('%H:%M')}"
 
 
 def auto_match_solo():
     """
-    Paart Solo-Spieler basierend auf gemeinsamer Verfügbarkeit für Samstag/Sonntag.
-    Speichert nur funktionierende Teams.
+    Pairs solo players based on common availability for Saturday/Sunday.
+    Only saves working teams.
     """
     tournament = load_tournament_data()
     solo_players = tournament.get("solo", [])
 
     if len(solo_players) < 2:
-        logger.info("[MATCHMAKER] Nicht genügend Solo-Spieler zum Paaren.")
+        logger.info("[MATCHMAKER] Not enough solo players to pair.")
         return []
 
-    logger.debug(f"[MATCHMAKER] Solo-Spieler (Rohdaten): {solo_players}")
+    logger.debug(f"[MATCHMAKER] Solo players (raw data): {solo_players}")
 
     random.shuffle(solo_players)
     new_teams = {}
@@ -88,15 +92,15 @@ def auto_match_solo():
         name1 = p1.get("player", "???")
         name2 = p2.get("player", "???")
 
-        logger.debug(f"[MATCHMAKER] Paarung: {name1} + {name2}")
+        logger.debug(f"[MATCHMAKER] Pairing: {name1} + {name2}")
 
-        avail1 = p1.get("verfügbarkeit", {})
-        avail2 = p2.get("verfügbarkeit", {})
+        avail1 = p1.get("availability", {})
+        avail2 = p2.get("availability", {})
 
         overlap = merge_weekend_availability(avail1, avail2)
 
         if all(val == "00:00-00:00" for val in overlap.values()):
-            logger.warning(f"[MATCHMAKER] ❌ Keine gemeinsame Verfügbarkeit für {name1} und {name2} – Team wird nicht erstellt.")
+            logger.warning(f"[MATCHMAKER] ❌ No common availability for {name1} and {name2} – Team will not be created.")
             continue
 
         team_name = generate_team_name()
@@ -105,34 +109,34 @@ def auto_match_solo():
             team_name = generate_team_name()
             attempts += 1
             if attempts > 10:
-                logger.error("[MATCHMAKER] ❌ Kein eindeutiger Teamname gefunden – Abbruch.")
+                logger.error("[MATCHMAKER] ❌ No unique team name found – Aborting.")
                 break
         used_names.add(team_name)
 
         new_teams[team_name] = {
             "members": [name1, name2],
-            "verfügbarkeit": overlap,
+            "availability": overlap,
         }
 
     if new_teams:
         tournament.setdefault("teams", {}).update(new_teams)
         tournament["solo"] = solo_players
         save_tournament_data(tournament)
-        logger.info(f"[MATCHMAKER] ✅ {len(new_teams)} Teams erstellt: {', '.join(new_teams.keys())}")
+        logger.info(f"[MATCHMAKER] ✅ {len(new_teams)} teams created: {', '.join(new_teams.keys())}")
     else:
-        logger.warning("[MATCHMAKER] ❌ Keine Teams erstellt – nichts gespeichert.")
+        logger.warning("[MATCHMAKER] ❌ No teams created – nothing saved.")
 
     return list(new_teams.keys())
 
 
 def create_round_robin_schedule(tournament: dict):
     """
-    Erstellt ein Round-Robin-Spielplan basierend auf den aktuellen Teams.
+    Creates a round-robin schedule based on the current teams.
     """
     teams = list(tournament.get("teams", {}).keys())
 
     if len(teams) < 2:
-        logger.warning("[MATCHMAKER] Nicht genügend Teams für einen Spielplan.")
+        logger.warning("[MATCHMAKER] Not enough teams for a schedule.")
         return []
 
     matches = []
@@ -144,7 +148,7 @@ def create_round_robin_schedule(tournament: dict):
                 "match_id": match_id,
                 "team1": team1,
                 "team2": team2,
-                "status": "offen",  # noch nicht gespielt
+                "status": "open",  # not yet played
                 "scheduled_time": None,
             }
         )
@@ -153,32 +157,32 @@ def create_round_robin_schedule(tournament: dict):
     tournament["matches"] = matches
     save_tournament_data(tournament)
 
-    logger.info(f"[MATCHMAKER] {len(matches)} Matches für {len(teams)} Teams erstellt.")
+    logger.info(f"[MATCHMAKER] {len(matches)} matches created for {len(teams)} teams.")
     return matches
 
 
 def generate_schedule_overview(matches: list) -> str:
     """
-    Erzeugt einen schön gruppierten Spielplan aus der übergebenen Matchliste.
-    Hebt Matches von HEUTE mit 🔥 hervor, erledigte Matches mit ✅.
+    Generates a nicely grouped schedule from the given match list.
+    Highlights matches of TODAY with 🔥, completed matches with ✅.
     """
-    logger.debug(f"[DEBUG] {len(matches)} Matches erhalten.")
+    logger.debug(f"[DEBUG] {len(matches)} matches received.")
     scheduled_count = sum(1 for m in matches if m.get("scheduled_time"))
-    logger.debug(f"[DEBUG] Davon mit scheduled_time: {scheduled_count}")
+    logger.debug(f"[DEBUG] Of which with scheduled_time: {scheduled_count}")
 
     if not matches:
-        return "Keine Matches geplant."
+        return "No matches scheduled."
 
-    today = datetime.now().date()  # Heutiges Datum
+    today = datetime.now().date()  # Today's date
 
-    # Gruppiere nach Datum
+    # Group by date
     schedule_by_day = defaultdict(list)
     for match in matches:
         scheduled_time = match.get("scheduled_time")
         if scheduled_time:
             dt = datetime.fromisoformat(scheduled_time)
             day = dt.strftime("%d.%m.%Y %A")
-            schedule_by_day[day].append((dt, match))  # Speichere datetime + Match
+            schedule_by_day[day].append((dt, match))  # Store datetime + match
 
     description = ""
     for day, matches_list in sorted(
@@ -187,18 +191,18 @@ def generate_schedule_overview(matches: list) -> str:
     ):
         description += f"📅 {day}\n"
 
-        # Sortiere die Matches an diesem Tag nach Uhrzeit
-        matches_list.sort(key=lambda x: x[0])  # x[0] ist die datetime
+        # Sort matches on this day by time
+        matches_list.sort(key=lambda x: x[0])  # x[0] is the datetime
 
         for dt, match in matches_list:
-            team1 = match.get("team1", "Unbekannt")
-            team2 = match.get("team2", "Unbekannt")
-            match_status = match.get("status", "offen")
+            team1 = match.get("team1", "Unknown")
+            team2 = match.get("team2", "Unknown")
+            match_status = match.get("status", "open")
 
-            # Emoji bestimmen
+            # Determine emoji
             if match.get("rescue_assigned"):
                 emoji = "❗"
-            elif match_status == "erledigt":
+            elif match_status == "completed":
                 emoji = "✅"
             elif dt.date() == today:
                 emoji = "🔥"
@@ -214,8 +218,8 @@ def generate_schedule_overview(matches: list) -> str:
 
 async def cleanup_orphan_teams(channel: TextChannel):
     """
-    Entfernt Teams mit nur 1 Spieler nach Anmeldeschluss
-    und verschiebt sie in die Solo-Liste.
+    Removes teams with only 1 player after registration close
+    and moves them to the solo list.
     """
     tournament = load_tournament_data()
     teams = tournament.get("teams", {})
@@ -227,14 +231,14 @@ async def cleanup_orphan_teams(channel: TextChannel):
     for team_name, team_data in list(teams.items()):
         members = team_data.get("members", [])
         if len(members) == 1:
-            # Nur 1 Spieler → auflösen
+            # Only 1 player → dissolve
             player = members[0]
             solo.append(
                 {
                     "player": player,
-                    "verfügbarkeit": team_data.get("verfügbarkeit", "00:00-23:59"),
-                    "samstag": team_data.get("samstag"),
-                    "sonntag": team_data.get("sonntag"),
+                    "availability": team_data.get("availability", "00:00-23:59"),
+                    "saturday": team_data.get("saturday"),
+                    "sunday": team_data.get("sunday"),
                 }
             )
             del teams[team_name]
@@ -247,25 +251,25 @@ async def cleanup_orphan_teams(channel: TextChannel):
 
     await send_cleanup_summary(channel, teams_deleted, players_rescued)
 
-    logger.info(f"[CLEANUP] {teams_deleted} leere Teams gelöscht, {players_rescued} Spieler gerettet.")
+    logger.info(f"[CLEANUP] {teams_deleted} empty teams deleted, {players_rescued} players rescued.")
 
 
 def parse_start_hour(availability_str: str) -> int:
     """
-    Extrahiert die Startstunde aus einem Zeitbereich (z.B. "12:00-20:00").
+    Extracts the start hour from a time range (e.g. "12:00-20:00").
     """
     try:
         start_time = availability_str.split("-")[0]
         hour = int(start_time.split(":")[0])
         return hour
     except Exception:
-        logger.warning(f"[SLOT-PLANUNG] Fehler beim Parsen der Verfügbarkeit: {availability_str}")
-        return 10  # Falls etwas schiefgeht, Standardwert 10 Uhr
+        logger.warning(f"[SLOT-PLANNING] Error parsing availability: {availability_str}")
+        return 10  # Default value 10 AM if something goes wrong
 
 
 def team_available_on_slot(team_data, slot_datetime):
     """
-    Prüft, ob das Team am Slot-Datum spielen darf (Blacklisted Dates).
+    Checks if the team is allowed to play on the slot date (blacklisted dates).
     """
     unavailable = set(team_data.get("unavailable_dates", []))
     slot_date_str = slot_datetime.strftime("%Y-%m-%d")
@@ -274,7 +278,7 @@ def team_available_on_slot(team_data, slot_datetime):
 
 def get_team_time_budget(team_name: str, date: datetime.date, matches: list) -> timedelta:
     """
-    Berechnet die gesamte Zeit, die ein Team an einem bestimmten Tag durch Matches + Pausen blockiert ist.
+    Calculates the total time a team is blocked on a specific day through matches + pauses.
     """
     total_time = timedelta()
 
@@ -299,21 +303,21 @@ def get_team_time_budget(team_name: str, date: datetime.date, matches: list) -> 
 
 def is_team_available_at_time(team_data: dict, slot_datetime: datetime) -> bool:
     """
-    Prüft, ob ein Team zum gegebenen Zeitpunkt verfügbar ist.
-    Beachtet samstags/sonntags explizite Zeitfenster im 'verfügbarkeit'-Dict.
+    Checks if a team is available at the given time.
+    Respects explicit Saturday/Sunday time windows in the 'availability' dict.
     """
-    weekday = slot_datetime.weekday()  # 5 = Samstag, 6 = Sonntag
+    weekday = slot_datetime.weekday()  # 5 = Saturday, 6 = Sunday
     time_only = slot_datetime.time()
 
-    day_key = "samstag" if weekday == 5 else "sonntag" if weekday == 6 else None
+    day_key = "saturday" if weekday == 5 else "sunday" if weekday == 6 else None
     if not day_key:
-        return True  # Unter der Woche keine Einschränkung
+        return True  # No restrictions during the week
 
-    availability = team_data.get("verfügbarkeit", {})
+    availability = team_data.get("availability", {})
     time_range = availability.get(day_key)
 
     if not time_range:
-        return False  # Keine Zeit angegeben = nicht verfügbar
+        return False  # No time specified = not available
 
     try:
         start_str, end_str = time_range.split("-")
@@ -321,39 +325,39 @@ def is_team_available_at_time(team_data: dict, slot_datetime: datetime) -> bool:
         end_time = datetime.strptime(end_str, "%H:%M").time()
         return start_time <= time_only < end_time
     except Exception as e:
-        logger.warning(f"[VERFÜGBARKEIT] Fehler beim Parsen der Zeit: {time_range} ({e})")
-        return True  # Bei Fehlern lieber zulassen
+        logger.warning(f"[AVAILABILITY] Error parsing time: {time_range} ({e})")
+        return True  # Allow if errors occur
 
 
 def get_compatible_slots(team1: dict, team2: dict, global_slots: list) -> list:
     """
-    Gibt eine Liste von Slots zurück, die innerhalb der gemeinsamen Verfügbarkeit beider Teams liegen.
-    Erwartet Slot-Times als UTC (ISO), Team-Verfügbarkeit als { "samstag": "HH:MM-HH:MM", ... }
+    Returns a list of slots that are within the common availability of both teams.
+    Expects slot times as UTC (ISO), team availability as { "saturday": "HH:MM-HH:MM", ... }
     """
     compatible = []
 
-    # hole die Teamverfügbarkeit
-    avail1 = team1.get("verfügbarkeit", {})
-    avail2 = team2.get("verfügbarkeit", {})
+    # Get team availability
+    avail1 = team1.get("availability", {})
+    avail2 = team2.get("availability", {})
 
     for slot_str in global_slots:
         try:
             slot_dt = datetime.fromisoformat(slot_str).astimezone(ZoneInfo("Europe/Berlin"))
-            tag = slot_dt.strftime("%A").lower()  # z. B. "samstag"
-            uhrzeit = slot_dt.strftime("%H:%M")
+            day = slot_dt.strftime("%A").lower()  # e.g. "saturday"
+            time_str = slot_dt.strftime("%H:%M")
 
-            # nur wenn Tag in beiden vorhanden
-            if tag not in avail1 or tag not in avail2:
+            # Only if day exists in both
+            if day not in avail1 or day not in avail2:
                 continue
 
-            start1, end1 = avail1[tag].split("-")
-            start2, end2 = avail2[tag].split("-")
+            start1, end1 = avail1[day].split("-")
+            start2, end2 = avail2[day].split("-")
 
-            # Slot muss in beiden Zeiträumen liegen
-            if start1 <= uhrzeit <= end1 and start2 <= uhrzeit <= end2:
+            # Slot must be in both time ranges
+            if start1 <= time_str <= end1 and start2 <= time_str <= end2:
                 compatible.append(slot_str)
         except Exception as e:
-            logger.warning(f"[SLOTS] Fehler beim Verarbeiten von Slot {slot_str}: {e}")
+            logger.warning(f"[SLOTS] Error processing slot {slot_str}: {e}")
 
     return compatible
 
@@ -363,8 +367,8 @@ def get_compatible_slots(team1: dict, team2: dict, global_slots: list) -> list:
 # ---------------------------------------
 def generate_slot_matrix(tournament: dict, slot_interval: int = 2) -> dict:
     """
-    Erstellt eine globale Slot-Matrix, die angibt, welche Teams an welchen Slots verfügbar sind.
-    Gibt zurück: Dict[datetime, Set[team_name]]
+    Creates a global slot matrix that indicates which teams are available at which slots.
+    Returns: Dict[datetime, Set[team_name]]
     """
     from datetime import datetime, timedelta
     from collections import defaultdict
@@ -400,7 +404,7 @@ def generate_slot_matrix(tournament: dict, slot_interval: int = 2) -> dict:
 
         current += timedelta(days=1)
 
-    # Optional: JSON-Debug speichern
+    # Optional: Save JSON debug
     if DEBUG_MODE:
         try:
             os.makedirs("debug", exist_ok=True)
@@ -417,16 +421,16 @@ def generate_slot_matrix(tournament: dict, slot_interval: int = 2) -> dict:
             with open("debug/slot_matrix_debug.json", "w", encoding="utf-8") as f:
                 json.dump(debug_data, f, indent=2, ensure_ascii=False)
 
-            logger.info("[SLOT-MATRIX] slot_matrix_debug.json gespeichert.")
+            logger.info("[SLOT-MATRIX] slot_matrix_debug.json saved.")
         except Exception as e:
-            logger.warning(f"[SLOT-MATRIX] Fehler beim Speichern: {e}")
+            logger.warning(f"[SLOT-MATRIX] Error saving: {e}")
 
     return dict(slot_matrix)
 
 
 def get_valid_slots_for_match(team1: str, team2: str, slot_matrix: dict[datetime, set[str]]) -> list[datetime]:
     """
-    Gibt alle Slots zurück, an denen sowohl team1 als auch team2 verfügbar sind.
+    Returns all slots where both team1 and team2 are available.
     """
     valid_slots = []
     for slot_time, team_set in slot_matrix.items():
@@ -438,9 +442,9 @@ def get_valid_slots_for_match(team1: str, team2: str, slot_matrix: dict[datetime
 
 def assign_slots_with_matrix(matches: list, slot_matrix: dict[datetime, set[str]]) -> tuple[list, list]:
     """
-    Weist Matches anhand der globalen Slot-Matrix Slots zu.
-    Berücksichtigt Pause + Zeitbudget + Dopplungen.
-    Gibt (updated_matches, unassigned_matches) zurück.
+    Assigns slots to matches based on the global slot matrix.
+    Considers pause + time budget + duplicates.
+    Returns (updated_matches, unassigned_matches).
     """
     used_slots = set()
     last_slot_per_team = {}
@@ -457,7 +461,7 @@ def assign_slots_with_matrix(matches: list, slot_matrix: dict[datetime, set[str]
 
         matches_with_options.append((match, valid_slots))
 
-    # Matches mit wenigsten Optionen zuerst
+    # Matches with fewest options first
     matches_with_options.sort(key=lambda x: len(x[1]))
 
     for match, valid_slots in matches_with_options:
@@ -469,15 +473,15 @@ def assign_slots_with_matrix(matches: list, slot_matrix: dict[datetime, set[str]
             slot_str = slot.isoformat()
             slot_date = slot.date()
 
-            # Slot bereits belegt?
+            # Slot already occupied?
             if slot_str in used_slots:
                 continue
 
-            # Pausenregel beachten
+            # Respect pause rule
             if not is_minimum_pause_respected(last_slot_per_team, team1, team2, slot):
                 continue
 
-            # Tageszeitbudget prüfen
+            # Check daily time budget
             team1_budget = get_team_time_budget(team1, slot_date, matches)
             team2_budget = get_team_time_budget(team2, slot_date, matches)
 
@@ -487,47 +491,47 @@ def assign_slots_with_matrix(matches: list, slot_matrix: dict[datetime, set[str]
             ):
                 continue
 
-            # Slot passt – zuweisen
+            # Slot fits – assign
             match["scheduled_time"] = slot_str
             used_slots.add(slot_str)
             last_slot_per_team[team1] = slot
             last_slot_per_team[team2] = slot
-            logger.info(f"[SLOT-MATRIX] Match {match_id} geplant auf {slot_str}.")
+            logger.info(f"[SLOT-MATRIX] Match {match_id} scheduled at {slot_str}.")
             break
 
         if not match.get("scheduled_time"):
             unassigned_matches.append(match)
-            logger.warning(f"[SLOT-MATRIX] Kein Slot gefunden für Match {match_id} ({team1} vs {team2})")
+            logger.warning(f"[SLOT-MATRIX] No slot found for match {match_id} ({team1} vs {team2})")
 
     return matches, unassigned_matches
 
 
 def is_minimum_pause_respected(
     last_slots: dict, team1: str, team2: str, new_slot: datetime, pause_minutes: int = 30
- ) -> bool:
+) -> bool:
     """
-    Prüft, ob beide Teams seit ihrem letzten Match mindestens X Minuten Pause hatten.
+    Checks if both teams had at least X minutes pause since their last match.
     """
     for team in (team1, team2):
         last = last_slots.get(team)
         if last:
             diff = (new_slot - last).total_seconds() / 60
             if diff < pause_minutes:
-                logger.debug(f"[PAUSE] {team} hatte nur {diff:.0f} Min. Pause – benötigt: {pause_minutes} Min.")
+                logger.debug(f"[PAUSE] {team} only had {diff:.0f} min pause – required: {pause_minutes} min.")
                 return False
     return True
 
 
 def assign_rescue_slots(unassigned_matches, matches, slot_matrix, teams):
     """
-    Versucht Matches aus der unassigned_matches-Liste trotzdem zu planen,
-    indem Pausen und Zeitbudget ignoriert werden.
-    Markiert diese mit 'rescue_assigned': True.
+    Tries to schedule matches from the unassigned_matches list anyway,
+    by ignoring pauses and time budget.
+    Marks these with 'rescue_assigned': True.
     """
     rescue_assigned = 0
     used_slots = set(m.get("scheduled_time") for m in matches if m.get("scheduled_time"))
 
-    logger.info(f"[RESCUE] Starte Rescue-Modus für {len(unassigned_matches)} Matches.")
+    logger.info(f"[RESCUE] Starting rescue mode for {len(unassigned_matches)} matches.")
 
     for problem in unassigned_matches:
         match_id = problem["match_id"]
@@ -540,42 +544,42 @@ def assign_rescue_slots(unassigned_matches, matches, slot_matrix, teams):
 
         possible_slots = get_valid_slots_for_match(team1, team2, slot_matrix)
         if not possible_slots:
-            logger.warning(f"[RESCUE] Keine gemeinsamen Slots für Match {match_id}.")
+            logger.warning(f"[RESCUE] No common slots for match {match_id}.")
             continue
 
         for slot in possible_slots:
             slot_str = slot.isoformat()
             if slot_str in used_slots:
-                continue  # Slot schon vergeben
+                continue  # Slot already assigned
 
-            # Slot zuweisen – ohne Rücksicht auf Pausen/Budget
+            # Assign slot – without regard for pauses/budget
             match["scheduled_time"] = slot_str
             match["rescue_assigned"] = True
             used_slots.add(slot_str)
             rescue_assigned += 1
 
             logger.info(
-                f"[RESCUE] Match {match_id} ({team1} vs {team2}) geplant auf {slot_str} "
-                f"(Regeln gelockert – Rescue-Modus)"
+                f"[RESCUE] Match {match_id} ({team1} vs {team2}) scheduled at {slot_str} "
+                f"(rules relaxed – rescue mode)"
             )
             break
 
         if not match.get("scheduled_time"):
             logger.warning(
-                f"[RESCUE] Selbst im Rescue-Modus kein Slot für Match {match_id} ({team1} vs {team2}) gefunden."
+                f"[RESCUE] Even in rescue mode no slot found for match {match_id} ({team1} vs {team2})."
             )
 
-    logger.info(f"[RESCUE] Insgesamt {rescue_assigned} Matches im Rescue-Modus zugewiesen.")
+    logger.info(f"[RESCUE] Total {rescue_assigned} matches assigned in rescue mode.")
     return matches
 
-d
+
 # ------------------
-# Alles zusammenbauen
+# Main Assembly
 # ------------------
 async def generate_and_assign_slots():
     """
-    Hauptfunktion zur Slot-Erzeugung und Zuweisung der Matches.
-    Nutzt globale Slot-Matrix und neue Zuweisungslogik.
+    Main function for slot generation and match assignment.
+    Uses global slot matrix and new assignment logic.
     """
     tournament = load_tournament_data()
     matches = tournament.get("matches", [])
@@ -583,22 +587,21 @@ async def generate_and_assign_slots():
 
     if not matches:
         logger.warning(
-            "[SLOT-PLANUNG] Keine Matches im Turnier gefunden. Registrierung beendet, aber es gibt nichts zu planen."
+            "[SLOT-PLANNING] No matches found in tournament. Registration closed, but there's nothing to plan."
         )
         return
 
-    # Schritt 1: Slot-Matrix erzeugen
+    # Step 1: Generate slot matrix
     slot_matrix = generate_slot_matrix(tournament)
 
-    # Schritt 2: Slots pro Match zuweisen
+    # Step 2: Assign slots per match
     updated_matches, unassigned_matches = assign_slots_with_matrix(matches, slot_matrix)
 
-    # Schritt 3: Rescue-Modus für ungeplante Matches
+    # Step 3: Rescue mode for unplanned matches
     updated_matches = assign_rescue_slots(unassigned_matches, updated_matches, slot_matrix, teams)
 
-    # Speichern
+    # Save
     tournament["matches"] = updated_matches
     save_tournament_data(tournament)
 
-    logger.info("[MATCHMAKER] Matches erfolgreich über globale Slot-Matrix geplant.")
-
+    logger.info("[MATCHMAKER] Matches successfully planned via global slot matrix.")
