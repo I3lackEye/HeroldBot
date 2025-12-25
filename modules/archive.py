@@ -9,11 +9,15 @@ from modules.dataStorage import (
     save_tournament_data,
 )
 
-# Lokale Module
+# Local modules
 from modules.logger import logger
 
 
 def archive_current_tournament():
+    """
+    Archives the current tournament data to a timestamped JSON file.
+    Returns the path to the archive file.
+    """
     tournament = load_tournament_data()
     global_data = load_global_data()
 
@@ -38,15 +42,15 @@ def archive_current_tournament():
 
 def update_tournament_history(winner_ids: list[str], chosen_game: str, mvp_name: str = None):
     """
-    Aktualisiert die tournament_history.json mit einem neuen Eintrag für das beendete Turnier.
+    Updates tournament_history.json with a new entry for the completed tournament.
 
-    :param winner_ids: Liste der Discord-User-IDs der Gewinner (als Strings)
-    :param chosen_game: Der Name des gespielten Spiels.
-    :param mvp_name: Optionaler Name des MVP-Spielers.
+    :param winner_ids: List of Discord user IDs of the winners (as strings)
+    :param chosen_game: The name of the game played.
+    :param mvp_name: Optional name of the MVP player.
     """
     history_path = "data/tournament_history.json"
 
-    # Datei vorbereiten
+    # Prepare file
     if not os.path.exists(history_path):
         history_data = []
     else:
@@ -54,10 +58,10 @@ def update_tournament_history(winner_ids: list[str], chosen_game: str, mvp_name:
             try:
                 history_data = json.load(f)
             except json.JSONDecodeError:
-                logger.warning("[HISTORY] tournament_history.json beschädigt. Erstelle neue Datei.")
+                logger.warning("[HISTORY] tournament_history.json corrupted. Creating new file.")
                 history_data = []
 
-    # Gewinnernamen aus global_data holen
+    # Get winner names from global_data
     global_data = load_global_data()
     player_stats = global_data.get("player_stats", {})
 
@@ -66,20 +70,20 @@ def update_tournament_history(winner_ids: list[str], chosen_game: str, mvp_name:
         name = player_stats.get(user_id, {}).get("name", f"<@{user_id}>")
         winners.append(name)
 
-    # Turnier-Entry
+    # Tournament entry
     history_entry = {
         "ended_on": datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
         "game": chosen_game,
         "winner_ids": winner_ids,
         "winners": winners,
-        "mvp": mvp_name or "Unbekannt",
+        "mvp": mvp_name or "Unknown",
     }
 
-    # An Liste anhängen
+    # Append to list
     history_data.append(history_entry)
 
-    # Speichern
+    # Save
     with open(history_path, "w", encoding="utf-8") as f:
         json.dump(history_data, f, indent=4, ensure_ascii=False)
 
-    logger.info(f"[HISTORY] Turnier abgeschlossen und in tournament_history.json eingetragen: {chosen_game}.")
+    logger.info(f"[HISTORY] Tournament completed and added to tournament_history.json: {chosen_game}.")

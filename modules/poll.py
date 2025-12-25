@@ -1,4 +1,4 @@
-# new_poll.py
+# modules/poll.py
 import asyncio
 import random
 from datetime import datetime, timedelta
@@ -7,18 +7,18 @@ from zoneinfo import ZoneInfo
 import discord
 from discord.ext import commands
 
-# Lokale Modules
+# Local modules
 from modules.dataStorage import load_tournament_data, save_tournament_data, load_games
 from modules.embeds import send_poll_results, send_registration_open
 from modules.logger import logger
 from modules.task_manager import add_task
 from modules.tournament import auto_end_poll, close_registration_after_delay
 
-# Globale Variablen
+# Global variables
 poll_message_id = None
 poll_channel_id = None
 poll_votes = {}  # user_id -> emoji
-poll_options = {}  # emoji -> spielname
+poll_options = {}  # emoji -> game_name
 
 emoji_list = ["🇦", "🇧", "🇨", "🇩", "🇪", "🇫", "🇬", "🇭", "🇮", "🇯"]
 
@@ -29,6 +29,14 @@ async def start_poll(
     registration_hours: int = 72,
     poll_duration_hours: int = 48,
 ):
+    """
+    Starts a game voting poll with the given options.
+
+    :param channel: Discord channel to send the poll to
+    :param options: List of game options
+    :param registration_hours: Hours until registration closes
+    :param poll_duration_hours: Hours until poll ends
+    """
     global poll_message_id, poll_channel_id, poll_votes, poll_options
 
     description = ""
@@ -36,23 +44,23 @@ async def start_poll(
 
     for idx, (game_id, game_data) in enumerate(options.items()):
         if idx >= len(emoji_list):
-            break  # Maximal verfügbare Emojis nutzen
+            break  # Use maximum available emojis
         emoji = emoji_list[idx]
-        game_name = game_data.get("name", game_id)  # Fallback: Key, falls kein name existiert
+        game_name = game_data.get("name", game_id)  # Fallback: Key if no name exists
         description += f"{emoji} {game_name}\n"
-        poll_options[emoji] = game_id  # Wichtig: Weiterhin den ID als Referenz speichern
+        poll_options[emoji] = game_id  # Important: Keep ID as reference
 
-    # Ablaufzeit berechnen
+    # Calculate end time
     poll_end_time = datetime.now(ZoneInfo("Europe/Berlin")) + timedelta(hours=registration_hours)
-    poll_end_str = poll_end_time.strftime("%d.%m.%Y %H:%M Uhr")
+    poll_end_str = poll_end_time.strftime("%d.%m.%Y %H:%M")
 
     embed = discord.Embed(
-        title="🎮 Abstimmung: Welches Spiel soll gespielt werden?",
+        title="🎮 Vote: Which game should we play?",
         description=description,
         color=discord.Color.blue(),
     )
 
-    embed.set_footer(text=f"⏳ Abstimmung endet am: {poll_end_str}")
+    embed.set_footer(text=f"⏳ Poll ends on: {poll_end_str}")
 
     message = await channel.send(embed=embed)
 
@@ -62,21 +70,25 @@ async def start_poll(
     poll_message_id = message.id
     poll_channel_id = message.channel.id
     poll_votes = {}
-    logger.info(f"[POLL] Neue Abstimmung gestartet mit {len(options)} Optionen.")
+    logger.info(f"[POLL] New poll started with {len(options)} options.")
 
 
 async def end_poll(bot: discord.Client, channel: discord.TextChannel):
+    """
+    Ends the current poll and determines the winning game.
+    If no votes were cast, a random game is selected.
+    """
     global poll_message_id, poll_options
 
     if not poll_message_id:
-        await channel.send("❌ Keine aktive Umfrage gefunden.")
+        await channel.send("❌ No active poll found.")
         return
 
     try:
         message = await channel.fetch_message(poll_message_id)
     except Exception as e:
-        logger.error(f"[POLL] Fehler beim Holen der Umfrage-Nachricht: {e}")
-        await channel.send("❌ Fehler beim Holen der Umfrage-Nachricht.")
+        logger.error(f"[POLL] Error fetching poll message: {e}")
+        await channel.send("❌ Error fetching poll message.")
         return
 
     real_votes = {}
@@ -96,38 +108,38 @@ async def end_poll(bot: discord.Client, channel: discord.TextChannel):
 
         if visible_games:
             chosen_game = random.choice(visible_games)
-            logger.warning(f"[POLL] ⚠️ Keine Stimmen abgegeben – Zufällig gewählt: {chosen_game}")
+            logger.warning(f"[POLL] ⚠️ No votes cast – randomly chosen: {chosen_game}")
         else:
-            chosen_game = "Keine Spiele verfügbar"
-            logger.error("[POLL] ❌ Keine Spiele verfügbar – Umfrage leer")
+            chosen_game = "No games available"
+            logger.error("[POLL] ❌ No games available – poll empty")
     else:
         sorted_votes = sorted(real_votes.items(), key=lambda kv: kv[1], reverse=True)
         max_votes = sorted_votes[0][1]
         top_options = [option for option, votes in sorted_votes if votes == max_votes]
-        chosen_game = top_options[0]  # oder random.choice(top_options)
+        chosen_game = top_options[0]  # or random.choice(top_options)
 
 
-    # Speichern ins Turnier
+    # Save to tournament
     tournament = load_tournament_data()
     tournament["poll_results"] = real_votes
     tournament["poll_results"]["chosen_game"] = chosen_game
     tournament["registration_open"] = True
     save_tournament_data(tournament)
 
-    # Poll-Embed posten
+    # Post poll embed
     placeholders = {"chosen_game": chosen_game}
     await send_poll_results(channel, placeholders, real_votes)
 
-    # Anmeldung öffnen
+    # Open registration
     reg_end = tournament.get("registration_end")
     if reg_end:
         formatted_end = reg_end.replace("T", " ")[:16]
     else:
-        formatted_end = "Unbekannt"
+        formatted_end = "Unknown"
 
     await send_registration_open(channel, {"endtime": formatted_end})
 
-    logger.info(f"[POLL] Umfrage beendet. Gewähltes Spiel: {chosen_game}")
+    logger.info(f"[POLL] Poll ended. Chosen game: {chosen_game}")
 
     # Reset
     poll_message_id = None
@@ -138,7 +150,7 @@ async def end_poll(bot: discord.Client, channel: discord.TextChannel):
     if registration_end_str:
         registration_end = datetime.fromisoformat(registration_end_str)
 
-        # Falls ohne Zeitzone: explizit UTC setzen
+        # If no timezone: explicitly set UTC
         if registration_end.tzinfo is None:
             registration_end = registration_end.replace(tzinfo=ZoneInfo("UTC"))
 
@@ -151,17 +163,21 @@ async def end_poll(bot: discord.Client, channel: discord.TextChannel):
             "close_registration",
             asyncio.create_task(close_registration_after_delay(delay_seconds, channel)),
         )
-        logger.info(f"[POLL] Anmeldung wird automatisch geschlossen in {delay_seconds // 3600} Stunden.")
+        logger.info(f"[POLL] Registration will auto-close in {delay_seconds // 3600} hours.")
     else:
-        logger.warning("[POLL] Kein registration_end gefunden – Anmeldung wird NICHT automatisch geschlossen.")
+        logger.warning("[POLL] No registration_end found – registration will NOT auto-close.")
 
 
 # Event Handler
 async def on_raw_reaction_add(payload: discord.RawReactionActionEvent):
+    """
+    Handles reaction adds to poll messages.
+    Registers votes for valid poll options.
+    """
     global poll_message_id, poll_votes, poll_options
 
     if payload.user_id == payload.client.user.id:
-        return  # eigene Reaktionen ignorieren
+        return  # ignore own reactions
 
     if payload.message_id != poll_message_id:
         return
@@ -169,9 +185,9 @@ async def on_raw_reaction_add(payload: discord.RawReactionActionEvent):
     emoji = str(payload.emoji)
 
     if emoji not in poll_options:
-        return  # Keine gültige Option
+        return  # Not a valid option
 
-    # Stimme speichern
+    # Save vote
     poll_votes[payload.user_id] = emoji
 
-    logger.info(f"[POLL] Stimme registriert: User {payload.user_id} für {emoji}.")
+    logger.info(f"[POLL] Vote registered: User {payload.user_id} for {emoji}.")
