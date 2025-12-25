@@ -69,7 +69,10 @@ cp .env.example .env
 # .env editieren und TOKEN eintragen
 
 # Bot starten
-python modules/main.py
+python run.py
+
+# Alternative: Als Modul starten
+python -m modules.main
 ```
 
 ---
