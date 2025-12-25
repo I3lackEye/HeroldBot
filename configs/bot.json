@@ -4,9 +4,9 @@
     "tournament": "data/tournament.json"
   },
   "channels": {
-    "limits": "1234567890",
-    "reminder": "1234567890",
-    "reschedule": "1234567890"
+    "limits": "1453847184171597927",
+    "reminder": "1453847114013741218",
+    "reschedule": "1453848141274152971"
   },
   "roles": {
     "moderator": ["Moderator", "Lappen des Vertrauens"],
