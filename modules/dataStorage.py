@@ -3,6 +3,7 @@
 import json
 import os
 import shutil
+import tempfile
 from datetime import datetime
 from typing import Dict, Any, Optional
 
@@ -58,6 +59,10 @@ RESCHEDULE_CHANNEL_ID = CONFIG.get_channel_id("reschedule")
 DATA_FILE_PATH = CONFIG.get_data_path("data")
 TOURNAMENT_FILE_PATH = CONFIG.get_data_path("tournament")
 
+# Base directory for calculating other paths
+BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+GAMES_FILE_PATH = os.path.join(BASE_DIR, "data", "games.json")
+
 # Default content for persistent data
 DEFAULT_GLOBAL_DATA = {"games": [], "last_tournament_winner": {}, "player_stats": {}}
 
@@ -70,6 +75,41 @@ DEFAULT_TOURNAMENT_DATA = {
     "registration_open": False,
     "poll_results": None,
 }
+
+
+# ------------------
+# Atomic Write Helper
+# ------------------
+def _atomic_write(file_path: str, data: Dict[str, Any], indent: int = 4) -> None:
+    """
+    Atomically write JSON data to a file.
+    Writes to temp file first, then renames to avoid corruption.
+
+    :param file_path: Target file path
+    :param data: Data to write
+    :param indent: JSON indentation
+    """
+    # Ensure directory exists
+    directory = os.path.dirname(file_path)
+    if directory and not os.path.exists(directory):
+        os.makedirs(directory)
+
+    # Write to temporary file first
+    temp_fd, temp_path = tempfile.mkstemp(dir=directory, suffix='.tmp')
+    try:
+        with os.fdopen(temp_fd, 'w', encoding='utf-8') as f:
+            json.dump(data, f, indent=indent, ensure_ascii=False)
+
+        # Atomic rename (replaces original file)
+        os.replace(temp_path, file_path)
+
+    except Exception as e:
+        # Clean up temp file on error
+        try:
+            os.unlink(temp_path)
+        except:
+            pass
+        raise e
 
 
 def load_names(language: str = "de") -> Dict[str, Any]:
@@ -165,13 +205,21 @@ async def validate_permissions(guild: discord.Guild) -> None:
 
 
 def init_file(file_path: str, default_content: Dict[str, Any]) -> None:
-    """Initialize a file with default content if it doesn't exist."""
+    """
+    Initialize a JSON file with default content if it doesn't exist.
+
+    :param file_path: Path to the file
+    :param default_content: Default content dictionary
+    """
     if not os.path.exists(file_path):
-        with open(file_path, "w", encoding="utf-8") as f:
-            json.dump(default_content, f, indent=4, ensure_ascii=False)
-        logger.info(f"{file_path} created")
+        try:
+            _atomic_write(file_path, default_content)
+            logger.info(f"[INIT] Created file: {file_path}")
+        except Exception as e:
+            logger.error(f"[INIT] Failed to create {file_path}: {e}")
+            raise
     else:
-        logger.info(f"{file_path} already exists")
+        logger.debug(f"[INIT] File already exists: {file_path}")
 
 
 # Functions for global data (data.json)
@@ -192,37 +240,64 @@ def load_global_data() -> Dict[str, Any]:
 
 
 def save_global_data(data: Dict[str, Any]) -> None:
-    """Save global data to data.json."""
-    with open(DATA_FILE_PATH, "w", encoding="utf-8") as file:
-        json.dump(data, file, indent=4, ensure_ascii=False)
+    """
+    Save global data to data.json atomically.
+
+    :param data: Global data dictionary
+    :raises ValueError: If data is not a dictionary
+    :raises IOError: If write fails
+    """
+    if not isinstance(data, dict):
+        raise ValueError("Global data must be a dictionary")
+
+    _atomic_write(DATA_FILE_PATH, data)
+    logger.debug(f"[DATA] Global data saved to {DATA_FILE_PATH}")
 
 
 def save_games(games: Dict[str, Any]) -> None:
-    """Save games dictionary to games.json."""
+    """
+    Save games dictionary to games.json atomically.
+
+    :param games: Games dictionary
+    :raises ValueError: If games is not a dictionary
+    :raises IOError: If write fails
+    """
+    if not isinstance(games, dict):
+        raise ValueError("Games data must be a dictionary")
+
     try:
-        current_dir = os.path.dirname(__file__)
-        games_path = os.path.join(current_dir, "../data/games.json")
-        with open(games_path, "w", encoding="utf-8") as file:
-            json.dump({"games": games}, file, indent=2, ensure_ascii=False)
-    except (IOError, TypeError) as e:
+        _atomic_write(GAMES_FILE_PATH, {"games": games}, indent=2)
+        logger.debug(f"[GAMES] Games saved to {GAMES_FILE_PATH}")
+    except Exception as e:
         logger.error(f"[GAMES] Error saving games.json: {e}")
+        raise
 
 
 def load_games() -> Dict[str, Any]:
     """
-    Loads games as dict from data/games.json (Format: {"games": {...}})
+    Load games as dict from data/games.json (Format: {"games": {...}}).
+
+    :return: Games dictionary, or empty dict on error
     """
-    try:
-        current_dir = os.path.dirname(__file__)
-        games_path = os.path.join(current_dir, "../data/games.json")
-        with open(games_path, "r", encoding="utf-8") as file:
-            games_data = json.load(file)
-        return games_data.get("games", {})
-    except FileNotFoundError:
-        logger.error("[GAMES] games.json not found!")
+    if not os.path.exists(GAMES_FILE_PATH):
+        logger.warning(f"[GAMES] games.json not found at {GAMES_FILE_PATH}")
         return {}
+
+    try:
+        with open(GAMES_FILE_PATH, "r", encoding="utf-8") as file:
+            games_data = json.load(file)
+
+        if not isinstance(games_data, dict):
+            logger.error("[GAMES] games.json format is incorrect (not a dict)")
+            return {}
+
+        return games_data.get("games", {})
+
     except json.JSONDecodeError as e:
         logger.error(f"[GAMES] Error parsing games.json: {e}")
+        return {}
+    except IOError as e:
+        logger.error(f"[GAMES] Error reading games.json: {e}")
         return {}
 
 
@@ -247,29 +322,27 @@ def load_tournament_data() -> Dict[str, Any]:
 
 
 def save_tournament_data(tournament: Dict[str, Any]) -> None:
-    """Save tournament data to tournament.json."""
-    with open(TOURNAMENT_FILE_PATH, "w", encoding="utf-8") as file:
-        json.dump(tournament, file, indent=4, ensure_ascii=False)
+    """
+    Save tournament data to tournament.json atomically.
+
+    :param tournament: Tournament data dictionary
+    :raises ValueError: If tournament is not a dictionary
+    :raises IOError: If write fails
+    """
+    if not isinstance(tournament, dict):
+        raise ValueError("Tournament data must be a dictionary")
+
+    _atomic_write(TOURNAMENT_FILE_PATH, tournament)
+    logger.debug(f"[TOURNAMENT] Tournament data saved to {TOURNAMENT_FILE_PATH}")
 
 
 def reset_tournament() -> None:
     """
-    Resets all tournament data.
-    The data is brought to 'initial state', ready for a new tournament.
+    Reset all tournament data to default state.
+    Uses DEFAULT_TOURNAMENT_DATA to ensure consistency.
     """
-    empty_tournament = {
-        "registration_open": False,
-        "registration_end": None,
-        "tournament_end": None,
-        "matches": [],
-        "teams": {},
-        "poll_results": {},
-    }
-
-    with open(TOURNAMENT_FILE_PATH, "w", encoding="utf-8") as f:
-        json.dump(empty_tournament, f, indent=4, ensure_ascii=False)
-
-    logger.info(f"[RESET] Tournament data was successfully reset.")
+    _atomic_write(TOURNAMENT_FILE_PATH, DEFAULT_TOURNAMENT_DATA.copy())
+    logger.info("[RESET] Tournament data was successfully reset to default state")
 
 
 def add_game(
@@ -324,34 +397,46 @@ def remove_game(game_id: str) -> None:
 
 def backup_current_state() -> None:
     """
-    Creates backups of the current tournament and global data from /data/.
+    Creates backups of tournament, global data, and games from /data/.
     Saves them in /backups/ with timestamp.
     """
-    backup_folder = "backups"
+    backup_folder = os.path.join(BASE_DIR, "backups")
     if not os.path.exists(backup_folder):
         os.makedirs(backup_folder)
 
     now = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 
     files_to_backup = {
-        "data/tournament.json": f"tournament_backup_{now}.json",
-        "data/data.json": f"data_backup_{now}.json",
+        TOURNAMENT_FILE_PATH: f"tournament_backup_{now}.json",
+        DATA_FILE_PATH: f"data_backup_{now}.json",
+        GAMES_FILE_PATH: f"games_backup_{now}.json",
     }
 
+    backed_up = 0
     for source_file, backup_name in files_to_backup.items():
         if os.path.exists(source_file):
-            shutil.copy(source_file, os.path.join(backup_folder, backup_name))
-            logger.info(f"[BACKUP] Backed up: {source_file}")
+            try:
+                shutil.copy(source_file, os.path.join(backup_folder, backup_name))
+                logger.info(f"[BACKUP] Backed up: {os.path.basename(source_file)}")
+                backed_up += 1
+            except IOError as e:
+                logger.error(f"[BACKUP] Failed to backup {os.path.basename(source_file)}: {e}")
         else:
-            logger.info(f"[BACKUP] Warning: {source_file} not found – skipping.")
+            logger.debug(f"[BACKUP] File not found, skipping: {os.path.basename(source_file)}")
+
+    logger.info(f"[BACKUP] Backup completed: {backed_up}/{len(files_to_backup)} files backed up")
 
 
 def delete_tournament_file() -> None:
     """
-    Deletes data/tournament.json after tournament end.
+    Delete tournament.json file.
+    Uses TOURNAMENT_FILE_PATH constant for consistency.
     """
     try:
-        os.remove("data/tournament.json")
-        logger.info(f"[RESET] tournament.json successfully deleted.")
-    except FileNotFoundError:
-        logger.info(f"[RESET] tournament.json was not present.")
+        if os.path.exists(TOURNAMENT_FILE_PATH):
+            os.remove(TOURNAMENT_FILE_PATH)
+            logger.info(f"[RESET] tournament.json successfully deleted")
+        else:
+            logger.debug("[RESET] tournament.json was not present")
+    except OSError as e:
+        logger.error(f"[RESET] Failed to delete tournament.json: {e}")
