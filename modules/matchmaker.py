@@ -99,9 +99,14 @@ def auto_match_solo():
 
         overlap = merge_weekend_availability(avail1, avail2)
 
-        if all(val == "00:00-00:00" for val in overlap.values()):
+        # Validate that there's at least one day with actual overlap
+        if not overlap or all(val == "00:00-00:00" for val in overlap.values()):
             logger.warning(f"[MATCHMAKER] ❌ No common availability for {name1} and {name2} – Team will not be created.")
             continue
+
+        # Log which days have overlap for debugging
+        overlapping_days = [day for day, time_range in overlap.items() if time_range != "00:00-00:00"]
+        logger.debug(f"[MATCHMAKER] ✅ Overlap found on: {', '.join(overlapping_days)}")
 
         team_name = generate_team_name()
         attempts = 0
@@ -236,9 +241,8 @@ async def cleanup_orphan_teams(channel: TextChannel):
             solo.append(
                 {
                     "player": player,
-                    "availability": team_data.get("availability", "00:00-23:59"),
-                    "saturday": team_data.get("saturday"),
-                    "sunday": team_data.get("sunday"),
+                    "availability": team_data.get("availability", {"saturday": "00:00-23:59", "sunday": "00:00-23:59"}),
+                    "unavailable_dates": team_data.get("unavailable_dates", [])
                 }
             )
             del teams[team_name]
@@ -304,20 +308,26 @@ def get_team_time_budget(team_name: str, date: datetime.date, matches: list) -> 
 def is_team_available_at_time(team_data: dict, slot_datetime: datetime) -> bool:
     """
     Checks if a team is available at the given time.
-    Respects explicit Saturday/Sunday time windows in the 'availability' dict.
+    Respects explicit time windows in the 'availability' dict for any day.
+    If a team hasn't specified availability for a day, they're considered unavailable.
     """
-    weekday = slot_datetime.weekday()  # 5 = Saturday, 6 = Sunday
+    weekday = slot_datetime.weekday()  # 0=Monday, 5=Saturday, 6=Sunday
     time_only = slot_datetime.time()
 
-    day_key = "saturday" if weekday == 5 else "sunday" if weekday == 6 else None
-    if not day_key:
-        return True  # No restrictions during the week
+    # Map weekday number to day name
+    day_names = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
+    day_key = day_names[weekday]
 
     availability = team_data.get("availability", {})
     time_range = availability.get(day_key)
 
     if not time_range:
-        return False  # No time specified = not available
+        # No time specified for this day = not available
+        return False
+
+    # Check if time range is "00:00-00:00" (explicitly unavailable)
+    if time_range == "00:00-00:00":
+        return False
 
     try:
         start_str, end_str = time_range.split("-")
@@ -326,7 +336,7 @@ def is_team_available_at_time(team_data: dict, slot_datetime: datetime) -> bool:
         return start_time <= time_only < end_time
     except Exception as e:
         logger.warning(f"[AVAILABILITY] Error parsing time: {time_range} ({e})")
-        return True  # Allow if errors occur
+        return False  # If parsing fails, assume unavailable for safety
 
 
 def get_compatible_slots(team1: dict, team2: dict, global_slots: list) -> list:
@@ -510,12 +520,16 @@ def is_minimum_pause_respected(
     last_slots: dict, team1: str, team2: str, new_slot: datetime, pause_minutes: int = 30
 ) -> bool:
     """
-    Checks if both teams had at least X minutes pause since their last match.
+    Checks if both teams had at least X minutes pause since their last match ended.
+    The pause is calculated from when the previous match ended (start + duration), not just started.
     """
     for team in (team1, team2):
         last = last_slots.get(team)
         if last:
-            diff = (new_slot - last).total_seconds() / 60
+            # Calculate when the previous match ended
+            last_match_end = last + MATCH_DURATION
+            # Calculate the actual pause time (time between match end and new slot start)
+            diff = (new_slot - last_match_end).total_seconds() / 60
             if diff < pause_minutes:
                 logger.debug(f"[PAUSE] {team} only had {diff:.0f} min pause – required: {pause_minutes} min.")
                 return False
