@@ -10,10 +10,10 @@ from discord.ext import commands
 
 # Local modules
 from modules import poll, tournament, task_manager
+from modules.config import CONFIG
 from modules.dataStorage import (
     DEBUG_MODE,
     TOKEN,
-    load_config,
     load_global_data,
     load_tournament_data,
     validate_channels,
@@ -37,14 +37,34 @@ def debug_dump_configs():
 
     logger.info("[DEBUG] Starting dump of configuration and data files...")
 
+    # Dump bot config
     try:
-        with open("configs/config.json", "r", encoding="utf-8") as f:
-            config_data = json.load(f)
-        logger.info("[DEBUG] Content of config.json:")
-        logger.info(json.dumps(config_data, indent=2, ensure_ascii=False))
+        with open("configs/bot.json", "r", encoding="utf-8") as f:
+            bot_config = json.load(f)
+        logger.info("[DEBUG] Content of configs/bot.json:")
+        logger.info(json.dumps(bot_config, indent=2, ensure_ascii=False))
     except (FileNotFoundError, json.JSONDecodeError, IOError) as e:
-        logger.error(f"[DEBUG] Error loading config.json: {e}")
+        logger.error(f"[DEBUG] Error loading bot.json: {e}")
 
+    # Dump tournament config
+    try:
+        with open("configs/tournament.json", "r", encoding="utf-8") as f:
+            tournament_config = json.load(f)
+        logger.info("[DEBUG] Content of configs/tournament.json:")
+        logger.info(json.dumps(tournament_config, indent=2, ensure_ascii=False))
+    except (FileNotFoundError, json.JSONDecodeError, IOError) as e:
+        logger.error(f"[DEBUG] Error loading tournament.json: {e}")
+
+    # Dump features config
+    try:
+        with open("configs/features.json", "r", encoding="utf-8") as f:
+            features_config = json.load(f)
+        logger.info("[DEBUG] Content of configs/features.json:")
+        logger.info(json.dumps(features_config, indent=2, ensure_ascii=False))
+    except (FileNotFoundError, json.JSONDecodeError, IOError) as e:
+        logger.error(f"[DEBUG] Error loading features.json: {e}")
+
+    # Dump data files
     try:
         global_data = load_global_data()
         logger.info("[DEBUG] Content of data.json:")
@@ -81,11 +101,10 @@ EXTENSIONS = [
 # ========== EVENTS ==========
 @bot.event
 async def on_ready():
-    config = load_config()
-    language = str(config.get("language", "de")).lower()
+    language = CONFIG.bot.language.lower()
 
     logger.info(f"[STARTUP] Bot is online as {bot.user.name} (ID: {bot.user.id})")
-    logger.info(f"[STARTUP] Language from config.json: {language}")
+    logger.info(f"[STARTUP] Language from config: {language}")
     logger.info(f"[STARTUP] DEBUG mode: {'active' if DEBUG_MODE else 'inactive'}")
 
     # Check important folders

@@ -11,12 +11,10 @@ from dotenv import load_dotenv
 
 # Local modules
 from modules.logger import logger
-
-# Global variables
-_config_cache: Optional[Dict[str, Any]] = None
+from modules.config import CONFIG
 
 # ------------------
-# Configuration & Environment Variables
+# Environment Variables & Helper Functions
 # ------------------
 def load_env() -> None:
     """Load environment variables from .env file."""
@@ -33,66 +31,32 @@ def to_bool(value: Any) -> bool:
     return str(value).lower() in ("1", "true", "yes", "on")
 
 
-def get_config_bool(feature_flag: str, default: bool = False) -> bool:
-    """Get boolean feature flag from config."""
-    config = load_config()
-    return bool(config.get("features", {}).get(feature_flag, default))
-
-
 def is_debug_mode() -> bool:
     """Check if debug mode is enabled."""
     return to_bool(get_env("DEBUG", "false"))
 
 
-def load_config(config_path: str = "../configs/config.json") -> Dict[str, Any]:
-    """
-    Loads the central bot configuration from config.json.
-    Uses caching to avoid multiple file reads.
-    """
-    global _config_cache
-    if _config_cache is not None:
-        return _config_cache
-
-    try:
-        current_dir = os.path.dirname(__file__)
-        full_path = os.path.join(current_dir, config_path)
-        with open(full_path, "r", encoding="utf-8") as config_file:
-            _config_cache = json.load(config_file)
-        return _config_cache
-    except FileNotFoundError:
-        logger.error(f"[CONFIG] File not found: {config_path}")
-        return {}
-    except json.JSONDecodeError as e:
-        logger.error(f"[CONFIG] Error parsing {config_path}: {e}")
-        return {}
-
-
-# Load configuration
-config = load_config()
+# ------------------
+# Configuration Constants
+# ------------------
 
 # Load Token
 TOKEN = get_env("DISCORD_TOKEN")
 if not TOKEN:
     raise ValueError("DISCORD_TOKEN missing in .env file!")
 
-# Debug / Feature Check
-DEBUG_MODE = to_bool(get_env("DEBUG", "false"))
+# Debug Mode
+DEBUG_MODE = is_debug_mode()
 
-REMINDER_ENABLED = config.get("features", {}).get("reminder_enabled", False)
-if not REMINDER_ENABLED:
-    logger.warning("[CONFIG] REMINDER_ENABLED not found in config file - using default: False")
+# Feature Flags (from new config system)
+REMINDER_ENABLED = CONFIG.is_feature_enabled("reminder_enabled")
 
-try:
-    RESCHEDULE_CHANNEL_ID = int(config.get("CHANNELS", {}).get("RESCHEDULE_CHANNEL_ID", "0"))
-except (ValueError, TypeError):
-    RESCHEDULE_CHANNEL_ID = 0
-    logger.error("[CONFIG] RESCHEDULE_CHANNEL_ID could not be interpreted as int!")
+# Channel IDs (from new config system)
+RESCHEDULE_CHANNEL_ID = CONFIG.get_channel_id("reschedule")
 
-
-# Calculate full paths from config.json
-BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-DATA_FILE_PATH = os.path.join(BASE_DIR, config.get("DATA_PATH", "data/data.json"))
-TOURNAMENT_FILE_PATH = os.path.join(BASE_DIR, config.get("TOURNAMENT_PATH", "data/tournament.json"))
+# Data File Paths (from new config system)
+DATA_FILE_PATH = CONFIG.get_data_path("data")
+TOURNAMENT_FILE_PATH = CONFIG.get_data_path("tournament")
 
 # Default content for persistent data
 DEFAULT_GLOBAL_DATA = {"games": [], "last_tournament_winner": {}, "player_stats": {}}
@@ -131,20 +95,20 @@ async def validate_channels(bot: discord.Client) -> None:
     """
     Validates that all channels specified in config exist and are accessible.
     """
-    config = load_config()
-    channels = config.get("CHANNELS", {})
-
-    if not channels:
-        logger.error("[CHANNEL CHECKER] No CHANNELS found in config.")
-        return
-
     logger.info("[CHANNEL CHECKER] Starting channel validation...")
 
-    for name, channel_id_str in channels.items():
+    # Get all channel names from the Channels dataclass
+    channel_names = ["limits", "reminder", "reschedule"]
+
+    for name in channel_names:
         try:
-            channel_id = int(channel_id_str)
-        except (TypeError, ValueError):
-            logger.error(f"[CHANNEL CHECKER] Channel ID for '{name}' is invalid: {channel_id_str}")
+            channel_id = CONFIG.get_channel_id(name)
+        except ValueError as e:
+            logger.error(f"[CHANNEL CHECKER] {e}")
+            continue
+
+        if channel_id == 0:
+            logger.error(f"[CHANNEL CHECKER] Channel '{name}' has invalid ID: 0")
             continue
 
         channel = bot.get_channel(channel_id)
@@ -174,14 +138,17 @@ async def validate_permissions(guild: discord.Guild) -> None:
     Checks if all roles specified in the config exist on the server.
     Outputs warnings for missing roles.
     """
-    from modules.dataStorage import load_config
-    from modules.logger import logger
-
-    config = load_config()
-    role_permissions = config.get("ROLE_PERMISSIONS", {})
     logger.info(f"[PERMISSION CHECKER] Starting permission validation for server '{guild.name}'...")
 
-    for permission_group, entries in role_permissions.items():
+    # Get all role groups from CONFIG
+    role_groups = {
+        "Moderator": CONFIG.bot.roles.moderator,
+        "Admin": CONFIG.bot.roles.admin,
+        "Dev": CONFIG.bot.roles.dev,
+        "Winner": CONFIG.bot.roles.winner,
+    }
+
+    for permission_group, entries in role_groups.items():
         logger.info(f"[PERMISSION CHECKER] Group '{permission_group}': Allowed roles/IDs: {entries}")
         for entry in entries:
             if entry.isdigit() and len(entry) > 10:

@@ -12,7 +12,8 @@ from discord.ext import commands
 from discord.ui import Button, View
 
 # Local modules
-from modules.dataStorage import load_config, load_tournament_data, save_tournament_data, RESCHEDULE_CHANNEL_ID
+from modules.config import CONFIG
+from modules.dataStorage import load_tournament_data, save_tournament_data, RESCHEDULE_CHANNEL_ID
 from modules.embeds import (
     build_embed_from_template,
     send_notify_team_members,
@@ -25,8 +26,7 @@ from modules.shared_states import pending_reschedules
 from modules.utils import get_player_team, get_team_open_matches, smart_send
 from views.reschedule_view import RescheduleView
 
-config = load_config()
-RESCHEDULE_TIMEOUT_HOURS = int(config.get("RESCHEDULE_TIMEOUT_HOURS", 24))
+RESCHEDULE_TIMEOUT_HOURS = CONFIG.tournament.reschedule_timeout_hours
 
 # ---------------------------------------
 # Helper: Extract IDs

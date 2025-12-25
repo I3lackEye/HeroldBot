@@ -1,0 +1,20 @@
+{
+  "data_paths": {
+    "data": "data/data.json",
+    "tournament": "data/tournament.json"
+  },
+  "channels": {
+    "limits": "1359882955564253324",
+    "reminder": "1363020796850737264",
+    "reschedule": "1363005262868385833"
+  },
+  "roles": {
+    "moderator": ["Moderator", "Lappen des Vertrauens"],
+    "admin": [],
+    "dev": ["157268596190478336"],
+    "winner": ["1357777322509603046"]
+  },
+  "language": "de",
+  "timezone": "Europe/Berlin",
+  "max_string_length": 50
+}
