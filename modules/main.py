@@ -150,7 +150,7 @@ async def on_ready():
     logger.info("[STARTUP] Old background tasks terminated.")
 
     # Get reminder channel from config
-    reminder_channel_id = int(config.get("CHANNELS", {}).get("REMINDER", 0))
+    reminder_channel_id = CONFIG.get_channel_id("reminder")
     channel = bot.get_channel(reminder_channel_id)
 
     if channel:

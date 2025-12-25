@@ -6,7 +6,7 @@ from discord.ext import commands
 from discord.ui import Modal, TextInput
 
 # Local modules
-from modules.dataStorage import config, load_tournament_data, save_tournament_data
+from modules.dataStorage import load_tournament_data, save_tournament_data
 from modules.embeds import (
     send_participants_overview,
     send_registration_confirmation,
