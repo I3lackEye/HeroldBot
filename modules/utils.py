@@ -2,8 +2,7 @@
 
 import random
 import re
-import time
-from datetime import datetime, timedelta
+from datetime import datetime, time, timedelta
 from typing import Optional, Tuple
 
 import discord
@@ -71,7 +70,7 @@ def validate_string(input_str: str, max_length: int = None) -> Tuple[bool, str]:
     """
     # If no max_length was passed, use the value from config or 50 as fallback
     if max_length is None:
-        max_length = config.get("STR_MAX_LENGTH", 50)
+        max_length = CONFIG.bot.max_string_length
 
     # Check length
     if len(input_str) > max_length:

@@ -185,7 +185,7 @@ def update_player_stats(winner_ids: list, chosen_game: str):
     global_data["tournament_history"].append(
         {
             "game": chosen_game,
-            "ended_at": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S"),
+            "ended_at": datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
         }
     )
 

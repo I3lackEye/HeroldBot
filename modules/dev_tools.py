@@ -344,7 +344,7 @@ class DevGroup(app_commands.Group):
             return
 
         # Prepare tournament data
-        now = datetime.utcnow()
+        now = datetime.now()
 
         # Tournament period: Start now, end after two full weekends starting next Saturday
         next_saturday = now + timedelta((5 - now.weekday()) % 7)
@@ -533,11 +533,13 @@ class DevGroup(app_commands.Group):
             return
 
         try:
-            from modules.matchmaker import create_round_robin_schedule, pair_solo_players
+            from modules.matchmaker import create_round_robin_schedule, auto_match_solo
 
             # Pair solo players first
             if solo:
-                pair_solo_players(tournament)
+                auto_match_solo()
+                # Reload tournament data after auto-matching
+                tournament = load_tournament_data()
                 teams = tournament.get("teams", {})
 
             # Get tournament end date
@@ -550,23 +552,22 @@ class DevGroup(app_commands.Group):
                 end_date = datetime.now() + timedelta(weeks=2)
 
             # Try to create schedule
-            all_teams = list(teams.keys())
-            matchups = create_round_robin_schedule(all_teams)
+            matchups = create_round_robin_schedule(tournament)
 
             # Report results
             result = [
                 f"**Matchmaker Test Results**",
                 f"",
                 f"📊 **Input:**",
-                f"  • Teams: {len(all_teams)}",
+                f"  • Teams: {len(teams)}",
                 f"  • Total matchups needed: {len(matchups)}",
                 f"  • Tournament end: {end_date.strftime('%Y-%m-%d')}",
                 f"",
                 f"🎯 **Round-Robin Pairings:**"
             ]
 
-            for i, (team1, team2) in enumerate(matchups[:10], 1):
-                result.append(f"  {i}. {team1} vs {team2}")
+            for i, match in enumerate(matchups[:10], 1):
+                result.append(f"  {i}. {match['team1']} vs {match['team2']}")
 
             if len(matchups) > 10:
                 result.append(f"  ... and {len(matchups)-10} more matchups")
@@ -606,33 +607,69 @@ class DevGroup(app_commands.Group):
             return
 
         try:
-            from modules.matchmaker import generate_matches as run_matchmaker
+            from modules.matchmaker import (
+                auto_match_solo,
+                create_round_robin_schedule,
+                generate_slot_matrix,
+                assign_slots_with_matrix
+            )
 
             # Set tournament as running if not already
             if not tournament.get("running"):
                 tournament["running"] = True
-                save_tournament_data(tournament)
 
-            # Run matchmaker
-            matches = run_matchmaker(tournament)
+            # Set tournament end if not set (default 2 weeks from now)
+            if not tournament.get("tournament_end"):
+                from datetime import datetime, timedelta
+                tournament["tournament_end"] = (datetime.now() + timedelta(weeks=2)).isoformat()
 
-            if matches:
-                await interaction.followup.send(
-                    f"✅ Successfully generated **{len(matches)} matches**!\n"
-                    f"Use `/dev show_state` to see the schedule.",
-                    ephemeral=True
+            save_tournament_data(tournament)
+
+            # Step 1: Auto-match solo players
+            solo = tournament.get("solo", [])
+            if solo:
+                auto_match_solo()
+                tournament = load_tournament_data()  # Reload after auto-matching
+
+            # Step 2: Create round-robin matchups
+            matches = create_round_robin_schedule(tournament)
+
+            # Step 3: Generate time slots
+            slot_matrix = generate_slot_matrix(tournament)
+
+            # Step 4: Assign slots to matches
+            assigned_matches, unassigned_matches = assign_slots_with_matrix(matches, slot_matrix)
+
+            # Build result message
+            if len(matches) == 0:
+                msg = "⚠️ No matches could be created (need at least 2 teams)."
+            elif len(assigned_matches) == len(matches):
+                msg = (
+                    f"✅ Successfully generated and scheduled **{len(matches)} matches**!\n"
+                    f"All matches have been assigned time slots.\n"
+                    f"Use `/dev show_state` to see the schedule."
                 )
-                logger.info(f"[DEV] Force-generated {len(matches)} matches")
+            elif len(assigned_matches) > 0:
+                msg = (
+                    f"⚠️ Partially successful:\n"
+                    f"  • Created: {len(matches)} matches\n"
+                    f"  • Scheduled: {len(assigned_matches)} matches\n"
+                    f"  • Unscheduled: {len(unassigned_matches)} matches\n\n"
+                    f"Some matches couldn't be scheduled due to availability conflicts.\n"
+                    f"Try using `/dev generate_dummy scenario:easy` for better overlap."
+                )
             else:
-                await interaction.followup.send(
-                    "⚠️ Matchmaker ran but generated 0 matches.\n"
-                    "This could be due to:\n"
-                    "  • No overlapping availability\n"
-                    "  • All dates blocked\n"
-                    "  • Not enough teams\n\n"
-                    "Try using `/dev generate_dummy scenario:easy` for a simpler test case.",
-                    ephemeral=True
+                msg = (
+                    f"⚠️ Created {len(matches)} matches but couldn't schedule any!\n"
+                    f"This could be due to:\n"
+                    f"  • No overlapping availability\n"
+                    f"  • All dates blocked\n"
+                    f"  • Too many matches for available time slots\n\n"
+                    f"Try using `/dev generate_dummy scenario:easy` for a simpler test case."
                 )
+
+            await interaction.followup.send(msg, ephemeral=True)
+            logger.info(f"[DEV] Force-generated {len(matches)} matches ({len(assigned_matches)} scheduled)")
 
         except Exception as e:
             logger.error(f"[DEV] Match generation failed: {e}")
@@ -672,7 +709,7 @@ class DevGroup(app_commands.Group):
         if reg_open and reg_end:
             try:
                 dt = datetime.fromisoformat(reg_end)
-                remaining = dt - datetime.utcnow()
+                remaining = dt - datetime.now()
                 report.append(f"📝 Registration: ✅ Open ({remaining.days}d {remaining.seconds//3600}h remaining)")
             except Exception:
                 report.append("📝 Registration: ⚠️ Invalid date format")

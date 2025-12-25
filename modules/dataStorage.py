@@ -107,7 +107,7 @@ def _atomic_write(file_path: str, data: Dict[str, Any], indent: int = 4) -> None
         # Clean up temp file on error
         try:
             os.unlink(temp_path)
-        except:
+        except OSError:
             pass
         raise e
 

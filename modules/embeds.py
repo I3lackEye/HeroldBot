@@ -257,7 +257,7 @@ async def send_notify_team_members(
     failed = False
 
     for member_str in all_members:
-        user_id_match = re.search(r"\\d+", member_str)
+        user_id_match = re.search(r"\d+", member_str)
         if not user_id_match:
             continue
 
@@ -397,8 +397,9 @@ async def send_global_stats(interaction: Interaction, description_text: str):
     if not template:
         logger.error("[EMBED] GLOBAL_STATS template missing.")
         return
-    embed = build_embed_from_template(template, placeholders)
-    await channel.send(embed=embed)
+    embed = build_embed_from_template(template, placeholders=None)
+    embed.description = description_text
+    await smart_send(interaction, embed=embed)
 
 
 async def send_list_matches(interaction: Interaction, matches: list):

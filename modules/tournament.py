@@ -41,7 +41,6 @@ from modules.matchmaker import (
 )
 from modules.stats import (
     autocomplete_players,
-    autocomplete_teams,
     get_mvp,
     get_winner_ids,
     get_winner_team,
@@ -56,7 +55,6 @@ from modules.utils import (
     has_permission,
     smart_send,
     update_all_participants,
-    update_player_stats,
 )
 
 # Global variable
@@ -245,7 +243,7 @@ async def close_registration_after_delay(delay_seconds: int, channel: discord.Te
 
     # Create match schedule
     tournament = load_tournament_data()
-    create_round_robin_schedule()
+    create_round_robin_schedule(tournament)
 
     # Remove all remaining solo players
     tournament = load_tournament_data()

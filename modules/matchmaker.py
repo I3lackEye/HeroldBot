@@ -311,8 +311,8 @@ async def cleanup_orphan_teams(channel: TextChannel):
     teams = tournament.get("teams", {})
     solo = tournament.get("solo", [])
 
-    teams_deleted = 0
-    players_rescued = 0
+    teams_deleted_list = []
+    players_rescued_list = []
 
     for team_name, team_data in list(teams.items()):
         members = team_data.get("members", [])
@@ -327,16 +327,16 @@ async def cleanup_orphan_teams(channel: TextChannel):
                 }
             )
             del teams[team_name]
-            teams_deleted += 1
-            players_rescued += 1
+            teams_deleted_list.append(team_name)
+            players_rescued_list.append(player)
 
     tournament["teams"] = teams
     tournament["solo"] = solo
     save_tournament_data(tournament)
 
-    await send_cleanup_summary(channel, teams_deleted, players_rescued)
+    await send_cleanup_summary(channel, teams_deleted_list, players_rescued_list)
 
-    logger.info(f"[CLEANUP] {teams_deleted} empty teams deleted, {players_rescued} players rescued.")
+    logger.info(f"[CLEANUP] {len(teams_deleted_list)} empty teams deleted, {len(players_rescued_list)} players rescued.")
 
 
 # =======================================
