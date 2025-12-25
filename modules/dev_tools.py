@@ -10,8 +10,8 @@ from discord.ext import commands
 
 # Import helper modules
 from modules import poll
+from modules.config import CONFIG
 from modules.dataStorage import (
-    load_config,
     load_games,
     load_tournament_data,
     save_tournament_data,
@@ -87,8 +87,7 @@ class DevGroup(app_commands.Group):
             await interaction.response.send_message("🚫 You don't have permission for this command.", ephemeral=True)
             return
 
-        config = load_config()
-        reminder_channel_id = int(config.get("CHANNELS", {}).get("REMINDER", 0))
+        reminder_channel_id = CONFIG.get_channel_id("reminder")
 
         guild = interaction.guild
         if not guild:
@@ -290,10 +289,9 @@ class DevGroup(app_commands.Group):
         from modules.dataStorage import load_games
         from modules.embeds import load_embed_template
 
-        config = load_config()
         tournament = load_tournament_data()
         report = []
-        language = config.get("language", "de")
+        language = CONFIG.bot.language
 
         # Tournament status
         running = tournament.get("running", False)

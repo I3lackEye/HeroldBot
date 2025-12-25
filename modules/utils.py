@@ -9,8 +9,8 @@ from typing import Optional, Tuple
 import discord
 from discord import Embed, Interaction, app_commands
 
+from modules.config import CONFIG
 from modules.dataStorage import (
-    load_config,
     load_games,
     load_global_data,
     load_names,
@@ -21,9 +21,6 @@ from modules.dataStorage import (
 # Local modules
 from modules.logger import logger
 
-# Load configuration
-config = load_config()
-
 
 def has_permission(member: discord.Member, *required_permissions: str) -> bool:
     """
@@ -32,9 +29,17 @@ def has_permission(member: discord.Member, *required_permissions: str) -> bool:
     """
     allowed_roles = []
     allowed_ids = set()
-    role_permissions = config.get("ROLE_PERMISSIONS", {})
+
+    # Map permission names to role lists from CONFIG
+    role_map = {
+        "Moderator": CONFIG.bot.roles.moderator,
+        "Admin": CONFIG.bot.roles.admin,
+        "Dev": CONFIG.bot.roles.dev,
+    }
+
     for permission in required_permissions:
-        for entry in role_permissions.get(permission, []):
+        role_list = role_map.get(permission, [])
+        for entry in role_list:
             if entry.isdigit() and len(entry) > 10:
                 allowed_ids.add(int(entry))
             else:
@@ -331,11 +336,11 @@ def generate_team_name(language: str = None) -> str:
     Generates a random team name from adjective and noun lists.
     If no names are found, a generic name is returned.
 
-    :param language: Language (optional); default: from config.json
+    :param language: Language (optional); default: from config
     :return: Team name as string
     """
     if not language:
-        language = load_config().get("language", "de")
+        language = CONFIG.bot.language
 
     names = load_names(language)
 
@@ -589,8 +594,11 @@ def generate_random_availability() -> dict[str, str]:
 
 def get_active_days_config() -> dict:
     """
-    Loads the days on which matches can take place from config.json.
-    Each day as a number from 0-6 (Monday-Sunday) with start and end time.
+    Gets the days on which matches can take place from tournament config.
+    Returns dict with day names (e.g., 'saturday') as keys and time ranges as values.
     """
-    config = load_config()
-    return config.get("ACTIVE_DAYS", {})
+    # Return active_days from CONFIG - format: {"friday": {"start": "16:00", "end": "22:00"}, ...}
+    return {
+        day: {"start": day_config.start, "end": day_config.end}
+        for day, day_config in CONFIG.tournament.active_days.items()
+    }

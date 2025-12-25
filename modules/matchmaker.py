@@ -13,15 +13,16 @@ from typing import Dict, List, Optional, Tuple
 from discord import TextChannel
 
 # Local modules
+from modules.config import CONFIG
 from modules.dataStorage import DEBUG_MODE, load_tournament_data, save_tournament_data
 from modules.embeds import send_cleanup_summary
 from modules.logger import logger
 from modules.utils import generate_team_name, get_active_days_config
 
-# Helper variables
-MATCH_DURATION = timedelta(minutes=90)
-PAUSE_DURATION = timedelta(minutes=30)
-MAX_TIME_BUDGET = timedelta(hours=2)
+# Tournament configuration (from centralized config)
+MATCH_DURATION = CONFIG.tournament.match_duration
+PAUSE_DURATION = CONFIG.tournament.pause_duration
+MAX_TIME_BUDGET = CONFIG.tournament.max_time_budget
 
 
 # ---------------------------------------

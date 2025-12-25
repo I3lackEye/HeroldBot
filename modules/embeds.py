@@ -14,7 +14,8 @@ from modules.dataStorage import REMINDER_ENABLED, load_tournament_data
 from modules.logger import logger
 
 # Local modules
-from modules.utils import load_config, smart_send
+from modules.config import CONFIG
+from modules.utils import smart_send
 from views.reschedule_view import RescheduleView
 
 
@@ -26,7 +27,7 @@ def load_embed_template(template_name: str, language: str = None) -> dict:
     Fallback on error: locale/default/embeds/{template_name}.json
     """
     if not language:
-        language = load_config().get("language", "de")
+        language = CONFIG.bot.language
 
     paths_to_try = [
         os.path.join("locale", language, "embeds", f"{template_name}.json"),
