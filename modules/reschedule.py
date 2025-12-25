@@ -11,7 +11,7 @@ from discord import ButtonStyle, Embed, Interaction, app_commands
 from discord.ext import commands
 from discord.ui import Button, View
 
-# Lokale modules
+# Local modules
 from modules.dataStorage import load_config, load_tournament_data, save_tournament_data, RESCHEDULE_CHANNEL_ID
 from modules.embeds import (
     build_embed_from_template,
@@ -29,9 +29,10 @@ config = load_config()
 RESCHEDULE_TIMEOUT_HOURS = int(config.get("RESCHEDULE_TIMEOUT_HOURS", 24))
 
 # ---------------------------------------
-# Helper: IDs extrahieren
+# Helper: Extract IDs
 # ---------------------------------------
 def extract_ids(members):
+    """Extracts user IDs from mention strings."""
     ids = []
     for m in members:
         match = re.search(r"\d+", m)
@@ -42,7 +43,7 @@ def extract_ids(members):
 
 def get_free_slots_for_match(tournament, match_id: int) -> list[datetime]:
     """
-    Gibt alle erlaubten und freien Slots für ein bestimmtes Match zurück.
+    Returns all allowed and free slots for a specific match.
     """
     match = next((m for m in tournament.get("matches", []) if m["match_id"] == match_id), None)
     if not match:
@@ -54,7 +55,7 @@ def get_free_slots_for_match(tournament, match_id: int) -> list[datetime]:
 
     all_valid = get_valid_slots_for_match(team1, team2, slot_matrix)
 
-    # Entferne bereits belegte Slots
+    # Remove already booked slots
     booked = {
         m["scheduled_time"]
         for m in tournament["matches"]
@@ -65,8 +66,8 @@ def get_free_slots_for_match(tournament, match_id: int) -> list[datetime]:
 
 def extend_tournament_and_reschedule_match(match: dict, days: int = 2) -> bool:
     """
-    Verlängert das Turnierende und versucht, für das gegebene Match neue Slots zu generieren und zuzuweisen.
-    Gibt True zurück, wenn erfolgreich, sonst False.
+    Extends the tournament end date and tries to generate and assign new slots for the given match.
+    Returns True if successful, otherwise False.
     """
     tournament = load_tournament_data()
     end_str = tournament.get("tournament_end")
@@ -74,26 +75,25 @@ def extend_tournament_and_reschedule_match(match: dict, days: int = 2) -> bool:
     try:
         current_end = datetime.fromisoformat(end_str).astimezone(ZoneInfo("UTC"))
     except Exception as e:
-        logger.error(f"[RESCHEDULE] ❌ Fehler beim Lesen des Turnierende-Zeitpunkts: {e}")
+        logger.error(f"[RESCHEDULE] ❌ Error reading tournament end time: {e}")
         return False
 
     new_end = current_end + timedelta(days=days)
     tournament["tournament_end"] = new_end.isoformat()
-    logger.warning(f"[RESCHEDULE] ⚠️ Turnierende wurde auf {new_end.isoformat()} verlängert.")
+    logger.warning(f"[RESCHEDULE] ⚠️ Tournament end extended to {new_end.isoformat()}.")
 
-    # Match zurücksetzen
+    # Reset match
     match["scheduled_time"] = None
 
-    # Nur dieses Match erneut einplanen
-    # Nur dieses Match erneut einplanen
+    # Reschedule only this match
     slot_matrix = generate_slot_matrix(tournament)
     success = not assign_slots_with_matrix([match], slot_matrix)[1]
     save_tournament_data(tournament)
 
     if success:
-        logger.info(f"[RESCHEDULE] ✅ Neuer Slot für Match {match['match_id']} nach Erweiterung zugewiesen.")
+        logger.info(f"[RESCHEDULE] ✅ New slot assigned for match {match['match_id']} after extension.")
     else:
-        logger.warning(f"[RESCHEDULE] ❌ Kein Slot gefunden trotz Turnierverlängerung.")
+        logger.warning(f"[RESCHEDULE] ❌ No slot found despite tournament extension.")
 
     return success
 
@@ -102,17 +102,21 @@ def extend_tournament_and_reschedule_match(match: dict, days: int = 2) -> bool:
 # Command: /request_reschedule
 # ---------------------------------------
 async def handle_request_reschedule(interaction: Interaction, match_id: int):
+    """
+    Handles a reschedule request from a player.
+    Validates the request, finds free slots, and posts a voting message.
+    """
     global pending_reschedules
     tournament = load_tournament_data()
     user_id = str(interaction.user.id)
-    logger.info(f"[RESCHEDULE] Anfrage empfangen von {interaction.user.display_name} für Match-ID {match_id}")
+    logger.info(f"[RESCHEDULE] Request received from {interaction.user.display_name} for match ID {match_id}")
 
 
 
-    # 1️⃣ Team und Match prüfen
+    # 1️⃣ Check team and match
     team_name = get_player_team(user_id)
     if not team_name:
-        await interaction.response.send_message("🚫 Du bist in keinem Team registriert.", ephemeral=True)
+        await interaction.response.send_message("🚫 You are not registered in any team.", ephemeral=True)
         return
 
 
@@ -120,27 +124,27 @@ async def handle_request_reschedule(interaction: Interaction, match_id: int):
     open_match_ids = [m["match_id"] for m in open_matches]
 
     if match_id not in open_match_ids:
-        await interaction.response.send_message("🚫 Ungültige Match-ID oder nicht dein Match!", ephemeral=True)
+        await interaction.response.send_message("🚫 Invalid match ID or not your match!", ephemeral=True)
         return
 
     if match_id in pending_reschedules:
         await interaction.response.send_message(
-            "🚫 Für dieses Match läuft bereits eine Reschedule-Anfrage!", ephemeral=True
+            "🚫 A reschedule request is already pending for this match!", ephemeral=True
         )
         return
 
     match = next((m for m in tournament.get("matches", []) if m.get("match_id") == match_id), None,)
     if not match:
-        await interaction.response.send_message("🚫 Match nicht gefunden.", ephemeral=True)
+        await interaction.response.send_message("🚫 Match not found.", ephemeral=True)
         return
     if match.get("rescheduled_once", False):
-        await interaction.response.send_message("🚫 Dieses Match wurde bereits verschoben und kann nicht erneut verschoben werden.", ephemeral=True)
+        await interaction.response.send_message("🚫 This match has already been rescheduled and cannot be rescheduled again.", ephemeral=True)
         return
-    logger.info(f"[RESCHEDULE] Open Match IDs für {team_name}: {open_match_ids}")
+    logger.info(f"[RESCHEDULE] Open match IDs for {team_name}: {open_match_ids}")
 
-    # 2️⃣ Automatisch nächsten freien Slot ermitteln
+    # 2️⃣ Automatically determine next free slot
     allowed_slots = get_free_slots_for_match(tournament, match_id)
-    logger.debug(f"[RESCHEDULE] get_free_slots_for_match lieferte: {allowed_slots}")
+    logger.debug(f"[RESCHEDULE] get_free_slots_for_match returned: {allowed_slots}")
     allowed_iso = {slot.isoformat() for slot in allowed_slots}
     booked_slots = {m["scheduled_time"] for m in tournament["matches"] if m.get("scheduled_time")}
     free_slots = [slot for slot in allowed_iso if slot not in booked_slots]
@@ -153,23 +157,23 @@ async def handle_request_reschedule(interaction: Interaction, match_id: int):
             if dt > now:
                 future_slots.append(dt)
         except Exception as e:
-            logger.error(f"[RESCHEDULE] Ungültiger Slot in free_slots: {slot} – Fehler: {e}")
+            logger.error(f"[RESCHEDULE] Invalid slot in free_slots: {slot} – Error: {e}")
 
     if not future_slots:
-        logger.warning(f"[RESCHEDULE] Keine freien Slots – Turnier wird erweitert.")
+        logger.warning(f"[RESCHEDULE] No free slots – tournament will be extended.")
         success = extend_tournament_and_reschedule_match(match, days=2)
         if not success:
             await interaction.response.send_message(
-                "🚫 Kein gültiger Slot mehr verfügbar – auch nach Verlängerung. Bitte Turnierleitung informieren.",
+                "🚫 No valid slot available – even after extension. Please inform tournament management.",
                 ephemeral=True
             )
             return
-        logger.debug(f"[RESCHEDULE] ISO-Slots: {allowed_iso}")
-        logger.debug(f"[RESCHEDULE] Gebuchte Slots: {booked_slots}")
-        logger.debug(f"[RESCHEDULE] Freie Slots nach Filter: {free_slots}")
-        logger.debug(f"[RESCHEDULE] Zukünftige Slots: {future_slots}")
+        logger.debug(f"[RESCHEDULE] ISO slots: {allowed_iso}")
+        logger.debug(f"[RESCHEDULE] Booked slots: {booked_slots}")
+        logger.debug(f"[RESCHEDULE] Free slots after filter: {free_slots}")
+        logger.debug(f"[RESCHEDULE] Future slots: {future_slots}")
 
-        # Neu laden
+        # Reload
         tournament = load_tournament_data()
         match = next((m for m in tournament.get("matches", []) if m.get("match_id") == match_id), None)
         allowed_slots = get_free_slots_for_match(tournament, match_id)
@@ -185,33 +189,33 @@ async def handle_request_reschedule(interaction: Interaction, match_id: int):
 
         if not future_slots:
             await interaction.response.send_message(
-                "❌ Auch nach Erweiterung konnte kein freier Slot gefunden werden.",
+                "❌ Even after extension, no free slot could be found.",
                 ephemeral=True
             )
             return
 
-    logger.debug(f"[RESCHEDULE] Zukünftige Slot-Kandidaten: {[s.isoformat() for s in future_slots]}")
-    # ⏰ Nächsten Slot nehmen
+    logger.debug(f"[RESCHEDULE] Future slot candidates: {[s.isoformat() for s in future_slots]}")
+    # ⏰ Take next slot
     new_dt = min(future_slots)
 
-    # Prüfe ob zu spät (Match zu nah am Start)
+    # Check if too late (match too close to start)
     scheduled_time_str = match.get("scheduled_time")
     if scheduled_time_str:
         try:
             scheduled_dt = datetime.fromisoformat(scheduled_time_str)
-            logger.debug(f"[RESCHEDULE] Geplanter Zeitpunkt laut Match: {scheduled_dt.isoformat()}")
+            logger.debug(f"[RESCHEDULE] Scheduled time from match: {scheduled_dt.isoformat()}")
             if scheduled_dt - datetime.now(ZoneInfo("UTC")) <= timedelta(hours=1):
                 await interaction.response.send_message(
-                    "🚫 Du kannst Matches nur bis spätestens 1 Stunde vor geplantem Beginn verschieben.",
+                    "🚫 You can only reschedule matches up to 1 hour before the scheduled start.",
                     ephemeral=True
                 )
                 return
         except Exception as e:
-            logger.error(f"[RESCHEDULE] ❌ Fehler beim Parsen von scheduled_time: {scheduled_time_str} – {e}")
+            logger.error(f"[RESCHEDULE] ❌ Error parsing scheduled_time: {scheduled_time_str} – {e}")
 
 
 
-    # 3️⃣ Spieler für Abstimmung vorbereiten
+    # 3️⃣ Prepare players for voting
     team1 = match["team1"]
     team2 = match["team2"]
     members1 = tournament.get("teams", {}).get(team1, {}).get("members", [])
@@ -226,20 +230,20 @@ async def handle_request_reschedule(interaction: Interaction, match_id: int):
                 member = await interaction.guild.fetch_member(uid)
                 valid_members.append(member)
             except discord.NotFound:
-                logger.warning(f"[RESCHEDULE] ⚠️ Member {uid} nicht gefunden.")
+                logger.warning(f"[RESCHEDULE] ⚠️ Member {uid} not found.")
             except discord.Forbidden:
-                logger.error(f"[RESCHEDULE] ❌ Keine Rechte, um Member {uid} zu fetchen.")
+                logger.error(f"[RESCHEDULE] ❌ No permission to fetch member {uid}.")
             except Exception as e:
-                logger.error(f"[RESCHEDULE] ❌ Fehler beim Holen von Member {uid}: {e}")
+                logger.error(f"[RESCHEDULE] ❌ Error fetching member {uid}: {e}")
 
 
-    logger.debug(f"[RESCHEDULE] Valid Members für Match {match_id}: {[m.display_name for m in valid_members]}")
+    logger.debug(f"[RESCHEDULE] Valid members for match {match_id}: {[m.display_name for m in valid_members]}")
 
     if not valid_members:
-        await interaction.response.send_message("❌ Keine gültigen Spieler gefunden.", ephemeral=True)
+        await interaction.response.send_message("❌ No valid players found.", ephemeral=True)
         return
 
-    # 4️⃣ Anfrage-Embed erstellen
+    # 4️⃣ Create request embed
     deadline = (datetime.now(ZoneInfo("Europe/Berlin")) + timedelta(hours=RESCHEDULE_TIMEOUT_HOURS)).strftime("%d.%m.%Y %H:%M")
     def shorten_lines(lines, max_total=1000):
         result = []
@@ -261,63 +265,63 @@ async def handle_request_reschedule(interaction: Interaction, match_id: int):
         "DEADLINE": deadline,
         "PLAYERS": short_players
     }
-    logger.debug(f"[RESCHEDULE] Embed-Preview: {placeholders}")
-    logger.debug(f"[RESCHEDULE] Embed wird versucht zu verschicken in Channel-ID {RESCHEDULE_CHANNEL_ID}")
+    logger.debug(f"[RESCHEDULE] Embed preview: {placeholders}")
+    logger.debug(f"[RESCHEDULE] Embed will be sent to channel ID {RESCHEDULE_CHANNEL_ID}")
 
     try:
         templates = load_embed_template("reschedule")
         if not isinstance(templates, dict):
-            raise TypeError("load_embed_template hat kein dict geliefert")
+            raise TypeError("load_embed_template did not return a dict")
 
         template = templates.get("RESCHEDULE")
         if not isinstance(template, dict):
-            raise TypeError("RESCHEDULE-Block fehlt oder ist kein dict")
+            raise TypeError("RESCHEDULE block missing or not a dict")
 
     except Exception as e:
-        logger.error(f"[RESCHEDULE] ❌ Fehler beim Laden des Embed-Templates: {e}")
-        await interaction.followup.send("❌ Embed-Vorlage konnte nicht geladen werden.", ephemeral=True)
+        logger.error(f"[RESCHEDULE] ❌ Error loading embed template: {e}")
+        await interaction.followup.send("❌ Embed template could not be loaded.", ephemeral=True)
         return
 
     try:
         final_embed = build_embed_from_template(template, placeholders)
-        logger.info(f"[RESCHEDULE] Embed erfolgreich gebaut. Sende in Channel-ID {RESCHEDULE_CHANNEL_ID}")
+        logger.info(f"[RESCHEDULE] Embed successfully built. Sending to channel ID {RESCHEDULE_CHANNEL_ID}")
     except Exception as e:
-        logger.error(f"[RESCHEDULE] ❌ Fehler beim Bauen des Embeds: {e}")
-        await interaction.followup.send("❌ Interner Fehler beim Erstellen des Embeds. Bitte Turnierleitung informieren.", ephemeral=True)
+        logger.error(f"[RESCHEDULE] ❌ Error building embed: {e}")
+        await interaction.followup.send("❌ Internal error creating embed. Please inform tournament management.", ephemeral=True)
         return
 
 
-    # 5️⃣ Anfrage im Channel posten
+    # 5️⃣ Post request in channel
     channel = interaction.guild.get_channel(RESCHEDULE_CHANNEL_ID)
     if not channel:
-        await interaction.response.send_message("❌ Reschedule-Channel nicht gefunden.", ephemeral=True)
+        await interaction.response.send_message("❌ Reschedule channel not found.", ephemeral=True)
         return
-    logger.debug(f"[RESCHEDULE] Channel ist: {channel} (Typ: {type(channel)})")
+    logger.debug(f"[RESCHEDULE] Channel is: {channel} (Type: {type(channel)})")
 
     view = RescheduleView(match_id, team1, team2, new_dt, valid_members)
-    logger.debug(f"[RESCHEDULE] Sende an Channel {channel.name} ({channel.id}) mit View: {view}")
+    logger.debug(f"[RESCHEDULE] Sending to channel {channel.name} ({channel.id}) with view: {view}")
     try:
-        logger.debug(f"[RESCHEDULE] Channel Permissions für Bot in #{channel.name}: {channel.permissions_for(interaction.guild.me)}")
+        logger.debug(f"[RESCHEDULE] Channel permissions for bot in #{channel.name}: {channel.permissions_for(interaction.guild.me)}")
         msg = await channel.send(embed=final_embed, view=view)
         view.message = msg
-        logger.info(f"[RESCHEDULE] Anfrage für Match {match_id} erfolgreich im Channel #{channel.name} gepostet.")
+        logger.info(f"[RESCHEDULE] Request for match {match_id} successfully posted in channel #{channel.name}.")
     except discord.HTTPException as e:
-        logger.error(f"[RESCHEDULE] ❌ Discord HTTPException beim Senden der Anfrage: {e.text} – {e.code}")
-        await interaction.followup.send("❌ Discord hat das Senden der Anfrage abgelehnt (HTTPException).", ephemeral=True)
+        logger.error(f"[RESCHEDULE] ❌ Discord HTTPException sending request: {e.text} – {e.code}")
+        await interaction.followup.send("❌ Discord rejected sending the request (HTTPException).", ephemeral=True)
         return
     except Exception as e:
-        logger.error(f"[RESCHEDULE] ❌ Allgemeiner Fehler beim Senden der Anfrage: {e}")
-        await interaction.followup.send("❌ Fehler beim Senden der Anfrage. Bitte Turnierleitung informieren.", ephemeral=True)
+        logger.error(f"[RESCHEDULE] ❌ General error sending request: {e}")
+        await interaction.followup.send("❌ Error sending request. Please inform tournament management.", ephemeral=True)
         return
 
 
-    # 6️⃣ Bestätigung an User
+    # 6️⃣ Confirmation to user
     try:
-        await interaction.response.send_message("✅ Deine Anfrage wurde im Reschedule-Channel gestartet!", ephemeral=True)
+        await interaction.response.send_message("✅ Your request has been started in the reschedule channel!", ephemeral=True)
     except discord.errors.InteractionResponded:
-        await interaction.followup.send("✅ Deine Anfrage wurde im Reschedule-Channel gestartet!", ephemeral=True)
+        await interaction.followup.send("✅ Your request has been started in the reschedule channel!", ephemeral=True)
 
-    # 7️⃣ Reschedule starten
+    # 7️⃣ Start reschedule
     pending_reschedules.add(match_id)
     interaction.client.loop.create_task(start_reschedule_timer(interaction.client, match_id))
 
@@ -325,9 +329,10 @@ async def handle_request_reschedule(interaction: Interaction, match_id: int):
 
 
 # ---------------------------------------
-# Autocomplete für Match-ID
+# Autocomplete for Match ID
 # ---------------------------------------
 async def match_id_autocomplete(interaction: Interaction, current: str):
+    """Provides autocomplete suggestions for match IDs."""
     tournament = load_tournament_data()
     user_id = str(interaction.user.id)
     team_name = get_player_team(user_id)
@@ -346,13 +351,14 @@ async def match_id_autocomplete(interaction: Interaction, current: str):
                     value=m["match_id"],
                 )
             )
-    return choices[:25]  # Discord erlaubt maximal 25 Vorschläge
+    return choices[:25]  # Discord allows max 25 suggestions
 
 
 # ---------------------------------------
-# Helper: Autocomplete für neue Terminwahl
+# Helper: Autocomplete for new time selection
 # ---------------------------------------
 async def neuer_zeitpunkt_autocomplete(interaction: Interaction, current: str):
+    """Provides autocomplete suggestions for available time slots."""
     tournament = load_tournament_data()
 
     try:
@@ -362,16 +368,16 @@ async def neuer_zeitpunkt_autocomplete(interaction: Interaction, current: str):
     except ValueError:
         return []
 
-    # Schon belegte Slots heraussuchen
+    # Find already booked slots
     booked_slots = set()
     for match in tournament.get("matches", []):
         if match.get("scheduled_time"):
             booked_slots.add(match["scheduled_time"])
 
-    # Nur erlaubte & freie Slots
+    # Only allowed & free slots
     free_slots = [slot for slot in allowed_iso if slot not in booked_slots]
 
-    # Nur zukünftige Slots
+    # Only future slots
     free_slots = [slot for slot in free_slots if datetime.fromisoformat(slot) > datetime.now()]
 
     if current:
@@ -380,7 +386,7 @@ async def neuer_zeitpunkt_autocomplete(interaction: Interaction, current: str):
     choices = []
     for slot in free_slots[:25]:
         dt = datetime.fromisoformat(slot)
-        label = f"{dt.strftime('%A')} {dt.strftime('%d.%m.%Y %H:%M')} Uhr"
+        label = f"{dt.strftime('%A')} {dt.strftime('%d.%m.%Y %H:%M')}"
         value = dt.strftime("%d.%m.%Y %H:%M")
         choices.append(app_commands.Choice(name=label, value=value))
 
@@ -389,20 +395,20 @@ async def neuer_zeitpunkt_autocomplete(interaction: Interaction, current: str):
 
 async def start_reschedule_timer(bot, match_id: int):
     """
-    Wartet eine bestimmte Zeit und entfernt dann die Reschedule-Anfrage automatisch.
-    Benachrichtigt optional den Reschedule-Channel.
+    Waits a certain time and then automatically removes the reschedule request.
+    Optionally notifies the reschedule channel.
     """
-    await asyncio.sleep(RESCHEDULE_TIMEOUT_HOURS * 3600)  # Timeout warten
+    await asyncio.sleep(RESCHEDULE_TIMEOUT_HOURS * 3600)  # Wait for timeout
 
     if match_id in pending_reschedules:
         pending_reschedules.discard(match_id)
         logger.info(
-            f"[RESCHEDULE] Automatische Aufräumung: Match {match_id} wurde zurückgesetzt (Timeout nach {RESCHEDULE_TIMEOUT_HOURS} Stunden)."
+            f"[RESCHEDULE] Automatic cleanup: Match {match_id} was reset (timeout after {RESCHEDULE_TIMEOUT_HOURS} hours)."
         )
 
-        # ➔ Nachricht im Reschedule-Channel schicken
+        # ➔ Send message in reschedule channel
         reschedule_channel = bot.get_channel(RESCHEDULE_CHANNEL_ID)
         if reschedule_channel:
             await reschedule_channel.send(
-                f"❗ Die Reschedule-Anfrage für Match `{match_id}` wurde automatisch beendet, da keine Einigung innerhalb von {RESCHEDULE_TIMEOUT_HOURS} Stunden erzielt wurde."
+                f"❗ The reschedule request for match `{match_id}` was automatically ended as no agreement was reached within {RESCHEDULE_TIMEOUT_HOURS} hours."
             )
