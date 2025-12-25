@@ -192,6 +192,44 @@ class AvailabilityChecker:
         """
         return [day for day, time_range in availability.items() if time_range != "00:00-00:00"]
 
+    @staticmethod
+    def can_fit_match(team_data: dict, slot_datetime: datetime, match_duration: timedelta) -> bool:
+        """
+        Checks if a team has enough time remaining in their availability window
+        to complete a full match starting at the given slot.
+
+        :param team_data: Team data dict with 'availability' field
+        :param slot_datetime: The proposed match start time
+        :param match_duration: How long the match takes
+        :return: True if match can be completed within availability window
+        """
+        weekday = slot_datetime.weekday()
+        day_key = AvailabilityChecker.DAY_NAMES[weekday]
+
+        availability = team_data.get("availability", {})
+        time_range = availability.get(day_key)
+
+        if not time_range or time_range == "00:00-00:00":
+            return False
+
+        try:
+            start_time, end_time = AvailabilityChecker.parse_time_range(time_range)
+
+            # Calculate when match would end
+            match_end = slot_datetime + match_duration
+            match_end_time = match_end.time()
+
+            # Check if match start is within availability
+            if not (start_time <= slot_datetime.time() < end_time):
+                return False
+
+            # Check if match end is within availability (or before)
+            # Note: We use <= for end_time because the match should finish by then
+            return match_end_time <= end_time
+
+        except ValueError:
+            return False
+
 
 # ---------------------------------------
 # Helper Functions
@@ -503,10 +541,19 @@ def get_compatible_slots(team1: dict, team2: dict, global_slots: list) -> list:
 # ---------------------------------------
 # Main Matchmaker
 # ---------------------------------------
-def generate_slot_matrix(tournament: dict, slot_interval: int = 2) -> dict:
+def generate_slot_matrix(tournament: dict, slot_interval_minutes: int = 60) -> dict:
     """
     Creates a global slot matrix that indicates which teams are available at which slots.
-    Returns: Dict[datetime, Set[team_name]]
+
+    Improvements:
+    - Configurable slot interval (default 60 minutes instead of 2 hours)
+    - Validates that teams have enough time to complete a full match
+    - Only generates slots where at least one team is available
+    - Supports finer granularity (30-minute or 1-hour intervals)
+
+    :param tournament: Tournament data dict
+    :param slot_interval_minutes: Minutes between slots (default 60, can be 30 for finer granularity)
+    :return: Dict[datetime, Set[team_name]]
     """
     from datetime import datetime, timedelta
     from collections import defaultdict
@@ -515,30 +562,65 @@ def generate_slot_matrix(tournament: dict, slot_interval: int = 2) -> dict:
     to_date = datetime.fromisoformat(tournament["tournament_end"])
     teams = tournament.get("teams", {})
 
+    if not teams:
+        logger.warning("[SLOT-MATRIX] No teams found, returning empty matrix.")
+        return {}
+
     slot_matrix = defaultdict(set)
+    slot_interval = timedelta(minutes=slot_interval_minutes)
+
+    logger.info(f"[SLOT-MATRIX] Generating slots from {from_date} to {to_date} with {slot_interval_minutes}min intervals")
 
     current = from_date
+    total_slots_generated = 0
+    slots_with_teams = 0
+
     while current <= to_date:
-        active_days = get_active_days_config()
+        # Check each team's availability for this specific day
         weekday = current.weekday()
-        if str(weekday) not in active_days:
+        day_key = AvailabilityChecker.DAY_NAMES[weekday]
+
+        # Collect all team availability windows for this day
+        day_has_available_teams = False
+        for team_data in teams.values():
+            availability = team_data.get("availability", {})
+            if day_key in availability and availability[day_key] != "00:00-00:00":
+                day_has_available_teams = True
+                break
+
+        # Skip day if no teams are available
+        if not day_has_available_teams:
             current += timedelta(days=1)
             continue
 
-        start_str = active_days[str(weekday)]["start"]
-        end_str = active_days[str(weekday)]["end"]
-        start_hour = int(start_str.split(":")[0])
-        end_hour = int(end_str.split(":")[0])
+        # Generate slots throughout the day at specified intervals
+        # Start from midnight and go until end of day
+        day_start = current.replace(hour=0, minute=0, second=0, microsecond=0)
+        day_end = day_start + timedelta(days=1)
 
-        for hour in range(start_hour, end_hour, slot_interval):
-            slot = current.replace(hour=hour, minute=0, second=0, microsecond=0)
+        slot = day_start
+        while slot < day_end:
+            total_slots_generated += 1
 
             for team_name, team_data in teams.items():
-                # Use the combined availability check from AvailabilityChecker
-                if AvailabilityChecker.is_team_available_for_slot(team_data, slot):
+                # Check if team is available AND has enough time for full match
+                if (AvailabilityChecker.is_team_available_for_slot(team_data, slot) and
+                    AvailabilityChecker.can_fit_match(team_data, slot, MATCH_DURATION)):
                     slot_matrix[slot].add(team_name)
 
+            # Only keep slots where at least one team is available
+            if slot not in slot_matrix or len(slot_matrix[slot]) == 0:
+                if slot in slot_matrix:
+                    del slot_matrix[slot]
+            else:
+                slots_with_teams += 1
+
+            slot += slot_interval
+
         current += timedelta(days=1)
+
+    logger.info(f"[SLOT-MATRIX] Generated {slots_with_teams} usable slots (from {total_slots_generated} checked)")
+    logger.info(f"[SLOT-MATRIX] Average teams per slot: {sum(len(teams) for teams in slot_matrix.values()) / max(len(slot_matrix), 1):.1f}")
 
     # Optional: Save JSON debug
     if DEBUG_MODE:
@@ -554,12 +636,20 @@ def generate_slot_matrix(tournament: dict, slot_interval: int = 2) -> dict:
                     "teams": sorted(teamset),
                 })
 
+            debug_summary = {
+                "total_slots_checked": total_slots_generated,
+                "usable_slots": slots_with_teams,
+                "slot_interval_minutes": slot_interval_minutes,
+                "match_duration_minutes": int(MATCH_DURATION.total_seconds() / 60),
+                "slots": debug_data
+            }
+
             with open("debug/slot_matrix_debug.json", "w", encoding="utf-8") as f:
-                json.dump(debug_data, f, indent=2, ensure_ascii=False)
+                json.dump(debug_summary, f, indent=2, ensure_ascii=False)
 
             logger.info("[SLOT-MATRIX] slot_matrix_debug.json saved.")
         except Exception as e:
-            logger.warning(f"[SLOT-MATRIX] Error saving: {e}")
+            logger.warning(f"[SLOT-MATRIX] Error saving debug data: {e}")
 
     return dict(slot_matrix)
 
