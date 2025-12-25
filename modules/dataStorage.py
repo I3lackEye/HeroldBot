@@ -137,6 +137,19 @@ async def validate_channels(bot: discord.Client) -> None:
     """
     logger.info("[CHANNEL CHECKER] Starting channel validation...")
 
+    # Debug: Show bot connection status
+    logger.info(f"[CHANNEL CHECKER] Bot user: {bot.user.name if bot.user else 'Not connected'} (ID: {bot.user.id if bot.user else 'N/A'})")
+    logger.info(f"[CHANNEL CHECKER] Bot is connected to {len(bot.guilds)} server(s)")
+
+    if len(bot.guilds) == 0:
+        logger.error("[CHANNEL CHECKER] ❌ Bot is not connected to any servers!")
+        logger.error("[CHANNEL CHECKER]    Please invite the bot to your Discord server first.")
+        return
+
+    for guild in bot.guilds:
+        logger.info(f"[CHANNEL CHECKER]   - Server: '{guild.name}' (ID: {guild.id})")
+        logger.info(f"[CHANNEL CHECKER]     Text channels visible: {len([c for c in guild.channels if isinstance(c, discord.TextChannel)])}")
+
     # Get all channel names from the Channels dataclass
     channel_names = ["limits", "reminder", "reschedule"]
 
@@ -154,21 +167,26 @@ async def validate_channels(bot: discord.Client) -> None:
         channel = bot.get_channel(channel_id)
 
         if not channel:
-            logger.error(f"[CHANNEL CHECKER] Channel '{name}' with ID {channel_id} was NOT found!")
+            logger.error(f"[CHANNEL CHECKER] ❌ Channel '{name}' with ID {channel_id} was NOT found!")
+            logger.error(f"[CHANNEL CHECKER]    Possible reasons:")
+            logger.error(f"[CHANNEL CHECKER]    1. Bot is not on the server where this channel exists")
+            logger.error(f"[CHANNEL CHECKER]    2. Channel ID is wrong in configs/bot.json")
+            logger.error(f"[CHANNEL CHECKER]    3. Channel was deleted from Discord")
+            logger.error(f"[CHANNEL CHECKER]    4. Bot lacks 'View Channels' permission")
             continue
 
         if not isinstance(channel, discord.TextChannel):
-            logger.warning(f"[CHANNEL CHECKER] Channel '{name}' (ID {channel_id}) is not a TextChannel.")
+            logger.warning(f"[CHANNEL CHECKER] ⚠️ Channel '{name}' (ID {channel_id}) is not a TextChannel.")
 
         perms = channel.permissions_for(channel.guild.me)
 
         if not perms.view_channel:
-            logger.error(f"[CHANNEL CHECKER] Bot has NO visibility on '{name}' (ID {channel_id})!")
+            logger.error(f"[CHANNEL CHECKER] ❌ Bot has NO visibility on '{name}' (ID {channel_id})!")
 
         if not perms.send_messages:
-            logger.error(f"[CHANNEL CHECKER] Bot can NOT write in '{name}' (ID {channel_id})!")
+            logger.error(f"[CHANNEL CHECKER] ❌ Bot can NOT write in '{name}' (ID {channel_id})!")
 
-        logger.info(f"[CHANNEL CHECKER] OK: {name} (ID {channel_id})")
+        logger.info(f"[CHANNEL CHECKER] ✅ OK: '{name}' in '{channel.guild.name}' (ID {channel_id})")
 
     logger.info("[CHANNEL CHECKER] Channel validation completed.")
 
