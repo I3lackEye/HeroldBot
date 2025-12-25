@@ -231,31 +231,9 @@ class AvailabilityChecker:
             return False
 
 
-# ---------------------------------------
-# Helper Functions
-# ---------------------------------------
-def merge_weekend_availability(avail1: dict, avail2: dict) -> dict:
-    """
-    Merges weekend availability of two players/teams.
-    Returns the overlapping time slots for Saturday and Sunday.
-
-    DEPRECATED: Use AvailabilityChecker.merge_availability() instead.
-    """
-    return AvailabilityChecker.merge_availability(avail1, avail2)
-
-
-def calculate_overlap(time_range1: str, time_range2: str) -> str:
-    """
-    Calculates the overlap of two time ranges in format 'HH:MM-HH:MM'.
-
-    DEPRECATED: Use AvailabilityChecker.calculate_overlap() instead.
-
-    :param time_range1: First time range as string.
-    :param time_range2: Second time range as string.
-    :return: The overlapping time range as string 'HH:MM-HH:MM', or '00:00-00:00' if no overlap.
-    """
-    return AvailabilityChecker.calculate_overlap(time_range1, time_range2)
-
+# =======================================
+# TEAM MANAGEMENT FUNCTIONS
+# =======================================
 
 def auto_match_solo():
     """
@@ -322,6 +300,47 @@ def auto_match_solo():
 
     return list(new_teams.keys())
 
+
+async def cleanup_orphan_teams(channel: TextChannel):
+    """
+    Removes teams with only 1 player after registration close
+    and moves them to the solo list.
+    """
+    tournament = load_tournament_data()
+    teams = tournament.get("teams", {})
+    solo = tournament.get("solo", [])
+
+    teams_deleted = 0
+    players_rescued = 0
+
+    for team_name, team_data in list(teams.items()):
+        members = team_data.get("members", [])
+        if len(members) == 1:
+            # Only 1 player → dissolve
+            player = members[0]
+            solo.append(
+                {
+                    "player": player,
+                    "availability": team_data.get("availability", {"saturday": "00:00-23:59", "sunday": "00:00-23:59"}),
+                    "unavailable_dates": team_data.get("unavailable_dates", [])
+                }
+            )
+            del teams[team_name]
+            teams_deleted += 1
+            players_rescued += 1
+
+    tournament["teams"] = teams
+    tournament["solo"] = solo
+    save_tournament_data(tournament)
+
+    await send_cleanup_summary(channel, teams_deleted, players_rescued)
+
+    logger.info(f"[CLEANUP] {teams_deleted} empty teams deleted, {players_rescued} players rescued.")
+
+
+# =======================================
+# SCHEDULE GENERATION FUNCTIONS
+# =======================================
 
 def create_round_robin_schedule(tournament: dict):
     """
@@ -410,65 +429,6 @@ def generate_schedule_overview(matches: list) -> str:
     return description
 
 
-async def cleanup_orphan_teams(channel: TextChannel):
-    """
-    Removes teams with only 1 player after registration close
-    and moves them to the solo list.
-    """
-    tournament = load_tournament_data()
-    teams = tournament.get("teams", {})
-    solo = tournament.get("solo", [])
-
-    teams_deleted = 0
-    players_rescued = 0
-
-    for team_name, team_data in list(teams.items()):
-        members = team_data.get("members", [])
-        if len(members) == 1:
-            # Only 1 player → dissolve
-            player = members[0]
-            solo.append(
-                {
-                    "player": player,
-                    "availability": team_data.get("availability", {"saturday": "00:00-23:59", "sunday": "00:00-23:59"}),
-                    "unavailable_dates": team_data.get("unavailable_dates", [])
-                }
-            )
-            del teams[team_name]
-            teams_deleted += 1
-            players_rescued += 1
-
-    tournament["teams"] = teams
-    tournament["solo"] = solo
-    save_tournament_data(tournament)
-
-    await send_cleanup_summary(channel, teams_deleted, players_rescued)
-
-    logger.info(f"[CLEANUP] {teams_deleted} empty teams deleted, {players_rescued} players rescued.")
-
-
-def parse_start_hour(availability_str: str) -> int:
-    """
-    Extracts the start hour from a time range (e.g. "12:00-20:00").
-    """
-    try:
-        start_time = availability_str.split("-")[0]
-        hour = int(start_time.split(":")[0])
-        return hour
-    except Exception:
-        logger.warning(f"[SLOT-PLANNING] Error parsing availability: {availability_str}")
-        return 10  # Default value 10 AM if something goes wrong
-
-
-def team_available_on_slot(team_data, slot_datetime):
-    """
-    Checks if the team is allowed to play on the slot date (not blacklisted).
-
-    DEPRECATED: Use AvailabilityChecker.is_team_available_for_slot() instead.
-    """
-    return not AvailabilityChecker.is_slot_blacklisted(team_data, slot_datetime)
-
-
 def get_team_time_budget(team_name: str, date: datetime.date, matches: list) -> timedelta:
     """
     Calculates the total time a team is blocked on a specific day through matches + pauses.
@@ -494,53 +454,10 @@ def get_team_time_budget(team_name: str, date: datetime.date, matches: list) -> 
     return total_time
 
 
-def is_team_available_at_time(team_data: dict, slot_datetime: datetime) -> bool:
-    """
-    Checks if a team is available at the given time.
-    Respects explicit time windows in the 'availability' dict for any day.
-    If a team hasn't specified availability for a day, they're considered unavailable.
+# =======================================
+# SLOT GENERATION FUNCTIONS
+# =======================================
 
-    DEPRECATED: Use AvailabilityChecker.is_available_at() instead.
-    """
-    return AvailabilityChecker.is_available_at(team_data, slot_datetime)
-
-
-def get_compatible_slots(team1: dict, team2: dict, global_slots: list) -> list:
-    """
-    Returns a list of slots that are within the common availability of both teams.
-    Expects slot times as UTC (ISO), team availability as { "saturday": "HH:MM-HH:MM", ... }
-    """
-    compatible = []
-
-    # Get team availability
-    avail1 = team1.get("availability", {})
-    avail2 = team2.get("availability", {})
-
-    for slot_str in global_slots:
-        try:
-            slot_dt = datetime.fromisoformat(slot_str).astimezone(ZoneInfo("Europe/Berlin"))
-            day = slot_dt.strftime("%A").lower()  # e.g. "saturday"
-            time_str = slot_dt.strftime("%H:%M")
-
-            # Only if day exists in both
-            if day not in avail1 or day not in avail2:
-                continue
-
-            start1, end1 = avail1[day].split("-")
-            start2, end2 = avail2[day].split("-")
-
-            # Slot must be in both time ranges
-            if start1 <= time_str <= end1 and start2 <= time_str <= end2:
-                compatible.append(slot_str)
-        except Exception as e:
-            logger.warning(f"[SLOTS] Error processing slot {slot_str}: {e}")
-
-    return compatible
-
-
-# ---------------------------------------
-# Main Matchmaker
-# ---------------------------------------
 def generate_slot_matrix(tournament: dict, slot_interval_minutes: int = 60) -> dict:
     """
     Creates a global slot matrix that indicates which teams are available at which slots.
@@ -665,6 +582,10 @@ def get_valid_slots_for_match(team1: str, team2: str, slot_matrix: dict[datetime
 
     return sorted(valid_slots)
 
+
+# =======================================
+# SLOT ASSIGNMENT FUNCTIONS
+# =======================================
 
 def assign_slots_with_matrix(matches: list, slot_matrix: dict[datetime, set[str]]) -> tuple[list, list]:
     """
@@ -803,9 +724,10 @@ def assign_rescue_slots(unassigned_matches, matches, slot_matrix, teams):
     return matches
 
 
-# ------------------
-# Main Assembly
-# ------------------
+# =======================================
+# MAIN ENTRY POINT
+# =======================================
+
 async def generate_and_assign_slots():
     """
     Main function for slot generation and match assignment.
