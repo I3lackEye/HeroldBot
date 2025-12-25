@@ -9,7 +9,7 @@
     "reschedule": "1453848141274152971"
   },
   "roles": {
-    "moderator": ["Moderator", "Lappen des Vertrauens"],
+    "moderator": ["Moderator"],
     "admin": [],
     "dev": ["157268596190478336"],
     "winner": ["1357777322509603046"]
