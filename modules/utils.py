@@ -333,7 +333,7 @@ def finalize_tournament(winning_team: str, winners: list[int], game: str, points
 def generate_team_name(language: str = None) -> str:
     """
     Generates a random team name from adjective and noun lists.
-    If no names are found, a generic name is returned.
+    If no names are found, generates a unique fallback name with UUID.
 
     :param language: Language (optional); default: from config
     :return: Team name as string
@@ -345,7 +345,11 @@ def generate_team_name(language: str = None) -> str:
 
     # Safety check: If file is missing or empty
     if not names or "adjectives" not in names or "nouns" not in names:
-        return "Team_X"
+        import uuid
+        # Generate unique fallback name
+        unique_id = str(uuid.uuid4())[:8]
+        logger.warning(f"[NAMEGEN] Names file missing or empty - using fallback name with ID {unique_id}")
+        return f"Team_{unique_id}"
 
     adjective = random.choice(names["adjectives"])
     noun = random.choice(names["nouns"])

@@ -282,14 +282,20 @@ def auto_match_solo():
             team_name = generate_team_name()
             attempts += 1
             if attempts > 10:
-                logger.error("[MATCHMAKER] ❌ No unique team name found – Aborting.")
+                logger.error("[MATCHMAKER] ❌ No unique team name found – Aborting this pairing.")
+                logger.error(f"[MATCHMAKER]    Players {name1} and {name2} will remain in solo queue.")
+                # Return players to solo queue instead of losing them
+                solo_players.append(p1)
+                solo_players.append(p2)
                 break
-        used_names.add(team_name)
+        else:
+            # Only create team if we successfully found a unique name
+            used_names.add(team_name)
 
-        new_teams[team_name] = {
-            "members": [name1, name2],
-            "availability": overlap,
-        }
+            new_teams[team_name] = {
+                "members": [name1, name2],
+                "availability": overlap,
+            }
 
     if new_teams:
         tournament.setdefault("teams", {}).update(new_teams)

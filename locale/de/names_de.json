@@ -1,5 +1,5 @@
 {
-    "adjektive": [
+    "adjectives": [
       "Mutige", "Wilde", "Eiserne", "Schnelle", "Stille", "Kühne", "Tapfere", "Listige",
       "Freche", "Donnernde", "Flinke", "Mächtige", "Verwegene", "Legendäre", "Lustige",
       "Athletische", "Beglückende", "Elegante", "Fabelhafte", "Feurige", "Grandiose",
@@ -11,7 +11,7 @@
       "Sonnige", "Frostige", "Windige", "Gelangweilte", "Unvergängliche", "Unnachgiebige",
       "Saubere", "Einarmige", "Einbeinige", "Imperiale", "Kaiserliche", "Melancholische", "Verwirrte"
     ],
-    "substantive": [
+    "nouns": [
       "Wölfe", "Drachen", "Falken", "Titanen", "Krieger", "Panther", "Schlangen", "Ninjas",
       "Löwen", "Bären", "Adler", "Haie", "Berserker", "Wächter", "Hobbits", "Goblins", "Ratten",
       "Hühner", "Flöten", "Feen", "Orks", "Elfen", "Vampire", "Lappen", "Seepferdchen", "Einhörner",
