@@ -5,7 +5,7 @@ from discord import Embed, Interaction, Member, app_commands
 from discord.ext import commands
 from discord.ui import Modal, TextInput
 
-# Lokale Module
+# Local modules
 from modules.dataStorage import config, load_tournament_data, save_tournament_data
 from modules.embeds import (
     send_participants_overview,
@@ -29,109 +29,109 @@ from modules.utils import (
 
 
 # ----------------------------------------
-# Slash-Commandsu
+# Slash Commands
 # ----------------------------------------
 class PlayerGroup(app_commands.Group):
     def __init__(self):
-        super().__init__(name="player", description="Befehle für Spieleranmeldung und Verfügbarkeit.")
+        super().__init__(name="player", description="Commands for player registration and availability.")
 
     @app_commands.command(
         name="request_reschedule",
-        description="Fordere eine Neuansetzung für ein Match an."
+        description="Request a rescheduling for a match."
     )
-    @app_commands.describe(match_id="Match-ID, das du verschieben möchtest")
+    @app_commands.describe(match_id="Match ID you want to reschedule")
     async def request_reschedule(self, interaction: Interaction, match_id: int):
         await handle_request_reschedule(interaction, match_id)
 
     @app_commands.command(
         name="update_availability",
-        description="Aktualisiere deine Verfügbarkeiten für das Turnier.",
+        description="Update your availability for the tournament.",
     )
     @app_commands.describe(
-        verfugbarkeit="Allgemeine Verfügbarkeit (z.B. 10:00-20:00)",
-        samstag="Verfügbarkeit am Samstag (z.B. 12:00-18:00)",
-        sonntag="Verfügbarkeit am Sonntag (z.B. 08:00-22:00)",
+        availability="General availability (e.g. 10:00-20:00)",
+        saturday="Availability on Saturday (e.g. 12:00-18:00)",
+        sunday="Availability on Sunday (e.g. 08:00-22:00)",
     )
     async def update_availability(
         self,
         interaction: Interaction,
-        verfugbarkeit: Optional[str] = None,
-        samstag: Optional[str] = None,
-        sonntag: Optional[str] = None,
+        availability: Optional[str] = None,
+        saturday: Optional[str] = None,
+        sunday: Optional[str] = None,
     ):
         """
-        Aktualisiert die Verfügbarkeit eines Spielers im Turnier.
-        Mindestens einer der Parameter (verfugbarkeit, samstag oder sonntag) muss angegeben werden.
+        Updates a player's availability in the tournament.
+        At least one of the parameters (availability, saturday, or sunday) must be provided.
         """
-        if not any([verfugbarkeit, samstag, sonntag]):
+        if not any([availability, saturday, sunday]):
             await interaction.response.send_message(
-                "⚠️ Bitte gib mindestens eine Verfügbarkeit an (verfugbarkeit, samstag oder sonntag).",
+                "⚠️ Please provide at least one availability (availability, saturday, or sunday).",
                 ephemeral=True,
             )
             return
 
-        # Verfügbarkeiten prüfen
+        # Check availability formats
         try:
-            if verfugbarkeit:
-                parse_availability(verfugbarkeit)
-            if samstag:
-                parse_availability(samstag)
-            if sonntag:
-                parse_availability(sonntag)
+            if availability:
+                parse_availability(availability)
+            if saturday:
+                parse_availability(saturday)
+            if sunday:
+                parse_availability(sunday)
         except ValueError as e:
-            await interaction.response.send_message(f"🚫 Ungültiges Format: {str(e)}", ephemeral=True)
+            await interaction.response.send_message(f"🚫 Invalid format: {str(e)}", ephemeral=True)
             return
 
-        # Turnierdaten laden
+        # Load tournament data
         tournament = load_tournament_data()
         updated = False
 
-        # Solo-Teilnehmer aktualisieren
+        # Update solo participants
         for entry in tournament.get("solo", []):
             if entry["player"] == interaction.user.mention:
-                if verfugbarkeit:
-                    entry["verfügbarkeit"] = verfugbarkeit
-                if samstag:
-                    entry["samstag"] = samstag
-                if sonntag:
-                    entry["sonntag"] = sonntag
+                if availability:
+                    entry["availability"] = availability
+                if saturday:
+                    entry["saturday"] = saturday
+                if sunday:
+                    entry["sunday"] = sunday
                 updated = True
                 break
 
-        # Team-Mitglieder aktualisieren
+        # Update team members
         for team_data in tournament.get("teams", {}).values():
             if interaction.user.mention in team_data.get("members", []):
-                if verfugbarkeit:
-                    team_data["verfügbarkeit"] = verfugbarkeit
-                if samstag:
-                    team_data["samstag"] = samstag
-                if sonntag:
-                    team_data["sonntag"] = sonntag
+                if availability:
+                    team_data["availability"] = availability
+                if saturday:
+                    team_data["saturday"] = saturday
+                if sunday:
+                    team_data["sunday"] = sunday
                 updated = True
                 break
 
         if not updated:
             await interaction.response.send_message(
-                "⚠️ Du bist aktuell in keinem Team oder auf der Solo-Liste eingetragen.",
+                "⚠️ You are currently not registered in any team or on the solo list.",
                 ephemeral=True,
             )
             return
 
         save_tournament_data(tournament)
         await interaction.response.send_message(
-            "✅ Deine Verfügbarkeit wurde erfolgreich aktualisiert!", ephemeral=True
+            "✅ Your availability has been successfully updated!", ephemeral=True
         )
 
-    @app_commands.command(name="leave", description="Melde dich vom Turnier ab.")
+    @app_commands.command(name="leave", description="Unregister from the tournament.")
     async def leave(self, interaction: Interaction):
         """
-        Meldet den User vom Turnier ab.
+        Unregisters the user from the tournament.
         """
 
         tournament = load_tournament_data()
 
         if not tournament.get("running", False):
-            await interaction.response.send_message("Momentan läuft kein Turnier.", ephemeral=True)
+            await interaction.response.send_message("No tournament is currently running.", ephemeral=True)
             return
 
         user_mention = interaction.user.mention
@@ -150,91 +150,95 @@ class PlayerGroup(app_commands.Group):
                 other_members = [m for m in found_team_entry.get("members", []) if m != user_mention]
                 del tournament["teams"][found_team]
                 if other_members:
-                    verfugbarkeit = found_team_entry.get("verfügbarkeit", "")
+                    availability = found_team_entry.get("availability", "")
                     tournament.setdefault("solo", []).append(
-                        {"player": other_members[0], "verfügbarkeit": verfugbarkeit}
+                        {"player": other_members[0], "availability": availability}
                     )
 
-                    # Namen auflösen
-                    other_id = int(other_members[0].strip("<@>"))
-                    other_member = interaction.guild.get_member(other_id)
-                    other_name = other_member.display_name if other_member else other_members[0]
+                    # Resolve names
+                    try:
+                        other_id = int(other_members[0].strip("<@!>"))
+                        other_member = interaction.guild.get_member(other_id)
+                        other_name = other_member.display_name if other_member else other_members[0]
+                    except (ValueError, AttributeError):
+                        other_name = other_members[0]
+                        logger.error(f"[LEAVE] Failed to parse member ID: {other_members[0]}")
 
-                    logger.info(f"[LEAVE] {other_name[0]} wurde aus Team {found_team} in die Solo-Liste übernommen.")
+                    logger.info(f"[LEAVE] {other_name} was transferred from team {found_team} to solo list.")
                 save_tournament_data(tournament)
-                logger.info(f"[LEAVE] {user_name} hat Team {found_team} verlassen. Team wurde aufgelöst.")
+                logger.info(f"[LEAVE] {user_name} left team {found_team}. Team was dissolved.")
                 await interaction.response.send_message(
-                    f"✅ Du wurdest erfolgreich von Team {found_team} abgemeldet.",
+                    f"✅ You have been successfully unregistered from team {found_team}.",
                     ephemeral=True,
                 )
                 return
             else:
                 del tournament["teams"][found_team]
                 save_tournament_data(tournament)
-                logger.info(f"[LEAVE] {user_name} hat Team {found_team} verlassen. Turnier war bereits geschlossen.")
-                await interaction.response.send_message(f"✅ Dein Team {found_team} wurde entfernt.", ephemeral=True)
+                logger.info(f"[LEAVE] {user_name} left team {found_team}. Tournament was already closed.")
+                await interaction.response.send_message(f"✅ Your team {found_team} has been removed.", ephemeral=True)
                 return
 
         for entry in tournament.get("solo", []):
             if entry.get("player") == user_mention:
                 tournament["solo"].remove(entry)
                 save_tournament_data(tournament)
-                logger.info(f"[LEAVE] Solo-Spieler {user_name} wurde erfolgreich abgemeldet.")
+                logger.info(f"[LEAVE] Solo player {user_name} was successfully unregistered.")
                 await interaction.response.send_message(
-                    "✅ Du wurdest erfolgreich aus der Solo-Liste entfernt.",
+                    "✅ You have been successfully removed from the solo list.",
                     ephemeral=True,
                 )
                 return
 
-        logger.warning(f"[LEAVE] {user_name} wollte sich abmelden, wurde aber nicht gefunden.")
+        logger.warning(f"[LEAVE] {user_name} wanted to unregister but was not found.")
         await interaction.response.send_message(
-            "⚠ Du bist weder in einem Team noch in der Solo-Liste angemeldet.",
+            "⚠ You are neither registered in a team nor on the solo list.",
             ephemeral=True,
         )
 
-    @app_commands.command(name="participants", description="Liste aller Teilnehmer anzeigen.")
+    @app_commands.command(name="participants", description="Show list of all participants.")
     async def participants(self, interaction: Interaction):
         """
-        Listet alle aktuellen Teilnehmer (Teams und Einzelspieler), alphabetisch sortiert.
+        Lists all current participants (teams and solo players), sorted alphabetically.
         """
         tournament = load_tournament_data()
 
         teams = tournament.get("teams", {})
         solo = tournament.get("solo", [])
 
-        # Teams alphabetisch sortieren
+        # Sort teams alphabetically
         sorted_teams = sorted(teams.items(), key=lambda x: x[0].lower())
 
-        # Solo-Spieler alphabetisch sortieren (nach Mention)
+        # Sort solo players alphabetically (by mention)
         sorted_solo = sorted(solo, key=lambda x: x.get("player", "").lower())
 
         team_lines = []
         for name, team_entry in sorted_teams:
             members = ", ".join(team_entry.get("members", []))
-            ver = team_entry.get("verfügbarkeit", {})
-            samstag = ver.get("samstag", "-")
-            sonntag = ver.get("sonntag", "-")
-            team_lines.append(f"- {name}: {members}\n Samstag: {samstag}, Sonntag: {sonntag}\n")
+            avail = team_entry.get("availability", {})
+            saturday = avail.get("saturday", "-")
+            sunday = avail.get("sunday", "-")
+            team_lines.append(f"- {name}: {members}\n Saturday: {saturday}, Sunday: {sunday}\n")
 
         solo_lines = []
         for solo_entry in sorted_solo:
             solo_lines.append(f"- {solo_entry.get('player')}")
 
-        # Text zusammensetzen
+        # Compose text
         full_text = ""
 
         if team_lines:
             full_text += "**Teams:**\n" + "\n".join(team_lines) + "\n\n"
 
         if solo_lines:
-            full_text += "**Einzelspieler:**\n" + "\n".join(solo_lines)
+            full_text += "**Solo Players:**\n" + "\n".join(solo_lines)
 
         if not full_text:
-            await interaction.response.send_message("❌ Es sind noch keine Teilnehmer angemeldet.", ephemeral=True)
+            await interaction.response.send_message("❌ No participants registered yet.", ephemeral=True)
         else:
             await send_participants_overview(interaction, full_text)
 
-    @app_commands.command(name="join", description="Melde dich solo oder als Team zum Turnier an")
+    @app_commands.command(name="join", description="Register solo or as a team for the tournament")
     async def join(self, interaction: Interaction):
         modal = TeamFullJoinModal()
         await interaction.response.send_modal(modal)
