@@ -150,13 +150,15 @@ async def on_ready():
     # Validate channels and permissions
     logger.info("[STARTUP] Validating channels and permissions...")
     try:
-        validate_channels()
+        await validate_channels(bot)
         logger.info("[STARTUP] ✅ Channel validation passed")
     except Exception as e:
         logger.error(f"[STARTUP] ❌ Channel validation failed: {e}")
 
+    # Validate permissions for all guilds the bot is in
     try:
-        validate_permissions()
+        for guild in bot.guilds:
+            await validate_permissions(guild)
         logger.info("[STARTUP] ✅ Permission validation passed")
     except Exception as e:
         logger.error(f"[STARTUP] ❌ Permission validation failed: {e}")
