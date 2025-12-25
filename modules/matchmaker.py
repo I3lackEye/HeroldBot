@@ -25,47 +25,198 @@ MAX_TIME_BUDGET = timedelta(hours=2)
 
 
 # ---------------------------------------
+# Availability Checker Class
+# ---------------------------------------
+class AvailabilityChecker:
+    """
+    Centralized availability and time range logic.
+    Handles all team availability checking, time range parsing, and overlap calculations.
+    """
+
+    # Day name mapping
+    DAY_NAMES = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
+
+    @staticmethod
+    def parse_time_range(range_str: str) -> Tuple[time, time]:
+        """
+        Parses a time range string 'HH:MM-HH:MM' into (start_time, end_time).
+
+        :param range_str: Time range as string (e.g., "14:00-18:00")
+        :return: Tuple of (start_time, end_time)
+        :raises ValueError: If parsing fails
+        """
+        try:
+            start_str, end_str = range_str.split("-")
+            start_time = datetime.strptime(start_str.strip(), "%H:%M").time()
+            end_time = datetime.strptime(end_str.strip(), "%H:%M").time()
+            return start_time, end_time
+        except Exception as e:
+            raise ValueError(f"Invalid time range format: {range_str}") from e
+
+    @staticmethod
+    def calculate_overlap(range1: str, range2: str) -> str:
+        """
+        Calculates the overlap between two time ranges.
+
+        :param range1: First time range (e.g., "12:00-18:00")
+        :param range2: Second time range (e.g., "14:00-20:00")
+        :return: Overlapping range as string, or "00:00-00:00" if no overlap
+        """
+        try:
+            start1, end1 = AvailabilityChecker.parse_time_range(range1)
+            start2, end2 = AvailabilityChecker.parse_time_range(range2)
+
+            # Convert to datetime for comparison (date doesn't matter, just time)
+            today = datetime.today().date()
+            start1_dt = datetime.combine(today, start1)
+            end1_dt = datetime.combine(today, end1)
+            start2_dt = datetime.combine(today, start2)
+            end2_dt = datetime.combine(today, end2)
+
+            latest_start = max(start1_dt, start2_dt)
+            earliest_end = min(end1_dt, end2_dt)
+
+            if latest_start >= earliest_end:
+                return "00:00-00:00"  # No overlap
+
+            return f"{latest_start.strftime('%H:%M')}-{earliest_end.strftime('%H:%M')}"
+        except ValueError:
+            logger.warning(f"[AVAILABILITY] Error calculating overlap: {range1} vs {range2}")
+            return "00:00-00:00"
+
+    @staticmethod
+    def merge_availability(avail1: dict, avail2: dict, days: Optional[List[str]] = None) -> dict:
+        """
+        Merges two availability dictionaries by calculating overlap for each day.
+
+        :param avail1: First availability dict (e.g., {"saturday": "12:00-18:00"})
+        :param avail2: Second availability dict
+        :param days: List of days to merge (defaults to saturday/sunday)
+        :return: Merged availability dict with overlapping time ranges
+        """
+        if days is None:
+            days = ["saturday", "sunday"]
+
+        result = {}
+        for day in days:
+            range1 = avail1.get(day, "00:00-00:00")
+            range2 = avail2.get(day, "00:00-00:00")
+            result[day] = AvailabilityChecker.calculate_overlap(range1, range2)
+
+        return result
+
+    @staticmethod
+    def is_time_in_range(time_to_check: time, time_range: str) -> bool:
+        """
+        Checks if a specific time falls within a time range.
+
+        :param time_to_check: The time to check
+        :param time_range: Time range string (e.g., "14:00-18:00")
+        :return: True if time is within range
+        """
+        if not time_range or time_range == "00:00-00:00":
+            return False
+
+        try:
+            start_time, end_time = AvailabilityChecker.parse_time_range(time_range)
+            return start_time <= time_to_check < end_time
+        except ValueError:
+            return False
+
+    @staticmethod
+    def is_available_at(team_data: dict, slot_datetime: datetime) -> bool:
+        """
+        Checks if a team is available at the given datetime.
+
+        :param team_data: Team data dict with 'availability' field
+        :param slot_datetime: The datetime to check
+        :return: True if team is available
+        """
+        weekday = slot_datetime.weekday()
+        day_key = AvailabilityChecker.DAY_NAMES[weekday]
+
+        availability = team_data.get("availability", {})
+        time_range = availability.get(day_key)
+
+        if not time_range:
+            return False
+
+        return AvailabilityChecker.is_time_in_range(slot_datetime.time(), time_range)
+
+    @staticmethod
+    def is_slot_blacklisted(team_data: dict, slot_datetime: datetime) -> bool:
+        """
+        Checks if a slot datetime is in the team's blacklisted dates.
+
+        :param team_data: Team data dict with optional 'unavailable_dates' field
+        :param slot_datetime: The datetime to check
+        :return: True if slot is blacklisted
+        """
+        unavailable_dates = set(team_data.get("unavailable_dates", []))
+        slot_date_str = slot_datetime.strftime("%Y-%m-%d")
+        return slot_date_str in unavailable_dates
+
+    @staticmethod
+    def is_team_available_for_slot(team_data: dict, slot_datetime: datetime) -> bool:
+        """
+        Complete availability check: both time range AND blacklist.
+
+        :param team_data: Team data dict
+        :param slot_datetime: The datetime to check
+        :return: True if team is available (not blacklisted AND within time range)
+        """
+        if AvailabilityChecker.is_slot_blacklisted(team_data, slot_datetime):
+            return False
+
+        return AvailabilityChecker.is_available_at(team_data, slot_datetime)
+
+    @staticmethod
+    def has_any_overlap(availability: dict) -> bool:
+        """
+        Checks if an availability dict has any actual availability.
+
+        :param availability: Availability dict
+        :return: True if at least one day has availability
+        """
+        if not availability:
+            return False
+        return any(val != "00:00-00:00" for val in availability.values())
+
+    @staticmethod
+    def get_available_days(availability: dict) -> List[str]:
+        """
+        Returns list of days where team has availability.
+
+        :param availability: Availability dict
+        :return: List of day names with non-zero availability
+        """
+        return [day for day, time_range in availability.items() if time_range != "00:00-00:00"]
+
+
+# ---------------------------------------
 # Helper Functions
 # ---------------------------------------
 def merge_weekend_availability(avail1: dict, avail2: dict) -> dict:
     """
     Merges weekend availability of two players/teams.
     Returns the overlapping time slots for Saturday and Sunday.
+
+    DEPRECATED: Use AvailabilityChecker.merge_availability() instead.
     """
-    result = {}
-    for day in ["saturday", "sunday"]:
-        slot1 = avail1.get(day, "00:00-00:00")
-        slot2 = avail2.get(day, "00:00-00:00")
-        overlap = calculate_overlap(slot1, slot2)
-        result[day] = overlap
-    return result
+    return AvailabilityChecker.merge_availability(avail1, avail2)
 
 
 def calculate_overlap(time_range1: str, time_range2: str) -> str:
     """
     Calculates the overlap of two time ranges in format 'HH:MM-HH:MM'.
 
+    DEPRECATED: Use AvailabilityChecker.calculate_overlap() instead.
+
     :param time_range1: First time range as string.
     :param time_range2: Second time range as string.
     :return: The overlapping time range as string 'HH:MM-HH:MM', or '00:00-00:00' if no overlap.
     """
-
-    def parse_time_range(range_str):
-        start_str, end_str = range_str.split("-")
-        start = datetime.strptime(start_str, "%H:%M")
-        end = datetime.strptime(end_str, "%H:%M")
-        return start, end
-
-    start1, end1 = parse_time_range(time_range1)
-    start2, end2 = parse_time_range(time_range2)
-
-    latest_start = max(start1, start2)
-    earliest_end = min(end1, end2)
-
-    if latest_start >= earliest_end:
-        return "00:00-00:00"  # No overlap
-
-    return f"{latest_start.strftime('%H:%M')}-{earliest_end.strftime('%H:%M')}"
+    return AvailabilityChecker.calculate_overlap(time_range1, time_range2)
 
 
 def auto_match_solo():
@@ -97,15 +248,15 @@ def auto_match_solo():
         avail1 = p1.get("availability", {})
         avail2 = p2.get("availability", {})
 
-        overlap = merge_weekend_availability(avail1, avail2)
+        overlap = AvailabilityChecker.merge_availability(avail1, avail2)
 
         # Validate that there's at least one day with actual overlap
-        if not overlap or all(val == "00:00-00:00" for val in overlap.values()):
+        if not AvailabilityChecker.has_any_overlap(overlap):
             logger.warning(f"[MATCHMAKER] ❌ No common availability for {name1} and {name2} – Team will not be created.")
             continue
 
         # Log which days have overlap for debugging
-        overlapping_days = [day for day, time_range in overlap.items() if time_range != "00:00-00:00"]
+        overlapping_days = AvailabilityChecker.get_available_days(overlap)
         logger.debug(f"[MATCHMAKER] ✅ Overlap found on: {', '.join(overlapping_days)}")
 
         team_name = generate_team_name()
@@ -273,11 +424,11 @@ def parse_start_hour(availability_str: str) -> int:
 
 def team_available_on_slot(team_data, slot_datetime):
     """
-    Checks if the team is allowed to play on the slot date (blacklisted dates).
+    Checks if the team is allowed to play on the slot date (not blacklisted).
+
+    DEPRECATED: Use AvailabilityChecker.is_team_available_for_slot() instead.
     """
-    unavailable = set(team_data.get("unavailable_dates", []))
-    slot_date_str = slot_datetime.strftime("%Y-%m-%d")
-    return slot_date_str not in unavailable
+    return not AvailabilityChecker.is_slot_blacklisted(team_data, slot_datetime)
 
 
 def get_team_time_budget(team_name: str, date: datetime.date, matches: list) -> timedelta:
@@ -310,33 +461,10 @@ def is_team_available_at_time(team_data: dict, slot_datetime: datetime) -> bool:
     Checks if a team is available at the given time.
     Respects explicit time windows in the 'availability' dict for any day.
     If a team hasn't specified availability for a day, they're considered unavailable.
+
+    DEPRECATED: Use AvailabilityChecker.is_available_at() instead.
     """
-    weekday = slot_datetime.weekday()  # 0=Monday, 5=Saturday, 6=Sunday
-    time_only = slot_datetime.time()
-
-    # Map weekday number to day name
-    day_names = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
-    day_key = day_names[weekday]
-
-    availability = team_data.get("availability", {})
-    time_range = availability.get(day_key)
-
-    if not time_range:
-        # No time specified for this day = not available
-        return False
-
-    # Check if time range is "00:00-00:00" (explicitly unavailable)
-    if time_range == "00:00-00:00":
-        return False
-
-    try:
-        start_str, end_str = time_range.split("-")
-        start_time = datetime.strptime(start_str, "%H:%M").time()
-        end_time = datetime.strptime(end_str, "%H:%M").time()
-        return start_time <= time_only < end_time
-    except Exception as e:
-        logger.warning(f"[AVAILABILITY] Error parsing time: {time_range} ({e})")
-        return False  # If parsing fails, assume unavailable for safety
+    return AvailabilityChecker.is_available_at(team_data, slot_datetime)
 
 
 def get_compatible_slots(team1: dict, team2: dict, global_slots: list) -> list:
@@ -406,10 +534,8 @@ def generate_slot_matrix(tournament: dict, slot_interval: int = 2) -> dict:
             slot = current.replace(hour=hour, minute=0, second=0, microsecond=0)
 
             for team_name, team_data in teams.items():
-                if (
-                    team_available_on_slot(team_data, slot)
-                    and is_team_available_at_time(team_data, slot)
-                ):
+                # Use the combined availability check from AvailabilityChecker
+                if AvailabilityChecker.is_team_available_for_slot(team_data, slot):
                     slot_matrix[slot].add(team_name)
 
         current += timedelta(days=1)
