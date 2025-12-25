@@ -9,7 +9,7 @@ from discord import app_commands
 from discord.ext import commands
 
 # Local modules
-from modules import poll, tournament, task_manager
+from modules import poll, tournament
 from modules.config import CONFIG
 from modules.dataStorage import (
     DEBUG_MODE,
@@ -22,7 +22,7 @@ from modules.dataStorage import (
 )
 from modules.logger import logger
 from modules.reminder import match_reminder_loop
-from modules.task_manager import add_task, cancel_all_tasks, get_all_tasks
+from modules.task_manager import add_task, cancel_all_tasks
 
 # Important
 load_env()
@@ -125,7 +125,9 @@ async def on_ready():
 
     # Check essential files
     required_files = [
-        "configs/config.json",
+        "configs/bot.json",
+        "configs/tournament.json",
+        "configs/features.json",
         "data/data.json",
         "data/tournament.json",
         "data/games.json",
@@ -140,25 +142,52 @@ async def on_ready():
             try:
                 with open(path, "r", encoding="utf-8") as f:
                     json.load(f)
-                logger.info(f"[STARTUP] File OK: {path}")
+                logger.info(f"[STARTUP] ✅ File OK: {path}")
             except (json.JSONDecodeError, IOError) as e:
                 logger.error(f"[STARTUP] ❌ Error parsing {path}: {e}")
     logger.info("[STARTUP] File validation completed.")
 
+    # Validate channels and permissions
+    logger.info("[STARTUP] Validating channels and permissions...")
+    try:
+        validate_channels()
+        logger.info("[STARTUP] ✅ Channel validation passed")
+    except Exception as e:
+        logger.error(f"[STARTUP] ❌ Channel validation failed: {e}")
+
+    try:
+        validate_permissions()
+        logger.info("[STARTUP] ✅ Permission validation passed")
+    except Exception as e:
+        logger.error(f"[STARTUP] ❌ Permission validation failed: {e}")
+
+    # Debug dump if enabled
+    if DEBUG_MODE:
+        try:
+            debug_dump_configs()
+            logger.info("[STARTUP] ✅ Debug configuration dump completed")
+        except Exception as e:
+            logger.error(f"[STARTUP] ❌ Debug dump failed: {e}")
+
     # Stop old tasks
-    task_manager.cancel_all_tasks()
-    logger.info("[STARTUP] Old background tasks terminated.")
+    try:
+        cancel_all_tasks()
+        logger.info("[STARTUP] ✅ Old background tasks terminated")
+    except Exception as e:
+        logger.error(f"[STARTUP] ⚠️ Error terminating old tasks: {e}")
 
-    # Get reminder channel from config
-    reminder_channel_id = CONFIG.get_channel_id("reminder")
-    channel = bot.get_channel(reminder_channel_id)
+    # Start reminder system
+    try:
+        reminder_channel_id = CONFIG.get_channel_id("reminder")
+        channel = bot.get_channel(reminder_channel_id)
 
-    if channel:
-        task_manager.add_task("reminder_loop", bot.loop.create_task(match_reminder_loop(channel)))
-        logger.info("[STARTUP] Reminder subsystem started")
-    else:
-        logger.error(f"[REMINDER] ❌ Reminder channel with ID {reminder_channel_id} not found!")
-
+        if channel:
+            add_task("reminder_loop", bot.loop.create_task(match_reminder_loop(channel)))
+            logger.info("[STARTUP] ✅ Reminder subsystem started")
+        else:
+            logger.error(f"[STARTUP] ❌ Reminder channel with ID {reminder_channel_id} not found!")
+    except Exception as e:
+        logger.error(f"[STARTUP] ❌ Failed to start reminder system: {e}")
 
     # Resync slash commands
     try:
@@ -166,26 +195,96 @@ async def on_ready():
         if len(synced) == 0:
             logger.warning("[STARTUP] ⚠️ No slash commands synchronized.")
         else:
-            logger.info(f"[STARTUP] Slash commands synchronized ({len(synced)} commands).")
+            logger.info(f"[STARTUP] ✅ Slash commands synchronized ({len(synced)} commands).")
     except Exception as e:
         logger.error(f"[STARTUP] ❌ Slash command sync failed: {e}")
 
     logger.info("[STARTUP] ✅ Initialization completed.\n")
 
 
+@bot.event
+async def on_error(event, *args, **kwargs):
+    """Global error handler for events."""
+    logger.error(f"[ERROR] Error in event '{event}': {args}, {kwargs}", exc_info=True)
+
+
+@bot.tree.error
+async def on_app_command_error(interaction: discord.Interaction, error: app_commands.AppCommandError):
+    """Global error handler for slash commands."""
+    if isinstance(error, app_commands.CommandOnCooldown):
+        await interaction.response.send_message(
+            f"⏳ Command is on cooldown. Try again in {error.retry_after:.1f} seconds.",
+            ephemeral=True
+        )
+    elif isinstance(error, app_commands.MissingPermissions):
+        await interaction.response.send_message(
+            "❌ You don't have permission to use this command.",
+            ephemeral=True
+        )
+    elif isinstance(error, app_commands.CommandNotFound):
+        logger.warning(f"[COMMAND] Command not found: {interaction.command.name if interaction.command else 'unknown'}")
+    else:
+        logger.error(f"[COMMAND ERROR] Error in command '{interaction.command.name if interaction.command else 'unknown'}': {error}", exc_info=error)
+        try:
+            if not interaction.response.is_done():
+                await interaction.response.send_message(
+                    "❌ An error occurred while executing this command. Please try again or contact an admin.",
+                    ephemeral=True
+                )
+            else:
+                await interaction.followup.send(
+                    "❌ An error occurred while executing this command.",
+                    ephemeral=True
+                )
+        except Exception:
+            pass  # Fail silently if we can't send error message
+
+
 # ========== LOAD EXTENSIONS & START BOT ==========
 async def main():
+    """Main entry point for the bot. Loads extensions and starts the bot."""
+    logger.info("[SYSTEM] Starting bot initialization...")
+
+    # Track extension loading
+    loaded_extensions = []
+    failed_extensions = []
+
     # Load extensions/cogs
     for ext in EXTENSIONS:
         try:
             await bot.load_extension(ext)
-            logger.info(f"[SYSTEM] Extension loaded: {ext}")
+            loaded_extensions.append(ext)
+            logger.info(f"[SYSTEM] ✅ Extension loaded: {ext}")
         except Exception as e:
-            logger.error(f"[SYSTEM] Error loading extension {ext}: {e}")
+            failed_extensions.append(ext)
+            logger.error(f"[SYSTEM] ❌ Error loading extension {ext}: {e}")
+
+    # Summary of extension loading
+    logger.info(f"[SYSTEM] Extension loading summary: {len(loaded_extensions)}/{len(EXTENSIONS)} loaded successfully")
+    if failed_extensions:
+        logger.warning(f"[SYSTEM] Failed extensions: {', '.join(failed_extensions)}")
+
+    # Validate TOKEN before starting
+    if not TOKEN:
+        logger.critical("[SYSTEM] ❌ CRITICAL: Discord bot token not found! Check your .env file.")
+        return
 
     # Start bot (blocks until the end)
-    await bot.start(TOKEN)
+    try:
+        logger.info("[SYSTEM] Starting Discord bot connection...")
+        await bot.start(TOKEN)
+    except discord.LoginFailure:
+        logger.critical("[SYSTEM] ❌ CRITICAL: Login failed - invalid bot token!")
+    except discord.PrivilegedIntentsRequired:
+        logger.critical("[SYSTEM] ❌ CRITICAL: Privileged intents required - enable them in Discord Developer Portal!")
+    except Exception as e:
+        logger.critical(f"[SYSTEM] ❌ CRITICAL: Bot crashed during startup: {e}")
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        logger.info("[SYSTEM] Bot shutdown requested by user (Ctrl+C)")
+    except Exception as e:
+        logger.critical(f"[SYSTEM] ❌ CRITICAL: Unexpected error in main loop: {e}")
