@@ -1,94 +1,94 @@
 # 🛡️ HeroldBot
 
-> Dein zuverlässiger Assistent für die Organisation und Verwaltung von Discord-Turnieren.
+> Your reliable assistant for organizing and managing Discord tournaments.
 
-Ein robuster Discord-Bot für automatisierte Turnierverwaltung mit intelligenter Zeitplanung, Verfügbarkeitsmanagement und umfassenden Statistiken.
+A robust Discord bot for automated tournament management with intelligent scheduling, availability management, and comprehensive statistics.
 
 ---
 
-## ✨ Hauptmerkmale
+## ✨ Key Features
 
-### 🎯 Kernfunktionen
-- 🗳️ **Spielauswahl per Abstimmung**: Emoji-Reaktions-Umfragen zur Wahl des Turnierspiels
-- 📥 **Flexible Anmeldung**: Solo-Spieler oder fertige Teams mit individuellen Verfügbarkeiten
-- 🎮 **Intelligentes Matchmaking**:
-  - Automatische Paarung von Solo-Spielern basierend auf gemeinsamen Verfügbarkeiten
-  - Round-Robin-Spielplanerstellung für faire Turniere
-  - Verfügbarkeitsbasierte Slot-Zuweisung mit intelligenter Pausenregelung
-  - Rescue-Modus für schwer planbare Matches
-- 🔄 **Flexibles Reschedule-System**:
-  - Verschiebungsanfragen mit automatischer Slot-Suche
-  - Abstimmung per Discord-Buttons (✅/❌)
-  - Automatische Turnierverlängerung bei Bedarf
-  - 24-Stunden-Timeout für Abstimmungen
-- 🔔 **Automatische Erinnerungen**:
-  - Match-Reminder 1 Stunde vor Spielbeginn
-  - Direkte Erwähnung aller betroffenen Spieler
-  - Kontinuierlicher Background-Loop
-- 📊 **Umfassende Statistiken**:
-  - Spieler: Siege, Teilnahmen, Lieblingsspiel, Winrate
-  - Turnier: Match-Historie, MVP-Ranking, Gesamtsieger
-  - Globale Bestenlisten und Turnierarchiv
+### 🎯 Core Functionality
+- 🗳️ **Game Selection via Poll**: Emoji reaction polls to vote for tournament games
+- 📥 **Flexible Registration**: Solo players or pre-formed teams with individual availability
+- 🎮 **Intelligent Matchmaking**:
+  - Automatic pairing of solo players based on common availability
+  - Round-robin tournament bracket generation for fair play
+  - Availability-based slot assignment with smart pause enforcement
+  - Rescue mode for difficult-to-schedule matches
+- 🔄 **Flexible Reschedule System**:
+  - Reschedule requests with automatic slot search
+  - Voting via Discord buttons (✅/❌)
+  - Automatic tournament extension when needed
+  - 24-hour timeout for voting
+- 🔔 **Automatic Reminders**:
+  - Match reminders 1 hour before start
+  - Direct mention of all affected players
+  - Continuous background loop
+- 📊 **Comprehensive Statistics**:
+  - Players: Wins, participations, favorite game, win rate
+  - Tournament: Match history, MVP ranking, overall winner
+  - Global leaderboards and tournament archive
 
-### 🏗️ Technische Features
-- ⚙️ **Modular Config System**: Getrennte Konfigurationsdateien für Bot, Turnier und Features
-- 💾 **Atomic File Writes**: Datensicherheit auch bei Abstürzen
-- 🔐 **Rollenbasierte Berechtigungen**: Admin, Moderator, Developer-Rollen
-- 🌍 **Mehrsprachigkeit**: Deutsch/Englisch mit lokalisierten Embeds
-- 🕒 **Timezone-Aware**: Korrekte Zeitverarbeitung mit ZoneInfo
-- 📦 **Automatische Backups**: Turnierarchiv mit JSON und ZIP-Export
-- 🧪 **Umfangreiche Dev-Tools**: Dummy-Generatoren, Diagnose, Testszenarien
-- 🛡️ **Robuste Error-Handling**: Graceful degradation bei Fehlern
-- 📝 **Typed Configuration**: Type-safe Config mit Python Dataclasses
+### 🏗️ Technical Features
+- ⚙️ **Modular Config System**: Separate configuration files for bot, tournament, and features
+- 💾 **Atomic File Writes**: Data safety even during crashes
+- 🔐 **Role-based Permissions**: Admin, Moderator, Developer roles
+- 🌍 **Multi-language**: German/English with localized embeds
+- 🕒 **Timezone-Aware**: Correct time processing with ZoneInfo
+- 📦 **Automatic Backups**: Tournament archive with JSON and ZIP export
+- 🧪 **Extensive Dev Tools**: Dummy generators, diagnostics, test scenarios
+- 🛡️ **Robust Error Handling**: Graceful degradation on failures
+- 📝 **Typed Configuration**: Type-safe config with Python Dataclasses
 
 ---
 
 ## 🚀 Installation
 
-### Voraussetzungen
+### Prerequisites
 - Python 3.13+
 - Discord Bot Token ([Discord Developer Portal](https://discord.com/developers/applications))
-- Server mit aktivierten Privileged Gateway Intents (Members, Message Content)
+- Server with enabled Privileged Gateway Intents (Members, Message Content)
 
 ### Setup
 
 ```bash
-# Repository klonen
+# Clone repository
 git clone https://github.com/I3lackEye/HeroldBot.git
 cd HeroldBot
 
-# Virtual Environment erstellen
+# Create virtual environment
 python3.13 -m venv .venv
-source .venv/bin/activate  # oder .venv\Scripts\activate auf Windows
+source .venv/bin/activate  # or .venv\Scripts\activate on Windows
 
-# Dependencies installieren
+# Install dependencies
 pip install -r requirements.txt
 
-# Umgebungsvariablen konfigurieren
+# Configure environment variables
 cp .env.example .env
-# .env editieren und TOKEN eintragen
+# Edit .env and add your TOKEN
 
-# Bot starten
+# Start bot
 python run.py
 
-# Alternative: Als Modul starten
+# Alternative: Run as module
 python -m modules.main
 ```
 
 ---
 
-## ⚙️ Konfiguration
+## ⚙️ Configuration
 
-### Konfigurationsdateien
+### Configuration Files
 
-#### **`.env`** – Sensible Daten (niemals committen!)
+#### **`.env`** – Sensitive Data (never commit!)
 ```env
-TOKEN=dein_discord_bot_token_hier
+TOKEN=your_discord_bot_token_here
 DEBUG_MODE=False
 REMINDER_ENABLED=True
 ```
 
-#### **`configs/bot.json`** – Bot-Einstellungen
+#### **`configs/bot.json`** – Bot Settings
 ```json
 {
   "data_paths": {
@@ -112,7 +112,7 @@ REMINDER_ENABLED=True
 }
 ```
 
-#### **`configs/tournament.json`** – Turnier-Parameter
+#### **`configs/tournament.json`** – Tournament Parameters
 ```json
 {
   "match_duration_minutes": 90,
@@ -128,7 +128,7 @@ REMINDER_ENABLED=True
 }
 ```
 
-#### **`configs/features.json`** – Feature-Toggles
+#### **`configs/features.json`** – Feature Toggles
 ```json
 {
   "enable_auto_match_solo": true,
@@ -137,225 +137,225 @@ REMINDER_ENABLED=True
 }
 ```
 
-### Sprachpakete
-- Embeds und Texte in `/locale/{language}/embeds/`
-- Teamname-Generator in `/locale/{language}/names_{language}.json`
-- Unterstützt: `de`, `en` (einfach erweiterbar)
+### Language Packs
+- Embeds and texts in `/locale/{language}/embeds/`
+- Team name generator in `/locale/{language}/names_{language}.json`
+- Supported: `de`, `en` (easily extensible)
 
 ---
 
-## 📚 Slash-Commands Übersicht
+## 📚 Slash Commands Overview
 
-### 🧍 Anmeldung & Verfügbarkeit
-| Command | Beschreibung |
+### 🧍 Registration & Availability
+| Command | Description |
 |---------|-------------|
-| `/player join` | Anmelden (Solo oder mit Partner via Modal) |
-| `/player leave` | Vom Turnier abmelden |
-| `/player update_availability` | Verfügbarkeiten aktualisieren |
-| `/player participants` | Aktuelle Teilnehmerliste anzeigen |
+| `/player join` | Register (solo or with partner via modal) |
+| `/player leave` | Leave the tournament |
+| `/player update_availability` | Update your availability |
+| `/player participants` | Show current participant list |
 
-### 📜 Turnierinfos
-| Command | Beschreibung |
+### 📜 Tournament Info
+| Command | Description |
 |---------|-------------|
-| `/info help` | Übersicht aller Bot-Befehle |
-| `/info match_schedule` | Aktueller Spielplan mit Zeitangaben |
-| `/info team` | Eigenes Team & Verfügbarkeit anzeigen |
-| `/info list_games` | Verfügbare Spiele anzeigen |
+| `/info help` | Overview of all bot commands |
+| `/info match_schedule` | Current match schedule with times |
+| `/info team` | Show your team & availability |
+| `/info list_games` | Show available games |
 
-### 🔄 Matchorganisation
-| Command | Beschreibung |
+### 🔄 Match Organization
+| Command | Description |
 |---------|-------------|
-| `/player request_reschedule` | Matchverschiebung beantragen (mit Abstimmung) |
-| `/test_reminder` | Match-Reminder manuell testen (nur Dev) |
+| `/player request_reschedule` | Request match reschedule (with voting) |
+| `/test_reminder` | Manually test match reminder (Dev only) |
 
-### 📊 Statistiken
-| Command | Beschreibung |
+### 📊 Statistics
+| Command | Description |
 |---------|-------------|
-| `/stats stats` | Eigene oder fremde Statistiken anzeigen |
-| `/stats overview` | Bestenliste, Turnierübersicht, Match-Historie |
-| `/stats status` | Aktueller Turnierstatus (Teams, Matches, Zeitplan) |
+| `/stats stats` | Show your or others' statistics |
+| `/stats overview` | Leaderboard, tournament overview, match history |
+| `/stats status` | Current tournament status (teams, matches, schedule) |
 
-### 🛡️ Admin-Befehle
-| Command | Beschreibung |
+### 🛡️ Admin Commands
+| Command | Description |
 |---------|-------------|
-| `/admin start_tournament` | Neues Turnier starten (Modal mit Zeitangaben) |
-| `/admin end_tournament` | Turnier beenden & archivieren |
-| `/admin close_registration` | Anmeldung manuell schließen |
-| `/admin archive_tournament` | Turnier in Archiv verschieben |
-| `/admin sign_out` | Spieler/Team zwangsweise abmelden |
-| `/admin add_win` | Sieg manuell vergeben |
-| `/admin award_overall_winner` | Gesamtsieger festlegen |
-| `/admin manage_game` | Spiele hinzufügen/entfernen |
-| `/admin end_poll` | Spielauswahl-Umfrage manuell beenden |
-| `/admin reload` | Slash-Commands neu synchronisieren |
-| `/admin reset_reschedule` | Reschedule-Anfrage zurücksetzen |
-| `/admin export_data` | Turnierdaten als ZIP exportieren (per DM) |
+| `/admin start_tournament` | Start new tournament (modal with times) |
+| `/admin end_tournament` | End tournament & archive |
+| `/admin close_registration` | Manually close registration |
+| `/admin archive_tournament` | Move tournament to archive |
+| `/admin sign_out` | Force sign-out player/team |
+| `/admin add_win` | Manually award win |
+| `/admin award_overall_winner` | Set overall winner |
+| `/admin manage_game` | Add/remove games |
+| `/admin end_poll` | Manually end game selection poll |
+| `/admin reload` | Re-sync slash commands |
+| `/admin reset_reschedule` | Reset reschedule request |
+| `/admin export_data` | Export tournament data as ZIP (via DM) |
 
-### 🧪 Developer-Tools
-| Command | Beschreibung |
+### 🧪 Developer Tools
+| Command | Description |
 |---------|-------------|
-| `/dev simulate_full_flow` | Kompletten Turnierdurchlauf simulieren |
-| `/dev generate_dummy` | Testdaten generieren (6 Szenarien: easy, hard, blocked, mixed, realistic, custom) |
-| `/dev reset_tournament` | Turnierdaten auf Standard zurücksetzen |
-| `/dev show_state` | Aktuellen Turnierstatus detailliert anzeigen |
-| `/dev test_matchmaker` | Matchmaker-Algorithmus testen (Dry-Run) |
-| `/dev generate_matches` | Matches generieren und zuweisen |
-| `/dev diagnose` | Systemdiagnose (Channel, Rollen, Tasks, Config) |
-| `/dev stop` | Bot sicher herunterfahren |
+| `/dev simulate_full_flow` | Simulate complete tournament flow |
+| `/dev generate_dummy` | Generate test data (6 scenarios: easy, hard, blocked, mixed, realistic, custom) |
+| `/dev reset_tournament` | Reset tournament data to default |
+| `/dev show_state` | Show detailed tournament status |
+| `/dev test_matchmaker` | Test matchmaker algorithm (dry-run) |
+| `/dev generate_matches` | Generate and assign matches |
+| `/dev diagnose` | System diagnostics (channels, roles, tasks, config) |
+| `/dev stop` | Safely shutdown bot |
 
 ---
 
-## 🏗️ Projektstruktur
+## 🏗️ Project Structure
 
 ```
 HeroldBot/
 ├── modules/
-│   ├── main.py              # Bot-Einstiegspunkt mit Error-Handling
-│   ├── config.py            # Zentrales Config-Management (NEW)
-│   ├── dataStorage.py       # Datenpersistenz mit Atomic Writes
-│   ├── matchmaker.py        # Matchmaking & Scheduling-Algorithmen
-│   ├── players.py           # Anmeldung & Verfügbarkeiten
-│   ├── tournament.py        # Turnier-Lifecycle-Management
-│   ├── stats.py             # Statistiken & Rankings
-│   ├── embeds.py            # Discord-Embed-Templates
-│   ├── admin_tools.py       # Admin-Kommandos
-│   ├── dev_tools.py         # Developer-Utilities
-│   ├── info.py              # Info-Commands
-│   ├── reminder.py          # Match-Reminder-System
-│   ├── reschedule.py        # Reschedule-Logic
-│   ├── poll.py              # Spielauswahl-Abstimmungen
-│   ├── archive.py           # Turnier-Archivierung
-│   ├── logger.py            # Logging-Setup
-│   ├── utils.py             # Helper-Funktionen
-│   └── task_manager.py      # Background-Task-Verwaltung
+│   ├── main.py              # Bot entry point with error handling
+│   ├── config.py            # Central config management (NEW)
+│   ├── dataStorage.py       # Data persistence with atomic writes
+│   ├── matchmaker.py        # Matchmaking & scheduling algorithms
+│   ├── players.py           # Registration & availability
+│   ├── tournament.py        # Tournament lifecycle management
+│   ├── stats.py             # Statistics & rankings
+│   ├── embeds.py            # Discord embed templates
+│   ├── admin_tools.py       # Admin commands
+│   ├── dev_tools.py         # Developer utilities
+│   ├── info.py              # Info commands
+│   ├── reminder.py          # Match reminder system
+│   ├── reschedule.py        # Reschedule logic
+│   ├── poll.py              # Game selection polls
+│   ├── archive.py           # Tournament archiving
+│   ├── logger.py            # Logging setup
+│   ├── utils.py             # Helper functions
+│   └── task_manager.py      # Background task management
 ├── configs/
-│   ├── bot.json             # Bot-Konfiguration
-│   ├── tournament.json      # Turnier-Parameter
-│   └── features.json        # Feature-Flags
+│   ├── bot.json             # Bot configuration
+│   ├── tournament.json      # Tournament parameters
+│   └── features.json        # Feature flags
 ├── locale/
-│   ├── de/embeds/           # Deutsche Embed-Templates
-│   ├── en/embeds/           # Englische Embed-Templates
-│   └── {lang}/names_{lang}.json  # Teamname-Generatoren
+│   ├── de/embeds/           # German embed templates
+│   ├── en/embeds/           # English embed templates
+│   └── {lang}/names_{lang}.json  # Team name generators
 ├── data/
-│   ├── data.json            # Globale Spielerdaten & Stats
-│   ├── tournament.json      # Aktuelles Turnier
-│   └── games.json           # Verfügbare Spiele
-├── views/                   # Discord UI Components (Buttons, Modals)
-├── backups/                 # Automatische Backups
-├── archive/                 # Archivierte Turniere
-├── logs/                    # Log-Dateien
-├── .env                     # Umgebungsvariablen (nicht versioniert)
-├── .gitignore              # Git-Ignore-Rules
-├── requirements.txt         # Python-Dependencies
-└── README.md               # Diese Datei
+│   ├── data.json            # Global player data & stats
+│   ├── tournament.json      # Current tournament
+│   └── games.json           # Available games
+├── views/                   # Discord UI components (buttons, modals)
+├── backups/                 # Automatic backups
+├── archive/                 # Archived tournaments
+├── logs/                    # Log files
+├── .env                     # Environment variables (not versioned)
+├── .gitignore              # Git ignore rules
+├── requirements.txt         # Python dependencies
+└── README.md               # This file
 ```
 
 ---
 
-## 🔐 Sicherheit
+## 🔐 Security
 
-- ✅ `.env` niemals öffentlich machen oder committen!
-- ✅ `.gitignore` schützt `.env`, `/data/`, `/backups/`, `/logs/` und `__pycache__/`
-- ✅ Alle Admin-Funktionen sind rollenbasiert geschützt
-- ✅ Atomic File Writes verhindern Datenverlust bei Crashes
-- ✅ Input-Validierung für alle User-Eingaben
-- ✅ Automatische Backups vor kritischen Operationen
+- ✅ Never commit or share `.env` publicly!
+- ✅ `.gitignore` protects `.env`, `/data/`, `/backups/`, `/logs/`, and `__pycache__/`
+- ✅ All admin functions are role-protected
+- ✅ Atomic file writes prevent data loss on crashes
+- ✅ Input validation for all user inputs
+- ✅ Automatic backups before critical operations
 
 ---
 
-## 🧠 Intelligente Features im Detail
+## 🧠 Intelligent Features in Detail
 
-### Verfügbarkeitsbasiertes Matchmaking
-1. **Slot Matrix Generation**: Erstellt globale Zeitfenster basierend auf Teamverfügbarkeiten
-2. **Overlap Detection**: Findet optimale Spielzeiten für beide Teams
-3. **Pause Enforcement**: Garantiert Mindestpausen zwischen Matches
-4. **Time Budget Tracking**: Verhindert Überlastung einzelner Spieltage
-5. **Rescue Mode**: Weist schwierige Matches mit relaxierten Regeln zu
+### Availability-Based Matchmaking
+1. **Slot Matrix Generation**: Creates global time windows based on team availability
+2. **Overlap Detection**: Finds optimal play times for both teams
+3. **Pause Enforcement**: Guarantees minimum breaks between matches
+4. **Time Budget Tracking**: Prevents overloading individual game days
+5. **Rescue Mode**: Assigns difficult matches with relaxed rules
 
 ### Solo-Player Auto-Matching
-- Merged Verfügbarkeiten von Solo-Spielern
-- Nur Teams mit echtem Zeitüberschnitt werden erstellt
-- Automatische Team-Namen-Generierung aus Wörterbuch
-- Orphan-Team-Cleanup bei ungeraden Spielerzahlen
+- Merges availability of solo players
+- Only creates teams with actual time overlap
+- Automatic team name generation from dictionary
+- Orphan team cleanup for odd player numbers
 
-### Reschedule-System
-- Findet automatisch freie Slots nach Turnierende
-- Verlängert Turnier bei Bedarf
-- DM-Benachrichtigungen an alle betroffenen Spieler
-- Button-basierte Abstimmung (Konsens erforderlich)
-- 24h Timeout mit automatischer Ablehnung
-
----
-
-## 🛣️ Roadmap V3 (geplant)
-
-- 🌀 **Flexible Turniermodi**: Double Elimination, Swiss System, Gruppenphase
-- 🎨 **Custom Themes**: Anpassbare Embed-Farben und -Designs
-- 🌐 **Erweiterte Mehrsprachigkeit**: Weitere Sprachen, Runtime-Sprachumschaltung
-- 📆 **Benutzerdefinierte Spieltage**: Flexiblere Turnierzeiträume
-- 🎁 **Belohnungssystem**: Automatische Key-Vergabe für Gewinner
-- 📅 **Kalenderintegration**: iCal-Export für Matches
-- 🧪 **Unit Tests & CI/CD**: Automatisierte Tests mit GitHub Actions
-- 📈 **Analytics Dashboard**: Webinterface für Turnier-Insights
-- 🔗 **API**: REST-API für externe Integrationen
-- 🤖 **AI-Features**: Intelligente Spieler-Empfehlungen, automatische Konfliktlösung
+### Reschedule System
+- Automatically finds free slots after tournament end
+- Extends tournament when needed
+- DM notifications to all affected players
+- Button-based voting (consensus required)
+- 24h timeout with automatic rejection
 
 ---
 
-## 📊 Technische Details
+## 🛣️ Roadmap V3 (Planned)
+
+- 🌀 **Flexible Tournament Modes**: Double Elimination, Swiss System, Group Stage
+- 🎨 **Custom Themes**: Customizable embed colors and designs
+- 🌐 **Extended Multi-language**: More languages, runtime language switching
+- 📆 **Custom Game Days**: More flexible tournament periods
+- 🎁 **Reward System**: Automatic key distribution for winners
+- 📅 **Calendar Integration**: iCal export for matches
+- 🧪 **Unit Tests & CI/CD**: Automated testing with GitHub Actions
+- 📈 **Analytics Dashboard**: Web interface for tournament insights
+- 🔗 **API**: REST API for external integrations
+- 🤖 **AI Features**: Intelligent player recommendations, automatic conflict resolution
+
+---
+
+## 📊 Technical Details
 
 ### Dependencies
-- **discord.py**: Discord Bot-Framework
-- **python-dotenv**: Umgebungsvariablen-Management
-- **typing**: Type Hints und Annotations
-- **zoneinfo**: Timezone-Aware Datetime-Handling
-- **json**: Konfiguration und Datenspeicherung
-- **asyncio**: Asynchrone Background-Tasks
+- **discord.py**: Discord bot framework
+- **python-dotenv**: Environment variable management
+- **typing**: Type hints and annotations
+- **zoneinfo**: Timezone-aware datetime handling
+- **json**: Configuration and data storage
+- **asyncio**: Asynchronous background tasks
 
 ### Performance
-- Atomic File Operations für Datensicherheit
-- Lazy Loading von Konfigurationen
-- Caching von häufig genutzten Daten
-- Effiziente Slot-Matrix-Generierung
-- Background-Tasks für nicht-blockierende Operationen
+- Atomic file operations for data safety
+- Lazy loading of configurations
+- Caching of frequently used data
+- Efficient slot matrix generation
+- Background tasks for non-blocking operations
 
 ### Error Handling
-- Globale Event-Error-Handler
-- Slash-Command-Error-Handler mit User-Feedback
-- Graceful Degradation bei Teilausfällen
-- Comprehensive Logging für Debugging
-- Validation auf allen Eingabeebenen
+- Global event error handlers
+- Slash command error handlers with user feedback
+- Graceful degradation on partial failures
+- Comprehensive logging for debugging
+- Validation at all input levels
 
 ---
 
 ## 🤝 Contributing
 
-Contributions sind willkommen! Bitte:
-1. Fork das Repository
-2. Erstelle einen Feature-Branch (`git checkout -b feature/AmazingFeature`)
-3. Committe deine Änderungen (`git commit -m 'Add some AmazingFeature'`)
-4. Push zum Branch (`git push origin feature/AmazingFeature`)
-5. Öffne einen Pull Request
+Contributions are welcome! Please:
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
 
 ---
 
 ## ✨ Credits
 
-- **I3lackEye** – Entwicklung, Architektur, Kaffeekonsum
-- **discord.py Community** – Exzellente Dokumentation und Support
+- **I3lackEye** – Development, Architecture, Coffee Consumption
+- **discord.py Community** – Excellent documentation and support
 
 ---
 
-## 📄 Lizenz
+## 📄 License
 
-Dieses Projekt ist unter der MIT-Lizenz lizenziert.
+This project is licensed under the MIT License.
 
 ---
 
-## 🔗 Ressourcen
+## 🔗 Resources
 
-- [discord.py auf GitHub](https://github.com/Rapptz/discord.py)
-- [discord.py Dokumentation](https://discordpy.readthedocs.io/en/stable/)
+- [discord.py on GitHub](https://github.com/Rapptz/discord.py)
+- [discord.py Documentation](https://discordpy.readthedocs.io/en/stable/)
 - [Python ZoneInfo](https://docs.python.org/3/library/zoneinfo.html)
 - [Discord Developer Portal](https://discord.com/developers/applications)
 - [Discord Privileged Intents](https://discord.com/developers/docs/topics/gateway#privileged-intents)
@@ -364,9 +364,9 @@ Dieses Projekt ist unter der MIT-Lizenz lizenziert.
 
 ## 📞 Support
 
-Bei Fragen oder Problemen:
-- Öffne ein [GitHub Issue](https://github.com/I3lackEye/HeroldBot/issues)
-- Kontaktiere I3lackEye
+For questions or issues:
+- Open a [GitHub Issue](https://github.com/I3lackEye/HeroldBot/issues)
+- Contact I3lackEye
 
 ---
 
