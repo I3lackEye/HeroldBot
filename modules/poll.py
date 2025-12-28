@@ -8,6 +8,7 @@ import discord
 from discord.ext import commands
 
 # Local modules
+from modules.config import CONFIG
 from modules.dataStorage import load_tournament_data, save_tournament_data, load_games
 from modules.embeds import send_poll_results, send_registration_open
 from modules.logger import logger
@@ -148,13 +149,16 @@ async def end_poll(bot: discord.Client, channel: discord.TextChannel):
     tournament = load_tournament_data()
     registration_end_str = tournament.get("registration_end")
     if registration_end_str:
+        # Get timezone from config
+        tz = ZoneInfo(CONFIG.bot.timezone)
+
         registration_end = datetime.fromisoformat(registration_end_str)
 
-        # If no timezone: explicitly set UTC
+        # If no timezone: use configured timezone
         if registration_end.tzinfo is None:
-            registration_end = registration_end.replace(tzinfo=ZoneInfo("UTC"))
+            registration_end = registration_end.replace(tzinfo=tz)
 
-        now = datetime.now(ZoneInfo("UTC"))
+        now = datetime.now(tz=tz)
         logger.debug(f"registration_end: {registration_end} ({registration_end.tzinfo})")
         logger.debug(f"now: {now} ({now.tzinfo})")
         delay_seconds = max(0, int((registration_end - now).total_seconds()))

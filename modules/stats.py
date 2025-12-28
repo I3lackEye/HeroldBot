@@ -4,6 +4,7 @@ import re
 from collections import Counter
 from datetime import datetime
 from typing import Optional
+from zoneinfo import ZoneInfo
 
 import discord
 from discord import Embed, Interaction, User, app_commands
@@ -11,6 +12,7 @@ from discord.app_commands import Choice
 from discord.ext import commands
 
 # Local modules
+from modules.config import CONFIG
 from modules.dataStorage import load_global_data, load_tournament_data, save_global_data
 from modules.embeds import send_status, send_tournament_stats
 from modules.logger import logger
@@ -370,7 +372,10 @@ class StatsGroup(app_commands.Group):
     async def status(self, interaction: Interaction):
         """Displays current tournament status."""
         tournament = load_tournament_data()
-        now = datetime.now()
+
+        # Get timezone from config and use timezone-aware datetime
+        tz = ZoneInfo(CONFIG.bot.timezone)
+        now = datetime.now(tz=tz)
 
         registration_open = tournament.get("registration_open", False)
         registration_end = tournament.get("registration_end")
@@ -384,11 +389,17 @@ class StatsGroup(app_commands.Group):
         registration_text = "Currently closed."
         if registration_open and registration_end:
             reg_end = datetime.fromisoformat(registration_end)
+            # Ensure timezone awareness
+            if reg_end.tzinfo is None:
+                reg_end = reg_end.replace(tzinfo=tz)
             registration_text = f"Open until {reg_end.strftime('%d.%m.%Y %H:%M')}"
 
         tournament_text = "No active tournament."
         if tournament_running and tournament_end:
             tourn_end = datetime.fromisoformat(tournament_end)
+            # Ensure timezone awareness
+            if tourn_end.tzinfo is None:
+                tourn_end = tourn_end.replace(tzinfo=tz)
             delta = tourn_end - now
             days = delta.days
             hours = delta.seconds // 3600
