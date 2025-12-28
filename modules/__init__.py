@@ -1,2 +1,2 @@
 # __init__.py
-# Legt Python scripts als Package fest
+# Set up pythonscripts as packages
