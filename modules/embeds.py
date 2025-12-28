@@ -442,32 +442,7 @@ async def send_list_matches(interaction: Interaction, matches: list):
         await interaction.followup.send(embed=embed, ephemeral=True)
 
 
-async def send_cleanup_summary(channel: discord.TextChannel, teams_deleted: list, players_rescued: list):
-    """Sends cleanup summary embed."""
-    template = load_embed_template("cleanup").get("CLEANUP_SUMMARY")
-    if not template:
-        logger.error("[EMBED] CLEANUP_SUMMARY template missing.")
-        return
-
-    # Build embed
-    embed = build_embed_from_template(template)
-
-    desc_parts = []
-
-    if teams_deleted:
-        teams_text = "\n".join(f"• {team}" for team in teams_deleted)
-        desc_parts.append(f"**🗑️ Deleted teams:**\n{teams_text}")
-
-    if players_rescued:
-        players_text = "\n".join(f"• {player}" for player in players_rescued)
-        desc_parts.append(f"**👤 Rescued players:**\n{players_text}")
-
-    if desc_parts:
-        embed.description = "\n\n".join(desc_parts)
-    else:
-        embed.description = "No incomplete teams found."
-
-    await channel.send(embed=embed)
+# Removed: send_cleanup_summary() - now uses logging only to reduce channel spam
 
 
 async def send_participants_overview(interaction: Interaction, participants_text: str):
