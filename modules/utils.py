@@ -605,3 +605,71 @@ def get_active_days_config() -> dict:
         day: {"start": day_config.start, "end": day_config.end}
         for day, day_config in CONFIG.tournament.active_days.items()
     }
+
+
+def calculate_optimal_tournament_duration(num_teams: int, registration_end: datetime) -> datetime:
+    """
+    Calculates optimal tournament end date based on number of teams and tournament configuration.
+
+    Takes into account:
+    - Number of round-robin matches: n*(n-1)/2
+    - Max matches per team per day (based on time budget)
+    - Active days per week from config
+    - Buffer for flexibility (20% extra time)
+
+    :param num_teams: Number of teams in the tournament
+    :param registration_end: When registration ends (tournament start)
+    :return: Recommended tournament end datetime
+    """
+    from math import ceil
+
+    if num_teams < 2:
+        # Fallback: If less than 2 teams, just use 1 week
+        return registration_end + timedelta(weeks=1)
+
+    # Calculate total number of matches (round-robin)
+    total_matches = (num_teams * (num_teams - 1)) // 2
+
+    # Calculate max matches per team per day based on time budget
+    match_and_pause_minutes = CONFIG.tournament.match_duration + CONFIG.tournament.pause_duration
+    max_time_budget_minutes = CONFIG.tournament.max_time_budget * 60  # Convert hours to minutes
+    max_matches_per_team_per_day = int(max_time_budget_minutes / match_and_pause_minutes)
+
+    # On a perfect day, assuming all teams can play simultaneously:
+    # With n teams, we can have n/2 matches happening in parallel
+    # But each team is limited to max_matches_per_team_per_day
+    max_matches_per_day = min(
+        (num_teams // 2) * max_matches_per_team_per_day,
+        total_matches  # Can't schedule more than total matches
+    )
+
+    # Prevent division by zero
+    if max_matches_per_day == 0:
+        max_matches_per_day = 1
+
+    # Calculate needed days
+    days_needed = ceil(total_matches / max_matches_per_day)
+
+    # Count active days per week
+    active_days_per_week = len(CONFIG.tournament.active_days)
+
+    # Calculate weeks needed (accounting for only active days)
+    if active_days_per_week > 0:
+        weeks_needed = ceil(days_needed / active_days_per_week)
+    else:
+        weeks_needed = ceil(days_needed / 7)  # Fallback to 7 days/week
+
+    # Add 20% buffer for flexibility and real-world constraints
+    weeks_with_buffer = ceil(weeks_needed * 1.2)
+
+    # Minimum 1 week
+    weeks_with_buffer = max(weeks_with_buffer, 1)
+
+    tournament_end = registration_end + timedelta(weeks=weeks_with_buffer)
+
+    logger.info(
+        f"[TOURNAMENT] Auto-calculated duration: {num_teams} teams → {total_matches} matches → "
+        f"{days_needed} days needed → {weeks_with_buffer} weeks (with buffer)"
+    )
+
+    return tournament_end

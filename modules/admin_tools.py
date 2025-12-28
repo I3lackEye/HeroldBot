@@ -116,7 +116,6 @@ async def handle_start_tournament_modal(
     interaction: Interaction,
     poll_duration: int,
     registration_duration: int,
-    tournament_weeks: int,
     team_size: int,
 ):
     logger.debug("[MODAL] handle_start_tournament_modal() was called")
@@ -136,7 +135,9 @@ async def handle_start_tournament_modal(
 
         now = datetime.now(ZoneInfo("Europe/Berlin"))
         registration_end = now + timedelta(hours=registration_duration)
-        tournament_end = registration_end + timedelta(weeks=max(tournament_weeks, 1))
+        # Set generous default duration (12 weeks) - will be automatically recalculated
+        # after registration closes based on actual number of teams
+        tournament_end = registration_end + timedelta(weeks=12)
 
         tournament = {
             "registration_open": False,
@@ -152,7 +153,8 @@ async def handle_start_tournament_modal(
 
         logger.info(
             f"[TOURNAMENT] Tournament started: "
-            f"Poll {poll_duration}h, Registration {registration_duration}h, Duration {tournament_weeks} week(s), Team size {team_size}"
+            f"Poll {poll_duration}h, Registration {registration_duration}h, Team size {team_size} "
+            f"(Duration will be auto-calculated after registration)"
         )
 
         # Send embed
