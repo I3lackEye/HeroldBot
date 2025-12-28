@@ -335,6 +335,12 @@ class DevGroup(app_commands.Group):
             ephemeral=True,
         )
 
+        # Reset registration closed flag for new test tournament
+        from modules.tournament import _registration_lock
+        import modules.tournament as tournament_module
+        async with _registration_lock:
+            tournament_module._registration_closed = False
+
         # Load dummy poll options
         poll_options = load_games()
         if not poll_options:
@@ -393,15 +399,14 @@ class DevGroup(app_commands.Group):
         await poll.start_poll(
             interaction.channel,
             poll_options,
-            registration_hours=20,
-            poll_duration_hours=10,
+            registration_hours=20,  # Registration duration in seconds (for testing)
+            poll_duration_hours=10,  # Poll duration in seconds (for testing)
         )
 
-        # Simulate poll end
+        # Simulate poll end (which will automatically trigger registration close)
+        # Note: auto_end_poll calls close_registration_after_delay automatically
+        # based on the registration_end timestamp, so no manual call needed
         asyncio.create_task(auto_end_poll(interaction.client, interaction.channel, delay_seconds=10))
-
-        # Simulate registration close
-        asyncio.create_task(close_registration_after_delay(delay_seconds=20, channel=interaction.channel))
 
     @app_commands.command(
         name="reset_tournament",

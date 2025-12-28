@@ -59,8 +59,9 @@ from modules.utils import (
     update_all_participants,
 )
 
-# Global variable
+# Global variables for double-call prevention
 _registration_closed = False
+_registration_lock = asyncio.Lock()  # Prevent race conditions
 
 
 # ---------------------------------------
@@ -216,13 +217,15 @@ async def close_registration_after_delay(delay_seconds: int, channel: discord.Te
     """
     tournament = load_tournament_data()  # always load data first
 
-    global _registration_closed
+    global _registration_closed, _registration_lock
     await asyncio.sleep(delay_seconds)
 
-    if _registration_closed:
-        logger.warning("[REGISTRATION] Process already completed – double prevention active.")
-        return
-    _registration_closed = True
+    # Use lock to prevent race conditions when multiple calls happen simultaneously
+    async with _registration_lock:
+        if _registration_closed:
+            logger.warning("[REGISTRATION] Process already completed – double prevention active.")
+            return
+        _registration_closed = True
 
     if not tournament.get("running", False):
         await channel.send(f"⚠️ No tournament is running – registration will not be closed.")
