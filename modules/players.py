@@ -21,8 +21,6 @@ from modules.reschedule import (
 from modules.utils import (
     generate_team_name,
     has_permission,
-    intersect_availability,
-    parse_availability,
     validate_string,
 )
 
@@ -41,85 +39,6 @@ class PlayerGroup(app_commands.Group):
     @app_commands.describe(match_id="Match ID you want to reschedule")
     async def request_reschedule(self, interaction: Interaction, match_id: int):
         await handle_request_reschedule(interaction, match_id)
-
-    @app_commands.command(
-        name="update_availability",
-        description="Update your availability for the tournament.",
-    )
-    @app_commands.describe(
-        availability="General availability (e.g. 10:00-20:00)",
-        saturday="Availability on Saturday (e.g. 12:00-18:00)",
-        sunday="Availability on Sunday (e.g. 08:00-22:00)",
-    )
-    async def update_availability(
-        self,
-        interaction: Interaction,
-        availability: Optional[str] = None,
-        saturday: Optional[str] = None,
-        sunday: Optional[str] = None,
-    ):
-        """
-        Updates a player's availability in the tournament.
-        At least one of the parameters (availability, saturday, or sunday) must be provided.
-        """
-        if not any([availability, saturday, sunday]):
-            await interaction.response.send_message(
-                "⚠️ Please provide at least one availability (availability, saturday, or sunday).",
-                ephemeral=True,
-            )
-            return
-
-        # Check availability formats
-        try:
-            if availability:
-                parse_availability(availability)
-            if saturday:
-                parse_availability(saturday)
-            if sunday:
-                parse_availability(sunday)
-        except ValueError as e:
-            await interaction.response.send_message(f"🚫 Invalid format: {str(e)}", ephemeral=True)
-            return
-
-        # Load tournament data
-        tournament = load_tournament_data()
-        updated = False
-
-        # Update solo participants
-        for entry in tournament.get("solo", []):
-            if entry["player"] == interaction.user.mention:
-                if availability:
-                    entry["availability"] = availability
-                if saturday:
-                    entry["saturday"] = saturday
-                if sunday:
-                    entry["sunday"] = sunday
-                updated = True
-                break
-
-        # Update team members
-        for team_data in tournament.get("teams", {}).values():
-            if interaction.user.mention in team_data.get("members", []):
-                if availability:
-                    team_data["availability"] = availability
-                if saturday:
-                    team_data["saturday"] = saturday
-                if sunday:
-                    team_data["sunday"] = sunday
-                updated = True
-                break
-
-        if not updated:
-            await interaction.response.send_message(
-                "⚠️ You are currently not registered in any team or on the solo list.",
-                ephemeral=True,
-            )
-            return
-
-        save_tournament_data(tournament)
-        await interaction.response.send_message(
-            "✅ Your availability has been successfully updated!", ephemeral=True
-        )
 
     @app_commands.command(name="leave", description="Unregister from the tournament.")
     async def leave(self, interaction: Interaction):
