@@ -622,7 +622,7 @@ def assign_slots_with_matrix(matches: list, slot_matrix: dict[datetime, set[str]
     Returns (updated_matches, unassigned_matches).
     """
     used_slots = set()
-    last_slot_per_team = {}
+    all_slots_per_team = {}  # Changed: track ALL slots per team, not just last one
     unassigned_matches = []
 
     matches_with_options = []
@@ -668,8 +668,8 @@ def assign_slots_with_matrix(matches: list, slot_matrix: dict[datetime, set[str]
                 logger.debug(f"[SLOT-ASSIGN]   ⏭️  {slot_str}: Already occupied")
                 continue
 
-            # Respect pause rule
-            if not is_minimum_pause_respected(last_slot_per_team, team1, team2, slot):
+            # Respect pause rule (only check against chronologically earlier slots)
+            if not is_minimum_pause_respected(all_slots_per_team, team1, team2, slot):
                 rejection_reasons["pause_violation"] += 1
                 continue
 
@@ -688,8 +688,9 @@ def assign_slots_with_matrix(matches: list, slot_matrix: dict[datetime, set[str]
             # Slot fits – assign
             match["scheduled_time"] = slot_str
             used_slots.add(slot_str)
-            last_slot_per_team[team1] = slot
-            last_slot_per_team[team2] = slot
+            # Track all slots per team (not just last one)
+            all_slots_per_team.setdefault(team1, []).append(slot)
+            all_slots_per_team.setdefault(team2, []).append(slot)
             logger.info(f"[SLOT-ASSIGN] ✅ Match {match_id} ({team1} vs {team2}) scheduled at {slot_str}")
             slot_found = True
             break
@@ -707,19 +708,39 @@ def assign_slots_with_matrix(matches: list, slot_matrix: dict[datetime, set[str]
 
 
 def is_minimum_pause_respected(
-    last_slots: dict, team1: str, team2: str, new_slot: datetime, pause_minutes: int = 30
+    all_slots: dict, team1: str, team2: str, new_slot: datetime, pause_minutes: int = 30
 ) -> bool:
     """
     Checks if both teams had at least X minutes pause since their last match ended.
     The pause is calculated from when the previous match ended (start + duration), not just started.
+
+    IMPORTANT: Only checks against matches that are chronologically BEFORE the new slot.
+    This allows the algorithm to assign matches in any order (prioritizing difficult matches)
+    without creating false pause violations when earlier slots are checked after later ones.
+
+    :param all_slots: Dict mapping team names to lists of all their assigned slots
+    :param team1: First team name
+    :param team2: Second team name
+    :param new_slot: The slot being considered for assignment
+    :param pause_minutes: Minimum required pause in minutes (default 30)
+    :return: True if pause requirement is met for both teams
     """
     for team in (team1, team2):
-        last = last_slots.get(team)
-        if last:
-            # Calculate when the previous match ended
-            last_match_end = last + MATCH_DURATION
+        team_slots = all_slots.get(team, [])
+
+        # Only check slots that are chronologically BEFORE the new slot
+        previous_slots = [slot for slot in team_slots if slot < new_slot]
+
+        if previous_slots:
+            # Find the most recent previous slot
+            last_previous_slot = max(previous_slots)
+
+            # Calculate when that match ended
+            last_match_end = last_previous_slot + MATCH_DURATION
+
             # Calculate the actual pause time (time between match end and new slot start)
             diff = (new_slot - last_match_end).total_seconds() / 60
+
             if diff < pause_minutes:
                 if DEBUG_MODE:
                     logger.debug(f"[PAUSE] {team} only had {diff:.0f} min pause – required: {pause_minutes} min.")
@@ -728,6 +749,7 @@ def is_minimum_pause_respected(
                 else:
                     logger.debug(f"[PAUSE] {team} only had {diff:.0f} min pause – required: {pause_minutes} min.")
                 return False
+
     return True
 
 
