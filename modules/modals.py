@@ -455,14 +455,6 @@ class StartTournamentModal(discord.ui.Modal, title="Start Tournament"):
         max_length=3,
     )
 
-    tournament_weeks = TextInput(
-        label="Tournament Duration (in weeks)",
-        placeholder="e.g. 1",
-        required=True,
-        default="1",
-        max_length=2,
-    )
-
     team_size = TextInput(
         label="Players per Team",
         placeholder="e.g. 2",
@@ -493,14 +485,6 @@ class StartTournamentModal(discord.ui.Modal, title="Start Tournament"):
             await interaction.response.send_message(error_msg, ephemeral=True)
             return
 
-        # Validate tournament weeks (1-52 weeks = 1 year max)
-        is_valid, weeks, error_msg = ModalValidator.validate_integer(
-            self.tournament_weeks.value, min_val=1, max_val=52, field_name="Tournament duration"
-        )
-        if not is_valid:
-            await interaction.response.send_message(error_msg, ephemeral=True)
-            return
-
         # Validate team size (1-10 players)
         is_valid, team_size_val, error_msg = ModalValidator.validate_integer(
             self.team_size.value, min_val=1, max_val=10, field_name="Team size"
@@ -519,7 +503,6 @@ class StartTournamentModal(discord.ui.Modal, title="Start Tournament"):
                 interaction,
                 poll_duration=poll_h,
                 registration_duration=reg_h,
-                tournament_weeks=weeks,
                 team_size=team_size_val,
             )
 

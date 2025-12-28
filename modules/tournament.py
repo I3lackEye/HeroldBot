@@ -13,6 +13,7 @@ from discord.ext import commands
 # Local modules
 from modules import poll
 from modules.archive import archive_current_tournament, update_tournament_history
+from modules.config import CONFIG
 from modules.dataStorage import (
     backup_current_state,
     delete_tournament_file,
@@ -50,6 +51,7 @@ from modules.task_manager import add_task
 from modules.utils import (
     all_matches_completed,
     autocomplete_teams,
+    calculate_optimal_tournament_duration,
     get_current_chosen_game,
     get_player_team,
     has_permission,
@@ -244,6 +246,23 @@ async def close_registration_after_delay(delay_seconds: int, channel: discord.Te
     # Create match schedule
     tournament = load_tournament_data()
     create_round_robin_schedule(tournament)
+
+    # Auto-calculate optimal tournament duration based on number of teams
+    num_teams = len(tournament.get("teams", {}))
+    if num_teams > 0:
+        registration_end_str = tournament.get("registration_end")
+        if registration_end_str:
+            registration_end = datetime.fromisoformat(registration_end_str)
+            # Ensure timezone awareness
+            tz = ZoneInfo(CONFIG.bot.timezone)
+            if registration_end.tzinfo is None:
+                registration_end = registration_end.replace(tzinfo=tz)
+
+            # Calculate and update tournament end
+            optimal_end = calculate_optimal_tournament_duration(num_teams, registration_end)
+            tournament["tournament_end"] = optimal_end.isoformat()
+            save_tournament_data(tournament)
+            logger.info(f"[TOURNAMENT] Duration auto-set to {optimal_end.strftime('%Y-%m-%d')}")
 
     # Remove all remaining solo players
     tournament = load_tournament_data()
