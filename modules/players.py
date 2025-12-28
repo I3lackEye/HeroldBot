@@ -8,7 +8,6 @@ from discord.ui import Modal, TextInput
 # Local modules
 from modules.dataStorage import load_tournament_data, save_tournament_data
 from modules.embeds import (
-    send_participants_overview,
     send_registration_confirmation,
     send_wrong_channel,
 )
@@ -232,48 +231,6 @@ class PlayerGroup(app_commands.Group):
             "⚠ You are neither registered in a team nor on the solo list.",
             ephemeral=True,
         )
-
-    @app_commands.command(name="participants", description="Show list of all participants.")
-    async def participants(self, interaction: Interaction):
-        """
-        Lists all current participants (teams and solo players), sorted alphabetically.
-        """
-        tournament = load_tournament_data()
-
-        teams = tournament.get("teams", {})
-        solo = tournament.get("solo", [])
-
-        # Sort teams alphabetically
-        sorted_teams = sorted(teams.items(), key=lambda x: x[0].lower())
-
-        # Sort solo players alphabetically (by mention)
-        sorted_solo = sorted(solo, key=lambda x: x.get("player", "").lower())
-
-        team_lines = []
-        for name, team_entry in sorted_teams:
-            members = ", ".join(team_entry.get("members", []))
-            avail = team_entry.get("availability", {})
-            saturday = avail.get("saturday", "-")
-            sunday = avail.get("sunday", "-")
-            team_lines.append(f"- {name}: {members}\n Saturday: {saturday}, Sunday: {sunday}\n")
-
-        solo_lines = []
-        for solo_entry in sorted_solo:
-            solo_lines.append(f"- {solo_entry.get('player')}")
-
-        # Compose text
-        full_text = ""
-
-        if team_lines:
-            full_text += "**Teams:**\n" + "\n".join(team_lines) + "\n\n"
-
-        if solo_lines:
-            full_text += "**Solo Players:**\n" + "\n".join(solo_lines)
-
-        if not full_text:
-            await interaction.response.send_message("❌ No participants registered yet.", ephemeral=True)
-        else:
-            await send_participants_overview(interaction, full_text)
 
     @app_commands.command(name="join", description="Register solo or as a team for the tournament")
     async def join(self, interaction: Interaction):

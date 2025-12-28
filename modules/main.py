@@ -95,7 +95,6 @@ EXTENSIONS = [
     "modules.info",
     "modules.admin_tools",
     "modules.dev_tools",
-    "modules.stats",
 ]
 
 
