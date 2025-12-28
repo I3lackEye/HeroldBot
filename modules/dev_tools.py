@@ -410,14 +410,6 @@ class DevGroup(app_commands.Group):
         # based on the registration_end timestamp, so no manual call needed
         asyncio.create_task(auto_end_poll(interaction.client, interaction.channel, delay_seconds=10))
 
-        await interaction.followup.send(
-            "🏁 Tournament end is being prepared... this may take a few seconds!",
-            ephemeral=True,
-        )
-
-        await end_tournament_procedure(interaction.channel, manual_trigger=True)
-
-
     @app_commands.command(
         name="reset_tournament",
         description="Clears all tournament data (teams, solo, matches).",
