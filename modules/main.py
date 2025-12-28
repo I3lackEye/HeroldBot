@@ -89,6 +89,7 @@ intents.members = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 EXTENSIONS = [
+    "modules.setup",
     "modules.players",
     "modules.tournament",
     "modules.info",
