@@ -32,7 +32,11 @@ from modules.utils import (
 
 class DevGroup(app_commands.Group):
     def __init__(self, bot):
-        super().__init__(name="dev", description="Developer commands")
+        super().__init__(
+            name="dev",
+            description="Developer commands",
+            default_permissions=discord.Permissions(administrator=True)
+        )
         self.bot = bot
 
     @app_commands.command(

@@ -213,7 +213,11 @@ async def handle_start_tournament_modal(
 # ----------------------------------------
 class AdminGroup(app_commands.Group):
     def __init__(self):
-        super().__init__(name="admin", description="Admin and moderator commands")
+        super().__init__(
+            name="admin",
+            description="Admin and moderator commands",
+            default_permissions=discord.Permissions(administrator=True)
+        )
 
     # --------- ADMIN COMMANDS ----------
     @app_commands.command(
