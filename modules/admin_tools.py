@@ -41,7 +41,7 @@ from modules.modals import (
 )
 
 from modules.poll import end_poll
-from modules.shared_states import pending_reschedules
+from modules.reschedule import pending_reschedules
 from modules.tournament import end_tournament_procedure, auto_end_poll
 from modules.utils import (
     autocomplete_teams,

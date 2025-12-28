@@ -8,7 +8,6 @@ from zoneinfo import ZoneInfo
 
 # Lokale Module
 from modules.dataStorage import load_tournament_data, save_tournament_data
-from modules.shared_states import pending_reschedules
 from modules.logger import logger
 
 
@@ -145,6 +144,8 @@ class RescheduleView(ui.View):
             save_tournament_data(tournament)
             logger.info(f"[RESCHEDULE] Match {self.match_id} forfeited by {decliner_team}. Winner: {opponent}")
 
+        # Import at runtime to avoid circular dependency
+        from modules.reschedule import pending_reschedules
         pending_reschedules.discard(self.match_id)
 
         if self.message:
@@ -172,6 +173,8 @@ class RescheduleView(ui.View):
             save_tournament_data(tournament)
             logger.info(f"[RESCHEDULE] Match {self.match_id} successfully rescheduled to {self.new_datetime}.")
 
+        # Import at runtime to avoid circular dependency
+        from modules.reschedule import pending_reschedules
         pending_reschedules.discard(self.match_id)
 
         await self.message.edit(
@@ -190,4 +193,6 @@ class RescheduleView(ui.View):
                 embed=None,
                 view=None
             )
+        # Import at runtime to avoid circular dependency
+        from modules.reschedule import pending_reschedules
         pending_reschedules.discard(self.match_id)

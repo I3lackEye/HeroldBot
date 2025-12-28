@@ -22,9 +22,11 @@ from modules.embeds import (
 )
 from modules.logger import logger
 from modules.matchmaker import generate_slot_matrix, get_valid_slots_for_match, assign_slots_with_matrix
-from modules.shared_states import pending_reschedules
 from modules.utils import get_player_team, get_team_open_matches, smart_send
-from views.reschedule_view import RescheduleView, SlotSelectView
+from modules.reschedule_view import RescheduleView, SlotSelectView
+
+# Global state for pending reschedule requests
+pending_reschedules = set()
 
 RESCHEDULE_TIMEOUT_HOURS = CONFIG.tournament.reschedule_timeout_hours
 
