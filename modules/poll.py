@@ -138,7 +138,10 @@ async def end_poll(bot: discord.Client, channel: discord.TextChannel):
         formatted_end = "Unknown"
 
     # Format votes for display
-    vote_text = ", ".join([f"{game}: {votes}" for game, votes in sorted(real_votes.items(), key=lambda x: x[1], reverse=True)])
+    if real_votes:
+        vote_text = ", ".join([f"{game}: {votes}" for game, votes in sorted(real_votes.items(), key=lambda x: x[1], reverse=True)])
+    else:
+        vote_text = "Keine Stimmen abgegeben (zufällig gewählt)"
 
     placeholders = {
         "game": chosen_game,
