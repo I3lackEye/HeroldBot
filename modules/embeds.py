@@ -164,16 +164,16 @@ async def send_tournament_end_announcement(
     if new_champion:
         champion_mention = new_champion.mention
 
-    # Now replace the text correctly
-    description_text = template.get("description", "")
-    description_text = description_text.replace("{MVP_MESSAGE}", mvp_message)
-    description_text = description_text.replace("{WINNERS}", winners_mentions)
-    description_text = description_text.replace("{CHOSEN_GAME}", chosen_game)
-    description_text = description_text.replace("{NEW_CHAMPION}", champion_mention)
+    # Use standard placeholder format
+    placeholders = {
+        "mvp_message": mvp_message,
+        "winners": winners_mentions,
+        "chosen_game": chosen_game,
+        "new_champion": champion_mention
+    }
 
-    # Now build embed
-    embed = build_embed_from_template(template, placeholders=None)
-    embed.description = description_text
+    # Build embed with placeholders
+    embed = build_embed_from_template(template, placeholders)
 
     await channel.send(embed=embed)
 

@@ -1,7 +1,8 @@
 {
-    "MATCH_SCHEDULE": {
-      "title": "📋 Spielplan Übersicht",
-      "description": "Hier siehst du alle geplanten Matches!",
-      "footer": "Spielplan wird automatisch aktualisiert. (Timezone)"
-      }
+  "MATCH_SCHEDULE": {
+    "title": "📋 Spielplan Übersicht",
+    "description": "Hier siehst du alle geplanten Matches!",
+    "color": "0x3498DB",
+    "footer": "Spielplan wird automatisch aktualisiert."
+  }
 }

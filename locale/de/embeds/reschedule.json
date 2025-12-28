@@ -1,11 +1,11 @@
 {
-    "RESCHEDULE": {
-      "title": "⏳ Anfrage zur Terminverschiebung",
-      "description": "**Match:** PLACEHOLDER_MATCH_INFO\n\n**Neuer Termin:** PLACEHOLDER_NEW_SLOT Uhr\n\n**Deadline zur Abstimmung:** PLACEHOLDER_DEADLINE Uhr\n\n**Beteiligte Spieler:**\nPLACEHOLDER_PLAYERS\n\n*Bitte stimme innerhalb von 24 Stunden zu oder lehne ab.*",
-      "color": "#F39C12",
-      "footer": "Eine Antwort ist erforderlich.",
-      "icon": "📅"
-    }
+  "RESCHEDULE": {
+    "title": "⏳ Anfrage zur Terminverschiebung",
+    "description": "**Match:** PLACEHOLDER_MATCH_INFO\n\n**Neuer Termin:** PLACEHOLDER_NEW_SLOT Uhr\n\n**Deadline zur Abstimmung:** PLACEHOLDER_DEADLINE Uhr\n\n**Beteiligte Spieler:**\nPLACEHOLDER_PLAYERS\n\n*Bitte stimme innerhalb von 24 Stunden zu oder lehne ab.*",
+    "color": "0xF39C12",
+    "footer": "Eine Antwort ist erforderlich.",
+    "icon": "📅"
+  }
 }
     
 

@@ -1,8 +1,8 @@
 {
-    "LIST_MATCHES": {
-        "title": "📋 Geplante Matches",
-        "description": "Hier siehst du alle angesetzten Begegnungen.",
-        "color": "#3498DB",
-        "footer": "Stand: Zeitpunkt der Abfrage"
-      }
+  "LIST_MATCHES": {
+    "title": "📋 Geplante Matches",
+    "description": "Hier siehst du alle angesetzten Begegnungen.",
+    "color": "0x3498DB",
+    "footer": "Stand: Zeitpunkt der Abfrage"
+  }
 }
