@@ -132,9 +132,9 @@ async def end_tournament_procedure(
     except Exception as e:
         logger.error(f"[TOURNAMENT] Error deleting tournament file: {e}")
 
-    # Send final embed
+    # Send final embed (before reset, so chosen_game is available)
     mvp_message = f"🏆 Tournament MVP: **{mvp}**!" if mvp else "🏆 No MVP determined."
-    await send_tournament_end_announcement(channel, mvp_message, winner_ids, new_champion_id)
+    await send_tournament_end_announcement(channel, mvp_message, winner_ids, chosen_game, new_champion_id)
 
     if mvp:  # If MVP exists
         try:

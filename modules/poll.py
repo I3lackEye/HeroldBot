@@ -122,7 +122,10 @@ async def end_poll(bot: discord.Client, channel: discord.TextChannel):
 
     # Save to tournament
     tournament = load_tournament_data()
-    tournament["poll_results"] = real_votes
+    # Update poll_results without completely overwriting (preserves pre-set values in tests)
+    if "poll_results" not in tournament:
+        tournament["poll_results"] = {}
+    tournament["poll_results"].update(real_votes)
     tournament["poll_results"]["chosen_game"] = chosen_game
     tournament["registration_open"] = True
     save_tournament_data(tournament)

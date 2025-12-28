@@ -368,7 +368,9 @@ class DevGroup(app_commands.Group):
             "registration_end": registration_end.isoformat(),
             "tournament_end": tournament_end.isoformat(),
             "matches": [],
-            "poll_results": {},
+            "poll_results": {
+                "chosen_game": "Test Game (SimulatedFlow)"  # Pre-set game for testing
+            },
         }
 
         # Optional: Add solo players
