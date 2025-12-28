@@ -352,45 +352,8 @@ async def send_match_schedule_for_channel(channel: discord.TextChannel, descript
             await channel.send(embed=embed)
 
 
-async def send_poll_results(channel: TextChannel, placeholders: dict, poll_results: dict):
-    """Sends poll results embed."""
-    template = load_embed_template("poll").get("POLL_RESULT")
-    if not template:
-        logger.error("[EMBED] POLL_RESULT template missing.")
-        return
-
-    from modules.dataStorage import load_games
-    games = load_games()
-
-    embed = build_embed_from_template(template, placeholders)
-
-    # Only filter real games (without "chosen_game")
-    real_votes = {k: v for k, v in poll_results.items() if k != "chosen_game"}
-
-    sorted_games = sorted(real_votes.items(), key=lambda kv: kv[1], reverse=True)
-
-    for game_id, votes in sorted_games:
-        game_name = games.get(game_id, {}).get("name", game_id)
-        embed.add_field(name=game_name, value=f"**{votes} Votes**", inline=False)
-
-    if "chosen_game" in poll_results:
-        winner_id = poll_results["chosen_game"]
-        winner_name = games.get(winner_id, {}).get("name", winner_id)
-        embed.add_field(name="🏆 Won", value=f"**{winner_name}**", inline=False)
-
-    await channel.send(embed=embed)
-
-
-async def send_help(interaction: Interaction):
-    """Sends help embed."""
-    template = load_embed_template("help").get("HELP")
-    if not template:
-        logger.error("[EMBED] HELP template missing.")
-        return
-
-    embed = build_embed_from_template(template, placeholders=None)
-
-    await interaction.response.send_message(embed=embed, ephemeral=True)
+# Removed: send_poll_results() - now combined with send_registration_open()
+# Removed: send_help() - now uses /info help command
 
 
 async def send_global_stats(interaction: Interaction, description_text: str):
@@ -468,32 +431,7 @@ async def send_list_matches(interaction: Interaction, matches: list):
         await interaction.followup.send(embed=embed, ephemeral=True)
 
 
-async def send_cleanup_summary(channel: discord.TextChannel, teams_deleted: list, players_rescued: list):
-    """Sends cleanup summary embed."""
-    template = load_embed_template("cleanup").get("CLEANUP_SUMMARY")
-    if not template:
-        logger.error("[EMBED] CLEANUP_SUMMARY template missing.")
-        return
-
-    # Build embed
-    embed = build_embed_from_template(template)
-
-    desc_parts = []
-
-    if teams_deleted:
-        teams_text = "\n".join(f"• {team}" for team in teams_deleted)
-        desc_parts.append(f"**🗑️ Deleted teams:**\n{teams_text}")
-
-    if players_rescued:
-        players_text = "\n".join(f"• {player}" for player in players_rescued)
-        desc_parts.append(f"**👤 Rescued players:**\n{players_text}")
-
-    if desc_parts:
-        embed.description = "\n\n".join(desc_parts)
-    else:
-        embed.description = "No incomplete teams found."
-
-    await channel.send(embed=embed)
+# Removed: send_cleanup_summary() - now uses logging only to reduce channel spam
 
 
 async def send_participants_overview(interaction: Interaction, participants_text: str):
