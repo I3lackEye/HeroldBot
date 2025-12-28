@@ -1,0 +1,8 @@
+{
+  "LIST_MATCHES": {
+    "title": "📋 Scheduled Matches",
+    "description": "Here you can see all scheduled matches.",
+    "color": "0x3498DB",
+    "footer": "Status: Time of query"
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "PARTICIPANTS_OVERVIEW": {
+    "title": "🏆 Participant Overview",
+    "description": "Here you can find all current tournament participants:\n\nPLACEHOLDER_PARTICIPANTS",
+    "color": "0x3498DB",
+    "fields": []
+  }
+}

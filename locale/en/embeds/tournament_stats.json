@@ -1,0 +1,29 @@
+{
+  "TOURNAMENT_STATS": {
+    "title": "📋 Tournament Statistics",
+    "description": "Here you can find an overview of previous tournament data.",
+    "fields": [
+      {
+        "name": "🧾 Summary",
+        "value": "📈 Tournament Overview"
+      },
+      {
+        "name": "👥 Total Players",
+        "value": "PLACEHOLDER_TOTAL_PLAYERS"
+      },
+      {
+        "name": "🏆 Total Wins",
+        "value": "PLACEHOLDER_TOTAL_WINS"
+      },
+      {
+        "name": "🥇 Best Player",
+        "value": "PLACEHOLDER_BEST_PLAYER"
+      },
+      {
+        "name": "🔥 Most Popular Game",
+        "value": "PLACEHOLDER_FAVORITE_GAME"
+      }
+    ],
+    "footer": "Statistics based on all past tournaments."
+  }
+}

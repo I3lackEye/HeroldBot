@@ -1,0 +1,18 @@
+{
+  "REGISTRATION_OPEN_ANNOUNCEMENT": {
+    "title": "🎮 PLACEHOLDER_GAME wins! - Registration Open!",
+    "description": "The voting has ended and the game has been chosen!\n\n🏆 **Chosen Game:** PLACEHOLDER_GAME\n📊 **Votes:** PLACEHOLDER_VOTES\n\n📥 **Registration is now open!**\nUse `/player join` to register (solo or as a team).",
+    "fields": [
+      {
+        "name": "⏰ Registration Deadline",
+        "value": "Registration is open until **PLACEHOLDER_ENDTIME**."
+      },
+      {
+        "name": "ℹ️ More Info",
+        "value": "Use `/info help` for a tournament guide."
+      }
+    ],
+    "color": "0x2ECC71",
+    "footer": "Good luck – may the best team win!"
+  }
+}

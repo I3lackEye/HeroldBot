@@ -1,0 +1,9 @@
+{
+  "RESCHEDULE": {
+    "title": "⏳ Reschedule Request",
+    "description": "**Match:** PLACEHOLDER_MATCH_INFO\n\n**New Time:** PLACEHOLDER_NEW_SLOT\n\n**Voting Deadline:** PLACEHOLDER_DEADLINE\n\n**Involved Players:**\nPLACEHOLDER_PLAYERS\n\n*Please approve or decline within 24 hours.*",
+    "color": "0xF39C12",
+    "footer": "A response is required.",
+    "icon": "📅"
+  }
+}

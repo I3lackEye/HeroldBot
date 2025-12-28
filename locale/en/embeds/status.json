@@ -1,0 +1,25 @@
+{
+  "STATUS": {
+    "title": "🎮 Tournament Status",
+    "description": "Here you can find all important information about the current tournament:",
+    "fields": [
+      {
+        "name": "📥 Registration",
+        "value": "PLACEHOLDER_REGISTRATION"
+      },
+      {
+        "name": "🕹️ Tournament Status",
+        "value": "PLACEHOLDER_TOURNAMENT"
+      },
+      {
+        "name": "🎯 Selected Game",
+        "value": "PLACEHOLDER_GAME"
+      },
+      {
+        "name": "📝 Upcoming Matches",
+        "value": "PLACEHOLDER_MATCHES"
+      }
+    ],
+    "footer": "Use /player join to register or /info stats for your statistics."
+  }
+}

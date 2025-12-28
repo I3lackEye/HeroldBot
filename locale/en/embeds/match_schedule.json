@@ -1,0 +1,8 @@
+{
+  "MATCH_SCHEDULE": {
+    "title": "📋 Match Schedule Overview",
+    "description": "Here you can see all planned matches!",
+    "color": "0x3498DB",
+    "footer": "Match schedule is updated automatically."
+  }
+}
