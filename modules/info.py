@@ -14,7 +14,7 @@ from discord.ext import commands
 # Local modules
 from modules.config import CONFIG
 from modules.dataStorage import load_global_data, load_tournament_data, save_global_data
-from modules.embeds import send_status, send_tournament_stats
+from modules.embeds import send_status, send_tournament_stats, load_embed_template, build_embed_from_template
 from modules.logger import logger
 from modules.utils import autocomplete_players, autocomplete_teams, has_permission
 
@@ -46,9 +46,7 @@ def get_leaderboard() -> str:
 
 
 def build_stats_embed(user, stats: dict) -> Embed:
-    """Builds an embed with player statistics."""
-    embed = Embed(title=f"📊 Statistics for {user.display_name}", color=0x3498DB)
-
+    """Builds an embed with player statistics using locale template."""
     wins = stats.get("wins", 0)
     participations = stats.get("participations", 0)
     winrate = f"{(wins / participations * 100):.1f}%" if participations > 0 else "–"
@@ -59,12 +57,25 @@ def build_stats_embed(user, stats: dict) -> Embed:
     if game_stats:
         favorite_game = max(game_stats.items(), key=lambda x: x[1])[0]
 
+    placeholders = {
+        "player_name": user.display_name,
+        "wins": str(wins),
+        "participations": str(participations),
+        "winrate": winrate,
+        "favorite_game": favorite_game
+    }
+
+    template = load_embed_template("info").get("PLAYER_STATS")
+    if template:
+        return build_embed_from_template(template, placeholders)
+
+    # Fallback if template not found
+    embed = Embed(title=f"📊 Statistics for {user.display_name}", color=0x3498DB)
     embed.add_field(name="🏆 Wins", value=wins, inline=True)
     embed.add_field(name="🧩 Participations", value=participations, inline=True)
     embed.add_field(name="📈 Win Rate", value=winrate, inline=True)
     embed.add_field(name="🎮 Favorite Game", value=favorite_game, inline=False)
     embed.set_footer(text="Tournament Evaluation")
-
     return embed
 
 
@@ -244,6 +255,33 @@ class InfoGroup(app_commands.Group):
     def __init__(self):
         super().__init__(name="info", description="Tournament information and statistics")
 
+    @app_commands.command(name="help", description="Show help guide and important information for players.")
+    async def help_command(self, interaction: Interaction):
+        """Displays a help guide with all important information for tournament participants."""
+        template = load_embed_template("info").get("HELP")
+        if template:
+            embed = build_embed_from_template(template)
+        else:
+            # Fallback if template not found
+            embed = discord.Embed(
+                title="📖 HeroldBot - Help & Guide",
+                description="Welcome to the automated tournament system!",
+                color=0x5865F2
+            )
+            embed.add_field(
+                name="📝 Important Commands",
+                value=(
+                    "`/player join` - Register for tournament\n"
+                    "`/player leave` - Unregister from tournament\n"
+                    "`/player request_reschedule` - Reschedule match\n"
+                    "`/info participants` - Participant list\n"
+                    "`/info tournament` - Tournament status\n"
+                    "`/info stats` - Your statistics"
+                ),
+                inline=False
+            )
+
+        await interaction.response.send_message(embed=embed, ephemeral=False)
 
     @app_commands.command(
     name="overview",
@@ -264,7 +302,12 @@ class InfoGroup(app_commands.Group):
         if view.value == "leaderboard":
             # Show leaderboard
             board = get_leaderboard()
-            embed = Embed(title="🏆 Leaderboard", description=board, color=0xF1C40F)
+            template = load_embed_template("info").get("LEADERBOARD")
+            if template:
+                embed = build_embed_from_template(template, {"leaderboard": board})
+            else:
+                # Fallback
+                embed = Embed(title="🏆 Leaderboard", description=board, color=0xF1C40F)
             await interaction.response.send_message(embed=embed)
 
         elif view.value == "summary":
@@ -293,11 +336,16 @@ class InfoGroup(app_commands.Group):
                 await interaction.response.send_message("⚠️ No matches found.", ephemeral=True)
                 return
 
-            embed = Embed(
-                title="🏛️ Tournament Match History",
-                description="Here are the past matches:",
-                color=0x7289DA,
-            )
+            template = load_embed_template("info").get("MATCH_HISTORY")
+            if template:
+                embed = build_embed_from_template(template)
+            else:
+                # Fallback
+                embed = Embed(
+                    title="🏛️ Tournament Match History",
+                    description="Here are the past matches:",
+                    color=0x7289DA,
+                )
 
             for match in matches[:25]:  # Discord limit
                 result = match.get("result", "Unknown").upper()
@@ -357,10 +405,22 @@ class InfoGroup(app_commands.Group):
             wins = team_data.get("wins", 0)
             matches_played = team_data.get("matches_played", 0)
 
-            embed = discord.Embed(title=f"📊 Team Statistics: {target}", color=0x1ABC9C)
-            embed.add_field(name="🏆 Wins", value=wins, inline=True)
-            embed.add_field(name="🎯 Matches Played", value=matches_played, inline=True)
-            embed.set_footer(text="Tournament Evaluation")
+            placeholders = {
+                "team_name": target,
+                "wins": str(wins),
+                "matches_played": str(matches_played)
+            }
+
+            template = load_embed_template("info").get("TEAM_STATS")
+            if template:
+                embed = build_embed_from_template(template, placeholders)
+            else:
+                # Fallback
+                embed = discord.Embed(title=f"📊 Team Statistics: {target}", color=0x1ABC9C)
+                embed.add_field(name="🏆 Wins", value=wins, inline=True)
+                embed.add_field(name="🎯 Matches Played", value=matches_played, inline=True)
+                embed.set_footer(text="Tournament Evaluation")
+
             await interaction.response.send_message(embed=embed, ephemeral=True)
             return
 
@@ -442,11 +502,16 @@ class InfoGroup(app_commands.Group):
         for solo_entry in sorted_solo:
             solo_lines.append(f"• {solo_entry.get('player')}")
 
-        # Compose embed
-        embed = discord.Embed(
-            title="👥 Tournament Participants",
-            color=0x3498DB
-        )
+        # Compose embed using template
+        template = load_embed_template("info").get("PARTICIPANTS")
+        if template:
+            embed = build_embed_from_template(template)
+        else:
+            # Fallback
+            embed = discord.Embed(
+                title="👥 Tournament Participants",
+                color=0x3498DB
+            )
 
         if team_lines:
             teams_text = "\n".join(team_lines)
