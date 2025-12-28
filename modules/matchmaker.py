@@ -425,16 +425,22 @@ def generate_schedule_overview(matches: list) -> str:
             match_status = match.get("status", "open")
 
             # Determine emoji
-            if match.get("rescue_assigned"):
+            if match_status == "forfeit":
+                emoji = "⚠️"  # Forfeit match
+                winner = match.get("winner", "Unknown")
+                description += f"{emoji} {dt.strftime('%H:%M')} – **{team1}** vs **{team2}** (Forfeit → {winner} wins)\n"
+            elif match.get("rescue_assigned"):
                 emoji = "❗"
+                description += f"{emoji} {dt.strftime('%H:%M')} – **{team1}** vs **{team2}**\n"
             elif match_status == "completed":
                 emoji = "✅"
+                description += f"{emoji} {dt.strftime('%H:%M')} – **{team1}** vs **{team2}**\n"
             elif dt.date() == today:
                 emoji = "🔥"
+                description += f"{emoji} {dt.strftime('%H:%M')} – **{team1}** vs **{team2}**\n"
             else:
                 emoji = "🕒"
-
-            description += f"{emoji} {dt.strftime('%H:%M')} – **{team1}** vs **{team2}**\n"
+                description += f"{emoji} {dt.strftime('%H:%M')} – **{team1}** vs **{team2}**\n"
 
         description += "\n"
 

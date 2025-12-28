@@ -147,6 +147,7 @@ class PlayerGroup(app_commands.Group):
 
         if found_team:
             if tournament.get("registration_open", False):
+                # DURING REGISTRATION: Dissolve team, move partner to solo queue
                 other_members = [m for m in found_team_entry.get("members", []) if m != user_mention]
                 del tournament["teams"][found_team]
                 if other_members:
@@ -173,10 +174,46 @@ class PlayerGroup(app_commands.Group):
                 )
                 return
             else:
-                del tournament["teams"][found_team]
+                # AFTER REGISTRATION: Mark team as withdrawn, forfeit all matches
+                from datetime import datetime
+
+                # Mark team as withdrawn (keep in system for match integrity)
+                tournament["teams"][found_team]["status"] = "withdrawn"
+                tournament["teams"][found_team]["withdrawn_by"] = user_mention
+                tournament["teams"][found_team]["withdrawn_at"] = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+
+                # Forfeit all matches involving this team
+                forfeited_matches = 0
+                for match in tournament.get("matches", []):
+                    if found_team in (match.get("team1"), match.get("team2")):
+                        match["status"] = "forfeit"
+                        # Opponent gets automatic win
+                        opponent = match["team2"] if match["team1"] == found_team else match["team1"]
+                        match["winner"] = opponent
+                        match["forfeit_by"] = found_team
+                        forfeited_matches += 1
+
+                # Notify partner (if team has 2+ members)
+                other_members = [m for m in found_team_entry.get("members", []) if m != user_mention]
+                if other_members:
+                    # Send DM or mention in channel about team withdrawal
+                    try:
+                        partner_mention = other_members[0]
+                        await interaction.channel.send(
+                            f"⚠️ {partner_mention}: Your teammate has left the tournament. "
+                            f"Team **{found_team}** has been withdrawn and all matches forfeited."
+                        )
+                    except Exception as e:
+                        logger.warning(f"[LEAVE] Failed to notify partner: {e}")
+
                 save_tournament_data(tournament)
-                logger.info(f"[LEAVE] {user_name} left team {found_team}. Tournament was already closed.")
-                await interaction.response.send_message(f"✅ Your team {found_team} has been removed.", ephemeral=True)
+                logger.warning(f"[LEAVE] {user_name} left team {found_team} after registration close. "
+                              f"Team marked as withdrawn, {forfeited_matches} matches forfeited.")
+                await interaction.response.send_message(
+                    f"✅ You have left team **{found_team}**.\n"
+                    f"⚠️ The team has been withdrawn and all {forfeited_matches} matches forfeited.",
+                    ephemeral=True
+                )
                 return
 
         for entry in tournament.get("solo", []):
