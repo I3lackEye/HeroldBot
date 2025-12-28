@@ -1,7 +1,5 @@
 {
   "reminder_enabled": true,
-  "auto_move": false,
-  "create_event": false,
   "game_key_handler": false,
   "debug_save_slot_matrix": true
 }
