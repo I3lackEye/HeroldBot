@@ -295,10 +295,7 @@ HeroldBot/
 - 📆 **Custom Game Days**: More flexible tournament periods
 - 🎁 **Reward System**: Automatic key distribution for winners
 - 📅 **Calendar Integration**: iCal export for matches
-- 🧪 **Unit Tests & CI/CD**: Automated testing with GitHub Actions
 - 📈 **Analytics Dashboard**: Web interface for tournament insights
-- 🔗 **API**: REST API for external integrations
-- 🤖 **AI Features**: Intelligent player recommendations, automatic conflict resolution
 
 ---
 
