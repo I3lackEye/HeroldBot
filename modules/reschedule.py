@@ -140,6 +140,17 @@ async def handle_request_reschedule(interaction: Interaction, match_id: int):
     if match.get("rescheduled_once", False):
         await interaction.response.send_message("🚫 This match has already been rescheduled and cannot be rescheduled again.", ephemeral=True)
         return
+
+    # Check if this team has already requested a reschedule for this match
+    reschedule_requested_by = match.get("reschedule_requested_by", [])
+    if team_name in reschedule_requested_by:
+        await interaction.response.send_message(
+            "🚫 Your team has already requested a reschedule for this match.\n"
+            "Each team can only request one reschedule per match.",
+            ephemeral=True
+        )
+        return
+
     logger.info(f"[RESCHEDULE] Open match IDs for {team_name}: {open_match_ids}")
 
     # 2️⃣ Find available slots
@@ -192,9 +203,9 @@ async def handle_request_reschedule(interaction: Interaction, match_id: int):
             if scheduled_dt.tzinfo is None:
                 scheduled_dt = scheduled_dt.replace(tzinfo=tz)
             logger.debug(f"[RESCHEDULE] Scheduled time from match: {scheduled_dt.isoformat()}")
-            if scheduled_dt - datetime.now(tz=tz) <= timedelta(hours=1):
+            if scheduled_dt - datetime.now(tz=tz) <= timedelta(hours=24):
                 await interaction.response.send_message(
-                    "🚫 You can only reschedule matches up to 1 hour before the scheduled start.",
+                    "🚫 You can only reschedule matches up to 24 hours before the scheduled start.",
                     ephemeral=True
                 )
                 return
@@ -250,6 +261,17 @@ async def handle_request_reschedule(interaction: Interaction, match_id: int):
             logger.error(f"[RESCHEDULE] ❌ Error building embed: {e}")
             await slot_interaction.followup.send("❌ Error creating embed.", ephemeral=True)
             return
+
+        # Mark that this team has requested a reschedule for this match
+        tournament_updated = load_tournament_data()
+        match_updated = next((m for m in tournament_updated.get("matches", []) if m.get("match_id") == match_id), None)
+        if match_updated:
+            reschedule_requested_by = match_updated.get("reschedule_requested_by", [])
+            if team_name not in reschedule_requested_by:
+                reschedule_requested_by.append(team_name)
+                match_updated["reschedule_requested_by"] = reschedule_requested_by
+                save_tournament_data(tournament_updated)
+                logger.info(f"[RESCHEDULE] Marked {team_name} as having requested reschedule for match {match_id}")
 
         # Post in reschedule channel
         channel = interaction.guild.get_channel(RESCHEDULE_CHANNEL_ID)
