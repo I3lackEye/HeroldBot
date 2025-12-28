@@ -102,8 +102,6 @@ class TournamentConfig:
 class Features:
     """Feature flags."""
     reminder_enabled: bool
-    auto_move: bool
-    create_event: bool
     game_key_handler: bool
     debug_save_slot_matrix: bool
 
