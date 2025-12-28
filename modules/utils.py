@@ -516,11 +516,14 @@ async def games_autocomplete(interaction: discord.Interaction, current: str):
 
 
 def all_matches_completed() -> bool:
-    """Check if all matches are completed."""
+    """
+    Check if all matches are completed or forfeited.
+    Forfeit matches count as completed since they have a determined outcome.
+    """
     tournament = load_tournament_data()
     matches = tournament.get("matches", [])
 
-    return all(match.get("status") == "completed" for match in matches)
+    return all(match.get("status") in ("completed", "forfeit") for match in matches)
 
 
 def get_current_chosen_game() -> str:
