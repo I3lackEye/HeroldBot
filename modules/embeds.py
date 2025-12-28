@@ -130,25 +130,27 @@ async def send_tournament_end_announcement(
     channel: discord.TextChannel,
     mvp_message: str,
     winner_ids: list[str],
+    chosen_game: str,
     new_champion_id: Optional[int] = None,
 ):
     """
     Sends a tournament end embed based on tournament_end.json.
+
+    Args:
+        channel: Discord channel to send to
+        mvp_message: MVP message string
+        winner_ids: List of winner user IDs
+        chosen_game: Name of the game that was played
+        new_champion_id: Optional ID of new champion
+
+    Note: chosen_game must be passed as parameter because tournament data
+    is reset before this function is called.
     """
 
     template = load_embed_template("tournament_end").get("TOURNAMENT_END")
     if not template:
         logger.error("[EMBED] TOURNAMENT_END template missing.")
         return
-
-    tournament = load_tournament_data()
-    if tournament is None:
-        logger.error("[TOURNAMENT] No active tournament found when sending end embed!")
-        await channel.send("❌ Error: Could not find a tournament to send the end embed.")
-        return
-
-    poll_results = tournament.get("poll_results") or {}
-    chosen_game = poll_results.get("chosen_game", "Unknown")
 
     # Process winners
     if winner_ids:
