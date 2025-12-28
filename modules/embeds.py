@@ -56,16 +56,23 @@ def build_embed_from_template(template: dict, placeholders: dict = None) -> Embe
     if isinstance(color_value, str):
         color_value = int(color_value.replace("#", "0x"), 16)
 
+    # Get title and description
+    title = template.get("title", "No title")
+    description = template.get("description", "")
+
+    # Replace placeholders in title and description if provided
+    if placeholders:
+        for key, value in placeholders.items():
+            title = title.replace(f"PLACEHOLDER_{key.upper()}", str(value))
+            description = description.replace(f"PLACEHOLDER_{key.upper()}", str(value))
+
     embed = Embed(
-        title=template.get("title", "No title"),
-        description=template.get("description", ""),
+        title=title,
+        description=description,
         color=color_value,
     )
 
     if placeholders:
-        # Replace placeholders in description
-        for key, value in placeholders.items():
-            embed.description = embed.description.replace(f"PLACEHOLDER_{key.upper()}", str(value))
 
         # Replace placeholders in fields
         for field in template.get("fields", []):

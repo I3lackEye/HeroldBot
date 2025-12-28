@@ -942,3 +942,8 @@ async def generate_and_assign_slots():
         logger.error("[SLOT-PLANNING]    1. Check team availability windows for overlap")
         logger.error("[SLOT-PLANNING]    2. Teams with no overlap cannot be scheduled (check registration data)")
         logger.error("[SLOT-PLANNING]    3. Consider manual intervention for problematic matches")
+
+    # Save updated matches to tournament data
+    tournament["matches"] = updated_matches
+    save_tournament_data(tournament)
+    logger.info("[SLOT-PLANNING] 💾 Match schedule saved to tournament.json")
