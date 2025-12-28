@@ -38,8 +38,7 @@ from modules.matchmaker import (
     generate_and_assign_slots,
     generate_schedule_overview,
 )
-from modules.stats import (
-    autocomplete_players,
+from modules.info import (
     get_mvp,
     get_winner_ids,
     get_winner_team,
