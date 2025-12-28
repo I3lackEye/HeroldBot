@@ -8,7 +8,6 @@ from zoneinfo import ZoneInfo
 
 import discord
 from discord import Embed, Interaction, app_commands
-from discord.ext import commands
 
 # Local modules
 from modules import poll
@@ -62,15 +61,6 @@ from modules.utils import (
 # Global variables for double-call prevention
 _registration_closed = False
 _registration_lock = asyncio.Lock()  # Prevent race conditions
-
-
-# ---------------------------------------
-# Tournament Cog
-# ---------------------------------------
-class TournamentCog(commands.Cog):
-    def __init__(self, bot):
-        self.bot = bot
-
 
 
 # ---------------------------------------
@@ -214,78 +204,88 @@ async def close_registration_after_delay(delay_seconds: int, channel: discord.Te
     """
     Closes registration after a delay automatically
     and starts automatic matchmaking & cleanup.
+
+    Thread-safe implementation using lock to prevent double execution.
     """
-    tournament = load_tournament_data()  # always load data first
-
     global _registration_closed, _registration_lock
-    await asyncio.sleep(delay_seconds)
 
-    # Use lock to prevent race conditions when multiple calls happen simultaneously
+    # CRITICAL: Acquire lock BEFORE sleeping to prevent race conditions
     async with _registration_lock:
         if _registration_closed:
             logger.warning("[REGISTRATION] Process already completed – double prevention active.")
             return
+
+        # Mark as in-progress immediately (still holding lock)
         _registration_closed = True
+        logger.info(f"[REGISTRATION] Will auto-close in {delay_seconds} seconds")
+
+    # Now we can safely sleep - we've marked ourselves as in-progress
+    await asyncio.sleep(delay_seconds)
+
+    # Load tournament data once
+    tournament = load_tournament_data()
 
     if not tournament.get("running", False):
-        await channel.send(f"⚠️ No tournament is running – registration will not be closed.")
+        await channel.send("⚠️ No tournament is running – registration will not be closed.")
         return
 
+    # Close registration if still open
     if not tournament.get("registration_open", False):
         logger.warning("[CLOSE] Registration was already closed, but continuing with match planning.")
     else:
-        # Close now
         tournament["registration_open"] = False
         save_tournament_data(tournament)
         await send_registration_closed(channel)
         logger.info("[TOURNAMENT] Registration automatically closed.")
 
-    # Clean up orphaned teams
-    await cleanup_orphan_teams(channel)
+    try:
+        # Step 1: Clean up orphaned teams (modifies tournament data)
+        await cleanup_orphan_teams(channel)
 
-    # Automatically match solo players
-    auto_match_solo()
+        # Step 2: Automatically match solo players (modifies tournament data)
+        auto_match_solo()
 
-    # Create match schedule
-    tournament = load_tournament_data()
-    create_round_robin_schedule(tournament)
+        # Step 3: Reload after modifications, create schedule
+        tournament = load_tournament_data()
+        create_round_robin_schedule(tournament)
 
-    # Auto-calculate optimal tournament duration based on number of teams
-    num_teams = len(tournament.get("teams", {}))
-    if num_teams > 0:
-        registration_end_str = tournament.get("registration_end")
-        if registration_end_str:
-            registration_end = datetime.fromisoformat(registration_end_str)
-            # Ensure timezone awareness
-            tz = ZoneInfo(CONFIG.bot.timezone)
-            if registration_end.tzinfo is None:
-                registration_end = registration_end.replace(tzinfo=tz)
+        # Step 4: Auto-calculate optimal tournament duration
+        num_teams = len(tournament.get("teams", {}))
+        if num_teams > 0:
+            registration_end_str = tournament.get("registration_end")
+            if registration_end_str:
+                registration_end = datetime.fromisoformat(registration_end_str)
+                # Ensure timezone awareness
+                tz = ZoneInfo(CONFIG.bot.timezone)
+                if registration_end.tzinfo is None:
+                    registration_end = registration_end.replace(tzinfo=tz)
 
-            # Calculate and update tournament end
-            optimal_end = calculate_optimal_tournament_duration(num_teams, registration_end)
-            tournament["tournament_end"] = optimal_end.isoformat()
-            save_tournament_data(tournament)
-            logger.info(f"[TOURNAMENT] Duration auto-set to {optimal_end.strftime('%Y-%m-%d')}")
+                # Calculate and update tournament end
+                optimal_end = calculate_optimal_tournament_duration(num_teams, registration_end)
+                tournament["tournament_end"] = optimal_end.isoformat()
+                save_tournament_data(tournament)
+                logger.info(f"[TOURNAMENT] Duration auto-set to {optimal_end.strftime('%Y-%m-%d')}")
 
-    # Remove all remaining solo players
-    tournament = load_tournament_data()
-    tournament["solo"] = []
-    save_tournament_data(tournament)
+        # Step 5: Clear solo list (already processed by auto_match_solo)
+        tournament["solo"] = []
+        save_tournament_data(tournament)
 
-    # Load matches
-    tournament = load_tournament_data()
-    matches = tournament.get("matches", [])
+        # Step 6: Generate slots and assign matches
+        await generate_and_assign_slots()
 
-    # Generate slots and distribute matches
-    await generate_and_assign_slots()
+        # Step 7: Reload to get updated matches, send schedule
+        tournament = load_tournament_data()
+        matches = tournament.get("matches", [])
 
-    # Reload after distribution
-    tournament = load_tournament_data()
-    matches = tournament.get("matches", [])
+        description_text = generate_schedule_overview(matches)
+        await send_match_schedule_for_channel(channel, description_text)
 
-    # Post overview
-    description_text = generate_schedule_overview(matches)
-    await send_match_schedule_for_channel(channel, description_text)
+        logger.info("[REGISTRATION] Registration close procedure completed successfully")
+
+    except Exception as e:
+        logger.error(f"[REGISTRATION] Error during close procedure: {e}", exc_info=True)
+        await channel.send(f"⚠️ An error occurred during match planning: {e}")
+        raise
 
 
 async def close_tournament_after_delay(delay_seconds: int, channel: discord.TextChannel):
@@ -296,4 +296,11 @@ async def close_tournament_after_delay(delay_seconds: int, channel: discord.Text
 
 
 async def setup(bot):
-    await bot.add_cog(TournamentCog(bot))
+    """
+    Setup function for tournament module.
+
+    Note: This module provides utility functions and background tasks,
+    but does not register any cogs or commands. Tournament-related commands
+    are registered in other modules (admin_tools, players, etc.).
+    """
+    logger.info("[TOURNAMENT] Tournament module loaded (utility functions only)")
