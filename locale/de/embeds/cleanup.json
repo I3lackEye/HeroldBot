@@ -1,7 +1,7 @@
 {
-    "CLEANUP_SUMMARY": {
-        "title": "🔍 Aufräumen abgeschlossen",
-        "description": "Hier sind die Ergebnisse des Aufräumvorgangs:",
-        "color": "0x3498db"
-      }
+  "CLEANUP_SUMMARY": {
+    "title": "🔍 Aufräumen abgeschlossen",
+    "description": "Hier sind die Ergebnisse des Aufräumvorgangs:",
+    "color": "0x3498DB"
+  }
 }

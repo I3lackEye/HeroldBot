@@ -1,10 +1,10 @@
 {
-    "REMINDER": {
-      "title": "🕒 Match-Erinnerung!",
-      "description": "**In 1 Stunde startet dein Match:**\n\n🏆 **PLACEHOLDER_TEAM1** vs **PLACEHOLDER_TEAM2**\n🕒 **Startzeit:** PLACEHOLDER_TIME\n\nBitte seid rechtzeitig bereit und viel Erfolg!\n\n📣 Teilnehmer: PLACEHOLDER_MENTIONS",
-      "color": "#F1C40F",
-      "footer": "Wir wünschen spannende Matches!",
-      "icon": "🎯"
-    }
+  "REMINDER": {
+    "title": "🕒 Match-Erinnerung!",
+    "description": "**In 1 Stunde startet dein Match:**\n\n🏆 **PLACEHOLDER_TEAM1** vs **PLACEHOLDER_TEAM2**\n🕒 **Startzeit:** PLACEHOLDER_TIME\n\nBitte seid rechtzeitig bereit und viel Erfolg!\n\n📣 Teilnehmer: PLACEHOLDER_MENTIONS",
+    "color": "0xF1C40F",
+    "footer": "Wir wünschen spannende Matches!",
+    "icon": "🎯"
   }
+}
   
