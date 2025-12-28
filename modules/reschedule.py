@@ -24,7 +24,7 @@ from modules.logger import logger
 from modules.matchmaker import generate_slot_matrix, get_valid_slots_for_match, assign_slots_with_matrix
 from modules.shared_states import pending_reschedules
 from modules.utils import get_player_team, get_team_open_matches, smart_send
-from views.reschedule_view import RescheduleView
+from views.reschedule_view import RescheduleView, SlotSelectView
 
 RESCHEDULE_TIMEOUT_HOURS = CONFIG.tournament.reschedule_timeout_hours
 
@@ -104,7 +104,7 @@ def extend_tournament_and_reschedule_match(match: dict, days: int = 2) -> bool:
 async def handle_request_reschedule(interaction: Interaction, match_id: int):
     """
     Handles a reschedule request from a player.
-    Validates the request, finds free slots, and posts a voting message.
+    Shows available slots for the player to choose from.
     """
     global pending_reschedules
     tournament = load_tournament_data()
@@ -142,69 +142,57 @@ async def handle_request_reschedule(interaction: Interaction, match_id: int):
         return
     logger.info(f"[RESCHEDULE] Open match IDs for {team_name}: {open_match_ids}")
 
-    # 2️⃣ Automatically determine next free slot
+    # 2️⃣ Find available slots
     allowed_slots = get_free_slots_for_match(tournament, match_id)
     logger.debug(f"[RESCHEDULE] get_free_slots_for_match returned: {allowed_slots}")
-    allowed_iso = {slot.isoformat() for slot in allowed_slots}
-    booked_slots = {m["scheduled_time"] for m in tournament["matches"] if m.get("scheduled_time")}
-    free_slots = [slot for slot in allowed_iso if slot not in booked_slots]
 
-    now = datetime.now(ZoneInfo("Europe/Berlin"))
-    future_slots = []
-    for slot in free_slots:
-        try:
-            dt = datetime.fromisoformat(slot).astimezone(ZoneInfo("Europe/Berlin"))
-            if dt > now:
-                future_slots.append(dt)
-        except Exception as e:
-            logger.error(f"[RESCHEDULE] Invalid slot in free_slots: {slot} – Error: {e}")
-
-    if not future_slots:
-        logger.warning(f"[RESCHEDULE] No free slots – tournament will be extended.")
+    if not allowed_slots:
+        logger.warning(f"[RESCHEDULE] No free slots found – trying to extend tournament.")
         success = extend_tournament_and_reschedule_match(match, days=2)
         if not success:
             await interaction.response.send_message(
-                "🚫 No valid slot available – even after extension. Please inform tournament management.",
+                "🚫 No valid slots available – even after extension. Please contact tournament management.",
                 ephemeral=True
             )
             return
-        logger.debug(f"[RESCHEDULE] ISO slots: {allowed_iso}")
-        logger.debug(f"[RESCHEDULE] Booked slots: {booked_slots}")
-        logger.debug(f"[RESCHEDULE] Free slots after filter: {free_slots}")
-        logger.debug(f"[RESCHEDULE] Future slots: {future_slots}")
 
-        # Reload
+        # Reload after extension
         tournament = load_tournament_data()
         match = next((m for m in tournament.get("matches", []) if m.get("match_id") == match_id), None)
         allowed_slots = get_free_slots_for_match(tournament, match_id)
-        allowed_iso = {slot.isoformat() for slot in allowed_slots}
-        booked_slots = {m["scheduled_time"] for m in tournament["matches"] if m.get("scheduled_time")}
-        free_slots = [slot for slot in allowed_iso if slot not in booked_slots]
 
-        future_slots = [
-            datetime.fromisoformat(slot).astimezone(ZoneInfo("Europe/Berlin"))
-            for slot in free_slots
-            if datetime.fromisoformat(slot).astimezone(ZoneInfo("Europe/Berlin")) > now
-        ]
-
-        if not future_slots:
+        if not allowed_slots:
             await interaction.response.send_message(
-                "❌ Even after extension, no free slot could be found.",
+                "❌ Even after extension, no free slots could be found.",
                 ephemeral=True
             )
             return
 
-    logger.debug(f"[RESCHEDULE] Future slot candidates: {[s.isoformat() for s in future_slots]}")
-    # ⏰ Take next slot
-    new_dt = min(future_slots)
+    # Filter to only future slots
+    tz = ZoneInfo(CONFIG.bot.timezone)
+    now = datetime.now(tz=tz)
+    future_slots = [slot for slot in allowed_slots if slot > now]
+
+    if not future_slots:
+        await interaction.response.send_message(
+            "❌ No future slots available for reschedule.",
+            ephemeral=True
+        )
+        return
+
+    # Sort slots chronologically
+    future_slots.sort()
+    logger.info(f"[RESCHEDULE] Found {len(future_slots)} available future slots for match {match_id}")
 
     # Check if too late (match too close to start)
     scheduled_time_str = match.get("scheduled_time")
     if scheduled_time_str:
         try:
             scheduled_dt = datetime.fromisoformat(scheduled_time_str)
+            if scheduled_dt.tzinfo is None:
+                scheduled_dt = scheduled_dt.replace(tzinfo=tz)
             logger.debug(f"[RESCHEDULE] Scheduled time from match: {scheduled_dt.isoformat()}")
-            if scheduled_dt - datetime.now(ZoneInfo("UTC")) <= timedelta(hours=1):
+            if scheduled_dt - datetime.now(tz=tz) <= timedelta(hours=1):
                 await interaction.response.send_message(
                     "🚫 You can only reschedule matches up to 1 hour before the scheduled start.",
                     ephemeral=True
@@ -213,117 +201,84 @@ async def handle_request_reschedule(interaction: Interaction, match_id: int):
         except Exception as e:
             logger.error(f"[RESCHEDULE] ❌ Error parsing scheduled_time: {scheduled_time_str} – {e}")
 
+    # 3️⃣ Show slot selection to requester
+    async def post_reschedule_request(slot_interaction: Interaction, selected_slot: datetime):
+        """Callback called when player selects a slot."""
+        # Get match data
+        team1 = match["team1"]
+        team2 = match["team2"]
+        members1 = tournament.get("teams", {}).get(team1, {}).get("members", [])
+        members2 = tournament.get("teams", {}).get(team2, {}).get("members", [])
+        mentions = members1 + members2
 
+        # Fetch valid members
+        valid_members = []
+        for mention in mentions:
+            if mention.startswith("<@"):
+                try:
+                    uid = int(mention.replace("<@", "").replace("!", "").replace(">", ""))
+                    member = await interaction.guild.fetch_member(uid)
+                    valid_members.append(member)
+                except discord.NotFound:
+                    logger.warning(f"[RESCHEDULE] ⚠️ Member {uid} not found.")
+                except discord.Forbidden:
+                    logger.error(f"[RESCHEDULE] ❌ No permission to fetch member {uid}.")
+                except Exception as e:
+                    logger.error(f"[RESCHEDULE] ❌ Error fetching member {uid}: {e}")
 
-    # 3️⃣ Prepare players for voting
-    team1 = match["team1"]
-    team2 = match["team2"]
-    members1 = tournament.get("teams", {}).get(team1, {}).get("members", [])
-    members2 = tournament.get("teams", {}).get(team2, {}).get("members", [])
-    mentions = members1 + members2
+        if not valid_members:
+            logger.error(f"[RESCHEDULE] No valid members found for match {match_id}")
+            return
 
-    valid_members = []
-    for mention in mentions:
-        if mention.startswith("<@"):
-            try:
-                uid = int(mention.replace("<@", "").replace("!", "").replace(">", ""))
-                member = await interaction.guild.fetch_member(uid)
-                valid_members.append(member)
-            except discord.NotFound:
-                logger.warning(f"[RESCHEDULE] ⚠️ Member {uid} not found.")
-            except discord.Forbidden:
-                logger.error(f"[RESCHEDULE] ❌ No permission to fetch member {uid}.")
-            except Exception as e:
-                logger.error(f"[RESCHEDULE] ❌ Error fetching member {uid}: {e}")
+        # Build embed
+        deadline = (datetime.now(tz=tz) + timedelta(hours=RESCHEDULE_TIMEOUT_HOURS)).strftime("%d.%m.%Y %H:%M")
+        short_players = "\n".join([m.mention for m in valid_members][:10])  # Max 10 for readability
+        short_match = f"{team1[:50]} vs {team2[:50]}"
 
+        placeholders = {
+            "MATCH_INFO": short_match,
+            "NEW_SLOT": selected_slot.strftime("%d.%m.%Y %H:%M"),
+            "DEADLINE": deadline,
+            "PLAYERS": short_players
+        }
 
-    logger.debug(f"[RESCHEDULE] Valid members for match {match_id}: {[m.display_name for m in valid_members]}")
+        try:
+            templates = load_embed_template("reschedule")
+            template = templates.get("RESCHEDULE")
+            final_embed = build_embed_from_template(template, placeholders)
+        except Exception as e:
+            logger.error(f"[RESCHEDULE] ❌ Error building embed: {e}")
+            await slot_interaction.followup.send("❌ Error creating embed.", ephemeral=True)
+            return
 
-    if not valid_members:
-        await interaction.response.send_message("❌ No valid players found.", ephemeral=True)
-        return
+        # Post in reschedule channel
+        channel = interaction.guild.get_channel(RESCHEDULE_CHANNEL_ID)
+        if not channel:
+            logger.error(f"[RESCHEDULE] Reschedule channel not found (ID: {RESCHEDULE_CHANNEL_ID})")
+            return
 
-    # 4️⃣ Create request embed
-    deadline = (datetime.now(ZoneInfo("Europe/Berlin")) + timedelta(hours=RESCHEDULE_TIMEOUT_HOURS)).strftime("%d.%m.%Y %H:%M")
-    def shorten_lines(lines, max_total=1000):
-        result = []
-        total = 0
-        for line in lines:
-            if total + len(line) > max_total:
-                result.append("…")
-                break
-            result.append(line)
-            total += len(line)
-        return "\n".join(result)
+        view = RescheduleView(match_id, team1, team2, selected_slot, valid_members, interaction.user)
+        try:
+            msg = await channel.send(embed=final_embed, view=view)
+            view.message = msg
+            logger.info(f"[RESCHEDULE] Request for match {match_id} posted in #{channel.name}")
+        except Exception as e:
+            logger.error(f"[RESCHEDULE] ❌ Error posting request: {e}")
+            return
 
-    short_players = shorten_lines([m.mention for m in valid_members])
-    short_match = f"{team1[:50]} vs {team2[:50]}"
+        # Start timer
+        pending_reschedules.add(match_id)
+        interaction.client.loop.create_task(start_reschedule_timer(interaction.client, match_id))
 
-    placeholders = {
-        "MATCH_INFO": short_match,
-        "NEW_SLOT": new_dt.strftime("%d.%m.%Y %H:%M"),
-        "DEADLINE": deadline,
-        "PLAYERS": short_players
-    }
-    logger.debug(f"[RESCHEDULE] Embed preview: {placeholders}")
-    logger.debug(f"[RESCHEDULE] Embed will be sent to channel ID {RESCHEDULE_CHANNEL_ID}")
-
-    try:
-        templates = load_embed_template("reschedule")
-        if not isinstance(templates, dict):
-            raise TypeError("load_embed_template did not return a dict")
-
-        template = templates.get("RESCHEDULE")
-        if not isinstance(template, dict):
-            raise TypeError("RESCHEDULE block missing or not a dict")
-
-    except Exception as e:
-        logger.error(f"[RESCHEDULE] ❌ Error loading embed template: {e}")
-        await interaction.followup.send("❌ Embed template could not be loaded.", ephemeral=True)
-        return
-
-    try:
-        final_embed = build_embed_from_template(template, placeholders)
-        logger.info(f"[RESCHEDULE] Embed successfully built. Sending to channel ID {RESCHEDULE_CHANNEL_ID}")
-    except Exception as e:
-        logger.error(f"[RESCHEDULE] ❌ Error building embed: {e}")
-        await interaction.followup.send("❌ Internal error creating embed. Please inform tournament management.", ephemeral=True)
-        return
-
-
-    # 5️⃣ Post request in channel
-    channel = interaction.guild.get_channel(RESCHEDULE_CHANNEL_ID)
-    if not channel:
-        await interaction.response.send_message("❌ Reschedule channel not found.", ephemeral=True)
-        return
-    logger.debug(f"[RESCHEDULE] Channel is: {channel} (Type: {type(channel)})")
-
-    view = RescheduleView(match_id, team1, team2, new_dt, valid_members)
-    logger.debug(f"[RESCHEDULE] Sending to channel {channel.name} ({channel.id}) with view: {view}")
-    try:
-        logger.debug(f"[RESCHEDULE] Channel permissions for bot in #{channel.name}: {channel.permissions_for(interaction.guild.me)}")
-        msg = await channel.send(embed=final_embed, view=view)
-        view.message = msg
-        logger.info(f"[RESCHEDULE] Request for match {match_id} successfully posted in channel #{channel.name}.")
-    except discord.HTTPException as e:
-        logger.error(f"[RESCHEDULE] ❌ Discord HTTPException sending request: {e.text} – {e.code}")
-        await interaction.followup.send("❌ Discord rejected sending the request (HTTPException).", ephemeral=True)
-        return
-    except Exception as e:
-        logger.error(f"[RESCHEDULE] ❌ General error sending request: {e}")
-        await interaction.followup.send("❌ Error sending request. Please inform tournament management.", ephemeral=True)
-        return
-
-
-    # 6️⃣ Confirmation to user
-    try:
-        await interaction.response.send_message("✅ Your request has been started in the reschedule channel!", ephemeral=True)
-    except discord.errors.InteractionResponded:
-        await interaction.followup.send("✅ Your request has been started in the reschedule channel!", ephemeral=True)
-
-    # 7️⃣ Start reschedule
-    pending_reschedules.add(match_id)
-    interaction.client.loop.create_task(start_reschedule_timer(interaction.client, match_id))
+    # Show slot selection view
+    view = SlotSelectView(match_id, interaction.user, future_slots, post_reschedule_request)
+    await interaction.response.send_message(
+        f"🔄 **Reschedule Request for Match {match_id}**\n"
+        f"Select a new time slot from the dropdown below:\n"
+        f"_({len(future_slots)} slots available)_",
+        view=view,
+        ephemeral=True
+    )
 
 
 
