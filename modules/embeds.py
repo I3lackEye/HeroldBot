@@ -353,18 +353,7 @@ async def send_match_schedule_for_channel(channel: discord.TextChannel, descript
 
 
 # Removed: send_poll_results() - now combined with send_registration_open()
-
-
-async def send_help(interaction: Interaction):
-    """Sends help embed."""
-    template = load_embed_template("help").get("HELP")
-    if not template:
-        logger.error("[EMBED] HELP template missing.")
-        return
-
-    embed = build_embed_from_template(template, placeholders=None)
-
-    await interaction.response.send_message(embed=embed, ephemeral=True)
+# Removed: send_help() - now uses /info help command
 
 
 async def send_global_stats(interaction: Interaction, description_text: str):
