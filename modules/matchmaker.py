@@ -15,7 +15,7 @@ from discord import TextChannel
 # Local modules
 from modules.config import CONFIG
 from modules.dataStorage import DEBUG_MODE, load_tournament_data, save_tournament_data
-from modules.embeds import send_cleanup_summary
+# Removed: send_cleanup_summary import - function deleted to reduce spam
 from modules.logger import logger
 from modules.utils import generate_team_name, get_active_days_config
 
