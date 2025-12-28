@@ -413,38 +413,6 @@ def remove_game(game_id: str) -> None:
     logger.info(f"[GAME] Game '{game_id}' was deleted.")
 
 
-def backup_current_state() -> None:
-    """
-    Creates backups of tournament, global data, and games from /data/.
-    Saves them in /backups/ with timestamp.
-    """
-    backup_folder = os.path.join(BASE_DIR, "backups")
-    if not os.path.exists(backup_folder):
-        os.makedirs(backup_folder)
-
-    now = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-
-    files_to_backup = {
-        TOURNAMENT_FILE_PATH: f"tournament_backup_{now}.json",
-        DATA_FILE_PATH: f"data_backup_{now}.json",
-        GAMES_FILE_PATH: f"games_backup_{now}.json",
-    }
-
-    backed_up = 0
-    for source_file, backup_name in files_to_backup.items():
-        if os.path.exists(source_file):
-            try:
-                shutil.copy(source_file, os.path.join(backup_folder, backup_name))
-                logger.info(f"[BACKUP] Backed up: {os.path.basename(source_file)}")
-                backed_up += 1
-            except IOError as e:
-                logger.error(f"[BACKUP] Failed to backup {os.path.basename(source_file)}: {e}")
-        else:
-            logger.debug(f"[BACKUP] File not found, skipping: {os.path.basename(source_file)}")
-
-    logger.info(f"[BACKUP] Backup completed: {backed_up}/{len(files_to_backup)} files backed up")
-
-
 def delete_tournament_file() -> None:
     """
     Delete tournament.json file.

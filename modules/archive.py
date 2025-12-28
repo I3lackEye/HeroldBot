@@ -16,6 +16,10 @@ from modules.logger import logger
 def archive_current_tournament():
     """
     Archives the current tournament data to a timestamped JSON file.
+    Only archives tournament-specific data (matches, teams, player_stats).
+
+    Note: games.json is NOT archived as it rarely changes and is not tournament-specific.
+
     Returns the path to the archive file.
     """
     tournament = load_tournament_data()
@@ -25,10 +29,13 @@ def archive_current_tournament():
     if not os.path.exists(archive_folder):
         os.makedirs(archive_folder)
 
+    # Only archive tournament-relevant data from global_data
+    # Exclude "games" as they're not tournament-specific and rarely change
     archive_data = {
         "archived_on": datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
         "tournament": tournament,
-        "global_data": global_data,
+        "player_stats": global_data.get("player_stats", {}),
+        "last_tournament_winner": global_data.get("last_tournament_winner", {}),
     }
 
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
@@ -37,6 +44,7 @@ def archive_current_tournament():
     with open(filename, "w", encoding="utf-8") as f:
         json.dump(archive_data, f, indent=4, ensure_ascii=False)
 
+    logger.info(f"[ARCHIVE] Tournament archived to: {filename}")
     return filename
 
 
