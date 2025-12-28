@@ -5,9 +5,9 @@ import os
 from typing import Optional
 
 import discord
-from discord import Interaction, app_commands, TextChannel, Role
+from discord import Interaction, app_commands, TextChannel, Role, ButtonStyle
 from discord.ext import commands
-from discord.ui import Modal, TextInput, View, Button, ButtonStyle
+from discord.ui import Modal, TextInput, View, Button
 
 from modules.logger import logger
 from modules.utils import has_permission
