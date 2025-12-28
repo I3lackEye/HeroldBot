@@ -16,7 +16,7 @@ from modules.logger import logger
 # Local modules
 from modules.config import CONFIG
 from modules.utils import smart_send
-from views.reschedule_view import RescheduleView
+from modules.reschedule_view import RescheduleView
 
 
 def load_embed_template(template_name: str, language: str = None) -> dict:
