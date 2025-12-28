@@ -1,0 +1,8 @@
+{
+  "SETUP_WELCOME": {
+    "title": "🎮 Welcome to HeroldBot Setup!",
+    "description": "This wizard will help you configure the bot for your server.\n\n**You will configure:**\n📍 Limits Channel\n📍 Reminder Channel\n📍 Reschedule Channel\n🏆 Champion/Winner Role\n🕒 Timezone\n\nClick **Start Setup** below to begin.",
+    "footer": "You can run this setup again anytime with /setup start",
+    "color": "0x5865F2"
+  }
+}
