@@ -822,6 +822,8 @@ async def generate_and_assign_slots():
     """
     Main function for slot generation and match assignment.
     Uses global slot matrix and new assignment logic.
+
+    Enhanced with automatic tournament extension when rescue mode fails due to capacity.
     """
     tournament = load_tournament_data()
     matches = tournament.get("matches", [])
@@ -851,9 +853,66 @@ async def generate_and_assign_slots():
     else:
         logger.info(f"[SLOT-PLANNING] Step 3/3: Rescue mode not needed - all matches scheduled!")
 
-    # Save
-    tournament["matches"] = updated_matches
-    save_tournament_data(tournament)
+    # Step 4: Auto-extend tournament if rescue mode failed due to capacity
+    failed_matches = [m for m in updated_matches if not m.get("scheduled_time")]
+
+    if failed_matches:
+        logger.info(f"[SLOT-PLANNING] Step 4/4: Checking if tournament extension can help...")
+
+        # Check which failed matches have availability overlap (capacity problem vs. no overlap)
+        extendable_matches = []
+        for match in failed_matches:
+            team1 = match["team1"]
+            team2 = match["team2"]
+            potential_slots = get_valid_slots_for_match(team1, team2, slot_matrix)
+
+            if potential_slots:
+                # Teams have overlapping availability, but all slots are occupied
+                extendable_matches.append(match)
+                logger.info(f"[EXTEND] ✅ Match {match['match_id']} ({team1} vs {team2}) has {len(potential_slots)} potential slots (capacity issue)")
+            else:
+                logger.error(f"[EXTEND] ❌ Match {match['match_id']} ({team1} vs {team2}) has NO overlapping availability (unfixable)")
+
+        if extendable_matches:
+            logger.info(f"[EXTEND] 🔧 {len(extendable_matches)} matches can be fixed by extending tournament duration")
+
+            # Extend tournament by 2 weeks
+            tz = ZoneInfo(CONFIG.bot.timezone)
+            tournament_end = datetime.fromisoformat(tournament["tournament_end"])
+            if tournament_end.tzinfo is None:
+                tournament_end = tournament_end.replace(tzinfo=tz)
+
+            original_end = tournament_end.strftime("%Y-%m-%d")
+            tournament_end += timedelta(weeks=2)
+            new_end = tournament_end.strftime("%Y-%m-%d")
+
+            tournament["tournament_end"] = tournament_end.isoformat()
+            save_tournament_data(tournament)
+
+            logger.warning(f"[EXTEND] ⏰ Tournament automatically extended: {original_end} → {new_end} (+2 weeks)")
+            logger.info(f"[EXTEND] 🔄 Regenerating slot matrix with new end date...")
+
+            # Reload tournament and regenerate slot matrix
+            tournament = load_tournament_data()
+            slot_matrix = generate_slot_matrix(tournament)
+
+            # Retry failed matches with expanded slot matrix
+            logger.info(f"[EXTEND] 🎯 Retrying {len(extendable_matches)} matches with expanded time window...")
+
+            # Use rescue mode directly on extendable matches (already relaxed rules)
+            updated_matches = assign_rescue_slots(extendable_matches, updated_matches, slot_matrix, teams)
+
+            # Save updated matches
+            tournament["matches"] = updated_matches
+            save_tournament_data(tournament)
+
+            # Report results
+            newly_scheduled = sum(1 for m in extendable_matches if m.get("scheduled_time"))
+            logger.info(f"[EXTEND] 📊 Extension result: {newly_scheduled}/{len(extendable_matches)} matches scheduled after extension")
+        else:
+            logger.error("[EXTEND] ❌ No matches can be fixed by extending tournament (all have no team overlap)")
+    else:
+        logger.info(f"[SLOT-PLANNING] Step 4/4: Extension not needed - all matches scheduled!")
 
     # Final summary
     scheduled_count = sum(1 for m in updated_matches if m.get("scheduled_time"))
@@ -872,5 +931,5 @@ async def generate_and_assign_slots():
     if failed_count > 0:
         logger.error("[SLOT-PLANNING] 💡 Troubleshooting tips:")
         logger.error("[SLOT-PLANNING]    1. Check team availability windows for overlap")
-        logger.error("[SLOT-PLANNING]    2. Extend tournament duration in configs/tournament.json")
-        logger.error("[SLOT-PLANNING]    3. Reduce match_duration_minutes or increase active_days")
+        logger.error("[SLOT-PLANNING]    2. Teams with no overlap cannot be scheduled (check registration data)")
+        logger.error("[SLOT-PLANNING]    3. Consider manual intervention for problematic matches")
