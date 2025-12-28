@@ -340,9 +340,12 @@ async def cleanup_orphan_teams(channel: TextChannel):
     tournament["solo"] = solo
     save_tournament_data(tournament)
 
-    await send_cleanup_summary(channel, teams_deleted_list, players_rescued_list)
-
-    logger.info(f"[CLEANUP] {len(teams_deleted_list)} empty teams deleted, {len(players_rescued_list)} players rescued.")
+    # Log cleanup results (no channel spam)
+    if teams_deleted_list:
+        logger.info(f"[CLEANUP] {len(teams_deleted_list)} orphan teams deleted: {', '.join(teams_deleted_list)}")
+        logger.info(f"[CLEANUP] {len(players_rescued_list)} players moved to solo list")
+    else:
+        logger.info("[CLEANUP] No orphan teams found.")
 
 
 # =======================================

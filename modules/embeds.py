@@ -352,33 +352,7 @@ async def send_match_schedule_for_channel(channel: discord.TextChannel, descript
             await channel.send(embed=embed)
 
 
-async def send_poll_results(channel: TextChannel, placeholders: dict, poll_results: dict):
-    """Sends poll results embed."""
-    template = load_embed_template("poll").get("POLL_RESULT")
-    if not template:
-        logger.error("[EMBED] POLL_RESULT template missing.")
-        return
-
-    from modules.dataStorage import load_games
-    games = load_games()
-
-    embed = build_embed_from_template(template, placeholders)
-
-    # Only filter real games (without "chosen_game")
-    real_votes = {k: v for k, v in poll_results.items() if k != "chosen_game"}
-
-    sorted_games = sorted(real_votes.items(), key=lambda kv: kv[1], reverse=True)
-
-    for game_id, votes in sorted_games:
-        game_name = games.get(game_id, {}).get("name", game_id)
-        embed.add_field(name=game_name, value=f"**{votes} Votes**", inline=False)
-
-    if "chosen_game" in poll_results:
-        winner_id = poll_results["chosen_game"]
-        winner_name = games.get(winner_id, {}).get("name", winner_id)
-        embed.add_field(name="🏆 Won", value=f"**{winner_name}**", inline=False)
-
-    await channel.send(embed=embed)
+# Removed: send_poll_results() - now combined with send_registration_open()
 
 
 async def send_help(interaction: Interaction):

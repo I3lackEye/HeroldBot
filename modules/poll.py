@@ -10,7 +10,7 @@ from discord.ext import commands
 # Local modules
 from modules.config import CONFIG
 from modules.dataStorage import load_tournament_data, save_tournament_data, load_games
-from modules.embeds import send_poll_results, send_registration_open
+from modules.embeds import send_registration_open
 from modules.logger import logger
 from modules.task_manager import add_task
 from modules.tournament import auto_end_poll, close_registration_after_delay
@@ -130,18 +130,23 @@ async def end_poll(bot: discord.Client, channel: discord.TextChannel):
     tournament["registration_open"] = True
     save_tournament_data(tournament)
 
-    # Post poll embed
-    placeholders = {"chosen_game": chosen_game}
-    await send_poll_results(channel, placeholders, real_votes)
-
-    # Open registration
+    # Open registration with poll results combined
     reg_end = tournament.get("registration_end")
     if reg_end:
         formatted_end = reg_end.replace("T", " ")[:16]
     else:
         formatted_end = "Unknown"
 
-    await send_registration_open(channel, {"endtime": formatted_end})
+    # Format votes for display
+    vote_text = ", ".join([f"{game}: {votes}" for game, votes in sorted(real_votes.items(), key=lambda x: x[1], reverse=True)])
+
+    placeholders = {
+        "game": chosen_game,
+        "votes": vote_text,
+        "endtime": formatted_end
+    }
+
+    await send_registration_open(channel, placeholders)
 
     logger.info(f"[POLL] Poll ended. Chosen game: {chosen_game}")
 

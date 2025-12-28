@@ -1,21 +1,18 @@
 {
   "REGISTRATION_OPEN_ANNOUNCEMENT": {
-    "title": "📥 Anmeldung geöffnet!",
-    "description": "Die Anmeldung für das Turnier läuft jetzt! Sichere dir deinen Platz und mach mit!",
+    "title": "🎮 PLACEHOLDER_GAME gewinnt! - Anmeldung geöffnet!",
+    "description": "Die Abstimmung ist beendet und das Spiel steht fest!\n\n🏆 **Gewähltes Spiel:** PLACEHOLDER_GAME\n📊 **Stimmen:** PLACEHOLDER_VOTES\n\n📥 **Die Anmeldung läuft jetzt!**\nNutze `/player join` um dich anzumelden (solo oder als Team).",
     "fields": [
       {
-        "name": "🛠 Wie melde ich mich an?",
-        "value": "Benutze den Befehl **/anmelden**, um dich für das Turnier einzutragen.\n\n➔ Gib eine allgemeine Verfügbarkeit an (z.B. `10:00-20:00`), in der du für Matches Zeit hast.\n➔ Optional kannst du auch getrennte Zeiten für Samstag und Sonntag angeben.\n➔ Achte darauf, mindestens 1 Stunde Verfügbarkeit anzugeben!"
+        "name": "⏰ Anmeldefrist",
+        "value": "Die Anmeldung ist offen bis **PLACEHOLDER_ENDTIME** Uhr."
       },
       {
-        "name": "👥 Teams bilden",
-        "value": "Du kannst dich alleine oder zusammen mit einem Mitspieler anmelden.\n\n➔ Wenn du gemeinsam antreten möchtest, gib im Feld **Mitspieler** den Discord-Namen deines Partners an.\n➔ Falls du alleine kommst, wirst du automatisch einem Team zugeteilt!"
-      },
-      {
-        "name": "⏳ Anmeldefrist",
-        "value": "Die Anmeldung ist offen bis **PLACEHOLDER_ENDTIME** Uhr.\n\n➔ Danach sind keine neuen Anmeldungen mehr möglich!\n➔ Stelle sicher, dass du dich rechtzeitig registrierst."
+        "name": "ℹ️ Mehr Infos",
+        "value": "Nutze `/info help` für eine Anleitung zum Turnier-Ablauf."
       }
     ],
+    "color": "0x2ECC71",
     "footer": "Viel Erfolg – möge das beste Team gewinnen!"
   }
 }
