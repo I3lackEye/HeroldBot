@@ -613,6 +613,8 @@ def assign_slots_with_matrix(matches: list, slot_matrix: dict[datetime, set[str]
 
         valid_slots = get_valid_slots_for_match(team1, team2, slot_matrix)
 
+        logger.debug(f"[SLOT-ASSIGN] Match {match_id} ({team1} vs {team2}): {len(valid_slots)} potential slots found")
+
         matches_with_options.append((match, valid_slots))
 
     # Matches with fewest options first
@@ -623,16 +625,31 @@ def assign_slots_with_matrix(matches: list, slot_matrix: dict[datetime, set[str]
         team2 = match["team2"]
         match_id = match["match_id"]
 
+        if len(valid_slots) == 0:
+            unassigned_matches.append(match)
+            logger.warning(f"[SLOT-ASSIGN] ❌ Match {match_id} ({team1} vs {team2}): No common availability slots")
+            continue
+
+        slot_found = False
+        rejection_reasons = {
+            "already_used": 0,
+            "pause_violation": 0,
+            "budget_exceeded": 0
+        }
+
         for slot in valid_slots:
             slot_str = slot.isoformat()
             slot_date = slot.date()
 
             # Slot already occupied?
             if slot_str in used_slots:
+                rejection_reasons["already_used"] += 1
+                logger.debug(f"[SLOT-ASSIGN]   ⏭️  {slot_str}: Already occupied")
                 continue
 
             # Respect pause rule
             if not is_minimum_pause_respected(last_slot_per_team, team1, team2, slot):
+                rejection_reasons["pause_violation"] += 1
                 continue
 
             # Check daily time budget
@@ -643,6 +660,8 @@ def assign_slots_with_matrix(matches: list, slot_matrix: dict[datetime, set[str]
                 team1_budget + MATCH_DURATION + PAUSE_DURATION > MAX_TIME_BUDGET
                 or team2_budget + MATCH_DURATION + PAUSE_DURATION > MAX_TIME_BUDGET
             ):
+                rejection_reasons["budget_exceeded"] += 1
+                logger.debug(f"[SLOT-ASSIGN]   💰 {slot_str}: Budget exceeded ({team1}: {team1_budget}, {team2}: {team2_budget})")
                 continue
 
             # Slot fits – assign
@@ -650,12 +669,18 @@ def assign_slots_with_matrix(matches: list, slot_matrix: dict[datetime, set[str]
             used_slots.add(slot_str)
             last_slot_per_team[team1] = slot
             last_slot_per_team[team2] = slot
-            logger.info(f"[SLOT-MATRIX] Match {match_id} scheduled at {slot_str}.")
+            logger.info(f"[SLOT-ASSIGN] ✅ Match {match_id} ({team1} vs {team2}) scheduled at {slot_str}")
+            slot_found = True
             break
 
-        if not match.get("scheduled_time"):
+        if not slot_found:
             unassigned_matches.append(match)
-            logger.warning(f"[SLOT-MATRIX] No slot found for match {match_id} ({team1} vs {team2})")
+            logger.warning(f"[SLOT-ASSIGN] ❌ Match {match_id} ({team1} vs {team2}): Failed to schedule")
+            logger.warning(f"[SLOT-ASSIGN]    📊 Rejection reasons: {rejection_reasons['already_used']} already used, "
+                          f"{rejection_reasons['pause_violation']} pause violations, "
+                          f"{rejection_reasons['budget_exceeded']} budget exceeded")
+
+    logger.info(f"[SLOT-ASSIGN] Summary: {len(matches) - len(unassigned_matches)}/{len(matches)} matches scheduled successfully")
 
     return matches, unassigned_matches
 
@@ -689,7 +714,8 @@ def assign_rescue_slots(unassigned_matches, matches, slot_matrix, teams):
     rescue_assigned = 0
     used_slots = set(m.get("scheduled_time") for m in matches if m.get("scheduled_time"))
 
-    logger.info(f"[RESCUE] Starting rescue mode for {len(unassigned_matches)} matches.")
+    logger.info(f"[RESCUE] 🚨 Starting rescue mode for {len(unassigned_matches)} unscheduled matches")
+    logger.info(f"[RESCUE] 🔧 Rescue mode relaxes: pause rules, time budget limits (but NOT availability)")
 
     for problem in unassigned_matches:
         match_id = problem["match_id"]
@@ -701,9 +727,13 @@ def assign_rescue_slots(unassigned_matches, matches, slot_matrix, teams):
             continue
 
         possible_slots = get_valid_slots_for_match(team1, team2, slot_matrix)
+
         if not possible_slots:
-            logger.warning(f"[RESCUE] No common slots for match {match_id}.")
+            logger.error(f"[RESCUE] ❌ Match {match_id} ({team1} vs {team2}): No common availability at all")
+            logger.error(f"[RESCUE]    💡 Suggestion: Check if teams have overlapping availability windows")
             continue
+
+        logger.debug(f"[RESCUE] 🔍 Match {match_id} ({team1} vs {team2}): {len(possible_slots)} potential slots available")
 
         for slot in possible_slots:
             slot_str = slot.isoformat()
@@ -717,17 +747,22 @@ def assign_rescue_slots(unassigned_matches, matches, slot_matrix, teams):
             rescue_assigned += 1
 
             logger.info(
-                f"[RESCUE] Match {match_id} ({team1} vs {team2}) scheduled at {slot_str} "
-                f"(rules relaxed – rescue mode)"
+                f"[RESCUE] ✅ Match {match_id} ({team1} vs {team2}) scheduled at {slot_str} "
+                f"(⚠️  rules relaxed – may violate pause/budget)"
             )
             break
 
         if not match.get("scheduled_time"):
-            logger.warning(
-                f"[RESCUE] Even in rescue mode no slot found for match {match_id} ({team1} vs {team2})."
+            logger.error(
+                f"[RESCUE] ❌ Match {match_id} ({team1} vs {team2}): Even rescue mode failed"
             )
+            logger.error(f"[RESCUE]    All {len(possible_slots)} available slots were already occupied")
 
-    logger.info(f"[RESCUE] Total {rescue_assigned} matches assigned in rescue mode.")
+    logger.info(f"[RESCUE] 📊 Rescue mode summary: {rescue_assigned}/{len(unassigned_matches)} matches rescued")
+
+    if rescue_assigned > 0:
+        logger.warning(f"[RESCUE] ⚠️  {rescue_assigned} matches scheduled with relaxed rules - check schedule carefully!")
+
     return matches
 
 
@@ -750,17 +785,44 @@ async def generate_and_assign_slots():
         )
         return
 
+    logger.info(f"[SLOT-PLANNING] ═══════════════════════════════════════════════════")
+    logger.info(f"[SLOT-PLANNING] Starting match scheduling for {len(matches)} matches and {len(teams)} teams")
+
     # Step 1: Generate slot matrix
+    logger.info(f"[SLOT-PLANNING] Step 1/3: Generating slot matrix...")
     slot_matrix = generate_slot_matrix(tournament)
 
     # Step 2: Assign slots per match
+    logger.info(f"[SLOT-PLANNING] Step 2/3: Assigning matches to slots (with pause & budget rules)...")
     updated_matches, unassigned_matches = assign_slots_with_matrix(matches, slot_matrix)
 
     # Step 3: Rescue mode for unplanned matches
-    updated_matches = assign_rescue_slots(unassigned_matches, updated_matches, slot_matrix, teams)
+    if unassigned_matches:
+        logger.info(f"[SLOT-PLANNING] Step 3/3: Rescue mode for {len(unassigned_matches)} unscheduled matches...")
+        updated_matches = assign_rescue_slots(unassigned_matches, updated_matches, slot_matrix, teams)
+    else:
+        logger.info(f"[SLOT-PLANNING] Step 3/3: Rescue mode not needed - all matches scheduled!")
 
     # Save
     tournament["matches"] = updated_matches
     save_tournament_data(tournament)
 
-    logger.info("[MATCHMAKER] Matches successfully planned via global slot matrix.")
+    # Final summary
+    scheduled_count = sum(1 for m in updated_matches if m.get("scheduled_time"))
+    rescue_count = sum(1 for m in updated_matches if m.get("rescue_assigned"))
+    failed_count = len(matches) - scheduled_count
+
+    logger.info(f"[SLOT-PLANNING] ═══════════════════════════════════════════════════")
+    logger.info(f"[SLOT-PLANNING] 📊 Final Statistics:")
+    logger.info(f"[SLOT-PLANNING]    ✅ Successfully scheduled: {scheduled_count - rescue_count}/{len(matches)} matches")
+    if rescue_count > 0:
+        logger.warning(f"[SLOT-PLANNING]    ⚠️  Rescue mode used: {rescue_count} matches (may have pause/budget violations)")
+    if failed_count > 0:
+        logger.error(f"[SLOT-PLANNING]    ❌ Failed to schedule: {failed_count} matches (no common availability)")
+    logger.info(f"[SLOT-PLANNING] ═══════════════════════════════════════════════════")
+
+    if failed_count > 0:
+        logger.error("[SLOT-PLANNING] 💡 Troubleshooting tips:")
+        logger.error("[SLOT-PLANNING]    1. Check team availability windows for overlap")
+        logger.error("[SLOT-PLANNING]    2. Extend tournament duration in configs/tournament.json")
+        logger.error("[SLOT-PLANNING]    3. Reduce match_duration_minutes or increase active_days")
