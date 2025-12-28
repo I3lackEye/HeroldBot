@@ -14,7 +14,6 @@ from modules import poll
 from modules.archive import archive_current_tournament, update_tournament_history
 from modules.config import CONFIG
 from modules.dataStorage import (
-    backup_current_state,
     delete_tournament_file,
     load_games,
     load_global_data,
@@ -85,15 +84,12 @@ async def end_tournament_procedure(
         await channel.send("⚠️ Not all matches are completed yet. Tournament remains open.")
         return
 
-    # Archive and cleanup
+    # Archive tournament data
     try:
         archive_path = archive_current_tournament()
-        logger.info(f"[TOURNAMENT] Tournament archived at: {archive_path}")
+        logger.info(f"[TOURNAMENT] Tournament successfully archived to: {archive_path}")
     except Exception as e:
-        logger.error(f"[TOURNAMENT] Error archiving: {e}")
-
-    backup_current_state()
-    logger.info(f"[TOURNAMENT] Backup successful")
+        logger.error(f"[TOURNAMENT] Error archiving tournament: {e}")
 
     # Winners, MVP, etc.
     winner_ids = get_winner_ids()
