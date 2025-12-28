@@ -311,6 +311,13 @@ async def send_match_schedule(interaction: Interaction, description_text: str):
         logger.error("[EMBED] MATCH_SCHEDULE template missing.")
         return
 
+    # Check if there are any matches
+    if not description_text or description_text.strip() == "":
+        embed = build_embed_from_template(template, placeholders=None)
+        embed.description = "📭 Noch keine Matches geplant.\n\nMatches werden automatisch erstellt, sobald die Anmeldung geschlossen wird."
+        await smart_send(interaction, embed=embed)
+        return
+
     # If text <= 4096 chars it fits directly
     if len(description_text) <= 4096:
         embed = build_embed_from_template(template, placeholders=None)
@@ -335,6 +342,13 @@ async def send_match_schedule_for_channel(channel: discord.TextChannel, descript
     template = load_embed_template("match_schedule").get("MATCH_SCHEDULE")
     if not template:
         logger.error("[EMBED] MATCH_SCHEDULE template missing.")
+        return
+
+    # Check if there are any matches
+    if not description_text or description_text.strip() == "":
+        embed = build_embed_from_template(template, placeholders=None)
+        embed.description = "📭 Noch keine Matches geplant.\n\nMatches werden automatisch erstellt, sobald die Anmeldung geschlossen wird."
+        await channel.send(embed=embed)
         return
 
     # If text <= 4096 chars it fits directly
