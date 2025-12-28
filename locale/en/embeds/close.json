@@ -1,0 +1,8 @@
+{
+  "REGISTRATION_CLOSED_ANNOUNCEMENT": {
+    "title": "🚫 Registration Closed",
+    "description": "The registration phase for the tournament has ended.\n\nAll registered teams and players have been saved. The match schedule is now being prepared!",
+    "color": "0xE74C3C",
+    "footer": "No late registrations possible."
+  }
+}

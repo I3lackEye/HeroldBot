@@ -2,7 +2,7 @@
     "TOURNAMENT_ANNOUNCEMENT": {
       "title": "🏆 Das Turnier beginnt!",
       "description": "Der Moment ist gekommen: Das nächste große Abenteuer wartet auf euch!\n\n⚔️ Stellt euer Können unter Beweis.\n🎮 Wählt gemeinsam das Spiel, in dem ihr Ruhm und Ehre erringen wollt.\n🌟 Nur die Besten werden Geschichte schreiben!\n\nBereit? Dann stimmt jetzt ab und bestimmt, in welchem Spiel ihr euch messen werdet!",
-      "color": "#F1C40F",
+      "color": "0xF1C40F",
       "footer": "Euer Mut wird entscheiden. Viel Glück, Champions!"
     }
   }
