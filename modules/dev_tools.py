@@ -344,18 +344,22 @@ class DevGroup(app_commands.Group):
             )
             return
 
-        # Prepare tournament data
-        now = datetime.now()
+        # Prepare tournament data with timezone awareness
+        tz = ZoneInfo(CONFIG.bot.timezone)
+        now = datetime.now(tz=tz)
 
-        # Tournament period: Start now, end after two full weekends starting next Saturday
-        next_saturday = now + timedelta((5 - now.weekday()) % 7)
-        tournament_end = next_saturday + timedelta(days=8)  # Sat + Sun + Sat + Sun
+        # Registration ends in 20 seconds (for quick testing)
+        registration_end = now + timedelta(seconds=20)
+
+        # Tournament duration will be auto-calculated after teams are known
+        # For now, set generous default (will be recalculated automatically)
+        tournament_end = registration_end + timedelta(weeks=12)
 
         tournament_data = {
             "registration_open": False,
             "running": True,
             "solo": [],
-            "registration_end": (now + timedelta(seconds=20)).isoformat(),
+            "registration_end": registration_end.isoformat(),
             "tournament_end": tournament_end.isoformat(),
             "matches": [],
             "poll_results": {},
