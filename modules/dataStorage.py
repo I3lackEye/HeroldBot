@@ -14,9 +14,9 @@ from dotenv import load_dotenv
 from modules.logger import logger
 from modules.config import CONFIG
 
-# ------------------
+# =========================================
 # Environment Variables & Helper Functions
-# ------------------
+# =========================================
 def load_env() -> None:
     """Load environment variables from .env file."""
     load_dotenv()
@@ -37,9 +37,9 @@ def is_debug_mode() -> bool:
     return to_bool(get_env("DEBUG", "false"))
 
 
-# ------------------
+# =======================================
 # Configuration Constants
-# ------------------
+# =======================================
 
 # Load Token
 TOKEN = get_env("DISCORD_TOKEN")
@@ -77,9 +77,10 @@ DEFAULT_TOURNAMENT_DATA = {
 }
 
 
-# ------------------
+# =======================================
 # Atomic Write Helper
-# ------------------
+# =======================================
+
 def _atomic_write(file_path: str, data: Dict[str, Any], indent: int = 4) -> None:
     """
     Atomically write JSON data to a file.
