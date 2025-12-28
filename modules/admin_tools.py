@@ -124,6 +124,13 @@ async def handle_start_tournament_modal(
         await interaction.followup.send("🚫 No permission.", ephemeral=True)
         return
 
+    # Reset registration closed flag for new tournament
+    from modules.tournament import _registration_lock
+    import modules.tournament as tournament_module
+    async with _registration_lock:
+        tournament_module._registration_closed = False
+        logger.debug("[TOURNAMENT] Registration flag reset for new tournament")
+
     try:
         tournament = load_tournament_data()
         if tournament.get("running", False):
