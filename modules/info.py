@@ -57,6 +57,7 @@ def build_stats_embed(user, stats: dict) -> Embed:
     if game_stats:
         favorite_game = max(game_stats.items(), key=lambda x: x[1])[0]
 
+    # Note: Keys are lowercase, build_embed_from_template converts them to PLACEHOLDER_{KEY.upper()}
     placeholders = {
         "player_name": user.display_name,
         "wins": str(wins),
