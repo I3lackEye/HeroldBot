@@ -4,6 +4,7 @@ import asyncio
 import random
 import discord
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 from discord import Interaction, app_commands
 from discord.ext import commands
 
@@ -544,12 +545,17 @@ class DevGroup(app_commands.Group):
 
             # Get tournament end date
             from datetime import datetime, timedelta
+            tz = ZoneInfo(CONFIG.bot.timezone)
+
             tournament_end = tournament.get("tournament_end")
             if tournament_end:
                 end_date = datetime.fromisoformat(tournament_end)
+                # Ensure timezone awareness
+                if end_date.tzinfo is None:
+                    end_date = end_date.replace(tzinfo=tz)
             else:
                 # Default: 2 weeks from now
-                end_date = datetime.now() + timedelta(weeks=2)
+                end_date = datetime.now(tz=tz) + timedelta(weeks=2)
 
             # Try to create schedule
             matchups = create_round_robin_schedule(tournament)
@@ -708,8 +714,12 @@ class DevGroup(app_commands.Group):
         reg_end = tournament.get("registration_end")
         if reg_open and reg_end:
             try:
+                tz = ZoneInfo(CONFIG.bot.timezone)
                 dt = datetime.fromisoformat(reg_end)
-                remaining = dt - datetime.now()
+                # Ensure timezone awareness
+                if dt.tzinfo is None:
+                    dt = dt.replace(tzinfo=tz)
+                remaining = dt - datetime.now(tz=tz)
                 report.append(f"📝 Registration: ✅ Open ({remaining.days}d {remaining.seconds//3600}h remaining)")
             except Exception:
                 report.append("📝 Registration: ⚠️ Invalid date format")

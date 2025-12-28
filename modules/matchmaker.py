@@ -393,7 +393,9 @@ def generate_schedule_overview(matches: list) -> str:
     if not matches:
         return "No matches scheduled."
 
-    today = datetime.now().date()  # Today's date
+    # Get timezone from config
+    tz = ZoneInfo(CONFIG.bot.timezone)
+    today = datetime.now(tz=tz).date()  # Today's date in configured timezone
 
     # Group by date
     schedule_by_day = defaultdict(list)
@@ -401,6 +403,9 @@ def generate_schedule_overview(matches: list) -> str:
         scheduled_time = match.get("scheduled_time")
         if scheduled_time:
             dt = datetime.fromisoformat(scheduled_time)
+            # Ensure timezone awareness
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=tz)
             day = dt.strftime("%d.%m.%Y %A")
             schedule_by_day[day].append((dt, match))  # Store datetime + match
 
@@ -440,6 +445,8 @@ def get_team_time_budget(team_name: str, date: datetime.date, matches: list) -> 
     """
     Calculates the total time a team is blocked on a specific day through matches + pauses.
     """
+    # Get timezone from config
+    tz = ZoneInfo(CONFIG.bot.timezone)
     total_time = timedelta()
 
     for match in matches:
@@ -449,6 +456,9 @@ def get_team_time_budget(team_name: str, date: datetime.date, matches: list) -> 
 
         try:
             match_time = datetime.fromisoformat(scheduled)
+            # Ensure timezone awareness
+            if match_time.tzinfo is None:
+                match_time = match_time.replace(tzinfo=tz)
         except ValueError:
             continue
 
@@ -482,8 +492,18 @@ def generate_slot_matrix(tournament: dict, slot_interval_minutes: int = 60) -> d
     from datetime import datetime, timedelta
     from collections import defaultdict
 
+    # Get timezone from config
+    tz = ZoneInfo(CONFIG.bot.timezone)
+
+    # Parse dates and ensure they're timezone-aware
     from_date = datetime.fromisoformat(tournament["registration_end"])
+    if from_date.tzinfo is None:
+        from_date = from_date.replace(tzinfo=tz)
+
     to_date = datetime.fromisoformat(tournament["tournament_end"])
+    if to_date.tzinfo is None:
+        to_date = to_date.replace(tzinfo=tz)
+
     teams = tournament.get("teams", {})
 
     if not teams:
@@ -494,6 +514,7 @@ def generate_slot_matrix(tournament: dict, slot_interval_minutes: int = 60) -> d
     slot_interval = timedelta(minutes=slot_interval_minutes)
 
     logger.info(f"[SLOT-MATRIX] Generating slots from {from_date} to {to_date} with {slot_interval_minutes}min intervals")
+    logger.info(f"[SLOT-MATRIX] Using timezone: {CONFIG.bot.timezone}")
 
     current = from_date
     total_slots_generated = 0
@@ -700,7 +721,12 @@ def is_minimum_pause_respected(
             # Calculate the actual pause time (time between match end and new slot start)
             diff = (new_slot - last_match_end).total_seconds() / 60
             if diff < pause_minutes:
-                logger.debug(f"[PAUSE] {team} only had {diff:.0f} min pause – required: {pause_minutes} min.")
+                if DEBUG_MODE:
+                    logger.debug(f"[PAUSE] {team} only had {diff:.0f} min pause – required: {pause_minutes} min.")
+                    logger.debug(f"[PAUSE]   Last match ended: {last_match_end} | New slot: {new_slot}")
+                    logger.debug(f"[PAUSE]   Timezone info - Last: {last_match_end.tzinfo} | New: {new_slot.tzinfo}")
+                else:
+                    logger.debug(f"[PAUSE] {team} only had {diff:.0f} min pause – required: {pause_minutes} min.")
                 return False
     return True
 
