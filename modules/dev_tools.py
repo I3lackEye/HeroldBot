@@ -21,7 +21,7 @@ from modules.dataStorage import (
 from modules.embeds import build_embed_from_template, load_embed_template
 from modules.logger import logger
 from modules.task_manager import get_all_tasks
-from modules.tournament import auto_end_poll, close_registration_after_delay
+from modules.tournament import auto_end_poll, close_registration_after_delay, end_tournament_procedure
 from modules.utils import (
     generate_random_availability,
     generate_team_name,
@@ -409,6 +409,14 @@ class DevGroup(app_commands.Group):
         # Note: auto_end_poll calls close_registration_after_delay automatically
         # based on the registration_end timestamp, so no manual call needed
         asyncio.create_task(auto_end_poll(interaction.client, interaction.channel, delay_seconds=10))
+
+        await interaction.followup.send(
+            "🏁 Tournament end is being prepared... this may take a few seconds!",
+            ephemeral=True,
+        )
+
+        await end_tournament_procedure(interaction.channel, manual_trigger=True)
+
 
     @app_commands.command(
         name="reset_tournament",
