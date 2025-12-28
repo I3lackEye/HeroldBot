@@ -254,7 +254,7 @@ class SetupCommands(app_commands.Group):
         embed.set_footer(text="You can run this setup again anytime with /setup start")
 
         view = SetupView()
-        await interaction.response.send_message(embed=embed, view=view, ephemeral=False)
+        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
 
 class SetupCog(commands.Cog):
