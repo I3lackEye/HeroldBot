@@ -101,23 +101,28 @@ async def end_poll(bot: discord.Client, channel: discord.TextChannel):
                     game = poll_options[str(reaction.emoji)]
                     real_votes[game] = real_votes.get(game, 0) + 1
 
+    # Load games for name conversion
+    all_games = load_games()
+
     if not real_votes:
-        all_games = load_games()
         visible_games = [
             g["name"] for g in all_games.values() if g.get("visible_in_poll", True)
         ]
 
         if visible_games:
-            chosen_game = random.choice(visible_games)
-            logger.warning(f"[POLL] ⚠️ No votes cast – randomly chosen: {chosen_game}")
+            chosen_game_name = random.choice(visible_games)
+            logger.warning(f"[POLL] ⚠️ No votes cast – randomly chosen: {chosen_game_name}")
         else:
-            chosen_game = "No games available"
+            chosen_game_name = "No games available"
             logger.error("[POLL] ❌ No games available – poll empty")
     else:
         sorted_votes = sorted(real_votes.items(), key=lambda kv: kv[1], reverse=True)
         max_votes = sorted_votes[0][1]
         top_options = [option for option, votes in sorted_votes if votes == max_votes]
-        chosen_game = top_options[0]  # or random.choice(top_options)
+        chosen_game_id = top_options[0]  # This is the game ID (e.g., "Gates_of_Hell")
+
+        # Convert game ID to display name
+        chosen_game_name = all_games.get(chosen_game_id, {}).get("name", chosen_game_id)
 
 
     # Save to tournament
@@ -126,7 +131,7 @@ async def end_poll(bot: discord.Client, channel: discord.TextChannel):
     if "poll_results" not in tournament:
         tournament["poll_results"] = {}
     tournament["poll_results"].update(real_votes)
-    tournament["poll_results"]["chosen_game"] = chosen_game
+    tournament["poll_results"]["chosen_game"] = chosen_game_name
     tournament["registration_open"] = True
     save_tournament_data(tournament)
 
@@ -137,21 +142,25 @@ async def end_poll(bot: discord.Client, channel: discord.TextChannel):
     else:
         formatted_end = "Unknown"
 
-    # Format votes for display
+    # Format votes for display - convert game IDs to display names
     if real_votes:
-        vote_text = ", ".join([f"{game}: {votes}" for game, votes in sorted(real_votes.items(), key=lambda x: x[1], reverse=True)])
+        vote_items = []
+        for game_id, votes in sorted(real_votes.items(), key=lambda x: x[1], reverse=True):
+            game_name = all_games.get(game_id, {}).get("name", game_id)
+            vote_items.append(f"{game_name}: {votes}")
+        vote_text = ", ".join(vote_items)
     else:
         vote_text = "Keine Stimmen abgegeben (zufällig gewählt)"
 
     placeholders = {
-        "game": chosen_game,
+        "game": chosen_game_name,
         "votes": vote_text,
         "endtime": formatted_end
     }
 
     await send_registration_open(channel, placeholders)
 
-    logger.info(f"[POLL] Poll ended. Chosen game: {chosen_game}")
+    logger.info(f"[POLL] Poll ended. Chosen game: {chosen_game_name}")
 
     # Reset
     poll_message_id = None
