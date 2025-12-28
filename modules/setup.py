@@ -11,6 +11,7 @@ from discord.ui import Modal, TextInput, View, Button
 
 from modules.logger import logger
 from modules.utils import has_permission
+from modules.embeds import build_embed_from_template, load_embed_template
 
 
 class SetupModal(Modal, title="🎮 HeroldBot Setup"):
@@ -237,21 +238,19 @@ class SetupCommands(app_commands.Group):
             )
             return
 
-        embed = discord.Embed(
-            title="🎮 Welcome to HeroldBot Setup!",
-            description=(
-                "This wizard will help you configure the bot for your server.\n\n"
-                "**You will configure:**\n"
-                "📍 Limits Channel\n"
-                "📍 Reminder Channel\n"
-                "📍 Reschedule Channel\n"
-                "🏆 Champion/Winner Role\n"
-                "🕒 Timezone\n\n"
-                "Click **Start Setup** below to begin."
-            ),
-            color=0x5865F2
-        )
-        embed.set_footer(text="You can run this setup again anytime with /setup start")
+        # Load embed from locale file
+        try:
+            templates = load_embed_template("setup")
+            template = templates.get("SETUP_WELCOME")
+            embed = build_embed_from_template(template, {})
+        except Exception as e:
+            logger.error(f"[SETUP] Error loading setup embed: {e}")
+            # Fallback embed if template loading fails
+            embed = discord.Embed(
+                title="🎮 HeroldBot Setup",
+                description="Click the button below to start the setup wizard.",
+                color=0x5865F2
+            )
 
         view = SetupView()
         await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
