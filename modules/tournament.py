@@ -195,33 +195,15 @@ async def update_champion_role(guild: discord.Guild, new_champion_id: int, role_
 # ---------------------------------------
 
 
-async def close_registration_after_delay(delay_seconds: int, channel: discord.TextChannel):
+async def execute_registration_close_procedure(channel: discord.TextChannel):
     """
-    Closes registration after a delay automatically
-    and starts automatic matchmaking & cleanup.
-
-    Thread-safe implementation using lock to prevent double execution.
+    Shared procedure for closing registration and starting matchmaking.
+    Can be called by both automatic timer and manual admin command.
     """
-    global _registration_closed, _registration_lock
-
-    # CRITICAL: Acquire lock BEFORE sleeping to prevent race conditions
-    async with _registration_lock:
-        if _registration_closed:
-            logger.warning("[REGISTRATION] Process already completed – double prevention active.")
-            return
-
-        # Mark as in-progress immediately (still holding lock)
-        _registration_closed = True
-        logger.info(f"[REGISTRATION] Will auto-close in {delay_seconds} seconds")
-
-    # Now we can safely sleep - we've marked ourselves as in-progress
-    await asyncio.sleep(delay_seconds)
-
-    # Load tournament data once
     tournament = load_tournament_data()
 
     if not tournament.get("running", False):
-        await channel.send("⚠️ No tournament is running – registration will not be closed.")
+        await channel.send("⚠️ No tournament is running – registration cannot be closed.")
         return
 
     # Close registration if still open
@@ -231,7 +213,7 @@ async def close_registration_after_delay(delay_seconds: int, channel: discord.Te
         tournament["registration_open"] = False
         save_tournament_data(tournament)
         await send_registration_closed(channel)
-        logger.info("[TOURNAMENT] Registration automatically closed.")
+        logger.info("[TOURNAMENT] Registration closed.")
 
     try:
         # Step 1: Clean up orphaned teams (modifies tournament data)
@@ -306,6 +288,32 @@ async def close_registration_after_delay(delay_seconds: int, channel: discord.Te
         logger.error(f"[REGISTRATION] Error during close procedure: {e}", exc_info=True)
         await channel.send(f"⚠️ An error occurred during match planning: {e}")
         raise
+
+
+async def close_registration_after_delay(delay_seconds: int, channel: discord.TextChannel):
+    """
+    Closes registration after a delay automatically
+    and starts automatic matchmaking & cleanup.
+
+    Thread-safe implementation using lock to prevent double execution.
+    """
+    global _registration_closed, _registration_lock
+
+    # CRITICAL: Acquire lock BEFORE sleeping to prevent race conditions
+    async with _registration_lock:
+        if _registration_closed:
+            logger.warning("[REGISTRATION] Process already completed – double prevention active.")
+            return
+
+        # Mark as in-progress immediately (still holding lock)
+        _registration_closed = True
+        logger.info(f"[REGISTRATION] Will auto-close in {delay_seconds} seconds")
+
+    # Now we can safely sleep - we've marked ourselves as in-progress
+    await asyncio.sleep(delay_seconds)
+
+    # Execute the shared close procedure
+    await execute_registration_close_procedure(channel)
 
 
 async def close_tournament_after_delay(delay_seconds: int, channel: discord.TextChannel):
