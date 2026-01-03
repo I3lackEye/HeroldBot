@@ -268,14 +268,33 @@ async def close_registration_after_delay(delay_seconds: int, channel: discord.Te
         # Step 6: Generate slots and assign matches
         await generate_and_assign_slots()
 
-        # Step 7: Reload to get updated matches, send schedule
-        tournament = load_tournament_data()
-        matches = tournament.get("matches", [])
+        # Step 7: Check for availability conflicts and resolve them
+        from modules.availability_conflict_resolver import ConflictResolutionCoordinator
 
-        description_text = generate_schedule_overview(matches)
-        await send_match_schedule_for_channel(channel, description_text)
+        resolver = ConflictResolutionCoordinator(channel)
+        has_conflicts = await resolver.detect_and_resolve_conflicts()
 
-        logger.info("[REGISTRATION] Registration close procedure completed successfully")
+        if has_conflicts:
+            # Conflicts detected - resolution is in progress
+            # Schedule will be published after all conflicts are resolved
+            logger.info(
+                "[REGISTRATION] Availability conflicts detected. "
+                "Waiting for resolution before publishing schedule."
+            )
+            await channel.send(
+                "⏸️ **Tournament schedule pending**\n"
+                "Waiting for availability conflicts to be resolved.\n"
+                "The schedule will be published automatically once all teams have responded."
+            )
+        else:
+            # No conflicts - publish schedule immediately
+            tournament = load_tournament_data()
+            matches = tournament.get("matches", [])
+
+            description_text = generate_schedule_overview(matches)
+            await send_match_schedule_for_channel(channel, description_text)
+
+            logger.info("[REGISTRATION] Registration close procedure completed successfully")
 
     except Exception as e:
         logger.error(f"[REGISTRATION] Error during close procedure: {e}", exc_info=True)
