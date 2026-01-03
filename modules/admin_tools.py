@@ -186,19 +186,24 @@ class AdminGroup(app_commands.Group):
     )
     @app_commands.describe(user="The player who should receive the win.")
     async def add_win(self, interaction: Interaction, user: discord.Member):
+        from modules.stats_tracker import load_player_stats, save_player_stats, initialize_player_stats
+
         if not has_permission(interaction.user, "Moderator", "Admin"):
             await interaction.response.send_message("🚫 You don't have permission for this command.", ephemeral=True)
             return
 
-        global_data = load_global_data()
-        player_stats = global_data.setdefault("player_stats", {})
-
         user_id = str(user.id)
-        if user_id not in player_stats:
-            player_stats[user_id] = {"wins": 0, "name": user.mention}
 
-        player_stats[user_id]["wins"] += 1
-        save_global_data(global_data)
+        # Load or initialize player stats
+        stats = load_player_stats(user_id)
+        if stats is None:
+            stats = initialize_player_stats(user_id, user.mention, user.display_name)
+
+        # Increment tournament wins
+        stats["wins"] += 1
+
+        # Save updated stats
+        save_player_stats(user_id, stats)
 
         await interaction.response.send_message(
             f"✅ {user.mention} was credited with an additional win.",

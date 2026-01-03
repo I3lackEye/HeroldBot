@@ -42,11 +42,11 @@ from modules.info import (
     get_mvp,
     get_winner_ids,
     get_winner_team,
-    update_player_stats,
 )
 from modules.stats_tracker import (
     record_match_result,
-    update_tournament_participation
+    update_tournament_participation,
+    update_tournament_wins
 )
 from modules.task_manager import add_task
 from modules.utils import (
@@ -57,7 +57,6 @@ from modules.utils import (
     get_player_team,
     has_permission,
     smart_send,
-    update_all_participants,
 )
 
 # Global variables for double-call prevention
@@ -107,9 +106,6 @@ async def end_tournament_procedure(
         match = re.search(r"\d+", mvp)  # MVP could be a mention like <@1234567890>
         if match:
             new_champion_id = int(match.group(0))
-
-    updated_count = await update_all_participants()
-    logger.info(f"[TOURNAMENT] {updated_count} participant statistics updated.")
 
     # Process all completed matches for detailed stats
     try:
@@ -168,11 +164,11 @@ async def end_tournament_procedure(
     except Exception as e:
         logger.error(f"[STATS] Error updating tournament participation: {e}", exc_info=True)
 
-    if winner_ids and chosen_game != "Unknown":
-        update_player_stats(winner_ids, chosen_game)
+    if winner_ids:
+        update_tournament_wins(winner_ids)
         logger.info(f"[TOURNAMENT] Winners saved: {winner_ids} for game: {chosen_game}")
     else:
-        logger.warning("[TOURNAMENT] No winners or game name found.")
+        logger.warning("[TOURNAMENT] No winners found.")
 
     update_tournament_history(
         winner_ids=winner_ids,

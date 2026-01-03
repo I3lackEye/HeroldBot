@@ -34,18 +34,31 @@ from modules.utils import autocomplete_players, autocomplete_teams, has_permissi
 def get_leaderboard() -> str:
     """
     Returns a formatted leaderboard based on player wins.
+    Uses individual player files.
     """
-    global_data = load_global_data()
-    player_stats = global_data.get("player_stats", {})
+    from modules.stats_tracker import list_all_players, load_player_stats
 
-    if not player_stats:
+    player_ids = list_all_players()
+
+    if not player_ids:
         return "No statistics available."
 
-    sorted_players = sorted(player_stats.items(), key=lambda item: item[1].get("wins", 0), reverse=True)
+    # Load all player stats
+    player_data = []
+    for user_id in player_ids:
+        stats = load_player_stats(user_id)
+        if stats:
+            player_data.append((user_id, stats))
+
+    if not player_data:
+        return "No statistics available."
+
+    # Sort by tournament wins
+    sorted_players = sorted(player_data, key=lambda item: item[1].get("wins", 0), reverse=True)
 
     lines = []
     for idx, (user_id, data) in enumerate(sorted_players, start=1):
-        name = data.get("name", f"<@{user_id}>")
+        name = data.get("display_name", data.get("mention", f"<@{user_id}>"))
         wins = data.get("wins", 0)
         lines.append(f"{idx}. {name} – 🏅 {wins} Win{'s' if wins != 1 else ''}")
 
@@ -118,14 +131,14 @@ def build_stats_embed(user, stats: dict) -> Embed:
         game_stats_text = messages.get("no_games_played", "No games played yet")
 
     # Nemesis & Rival
-    global_data = load_global_data()
-    player_stats_all = global_data.get("player_stats", {})
+    from modules.stats_tracker import load_player_stats
 
     nemesis = get_nemesis(str(user.id))
     if nemesis:
         nemesis_id, nemesis_stats = nemesis
-        nemesis_data = player_stats_all.get(nemesis_id, {})
-        nemesis_name = nemesis_data.get("display_name", f"<@{nemesis_id}>")
+        # Load nemesis player data from file
+        nemesis_data = load_player_stats(nemesis_id)
+        nemesis_name = nemesis_data.get("display_name", f"<@{nemesis_id}>") if nemesis_data else f"<@{nemesis_id}>"
         nemesis_record = f"{nemesis_stats['wins']}W-{nemesis_stats['losses']}L"
         nemesis_text = f"👿 {nemesis_name} ({nemesis_record})"
     else:
@@ -134,8 +147,9 @@ def build_stats_embed(user, stats: dict) -> Embed:
     rival = get_favorite_rival(str(user.id))
     if rival:
         rival_id, rival_stats = rival
-        rival_data = player_stats_all.get(rival_id, {})
-        rival_name = rival_data.get("display_name", f"<@{rival_id}>")
+        # Load rival player data from file
+        rival_data = load_player_stats(rival_id)
+        rival_name = rival_data.get("display_name", f"<@{rival_id}>") if rival_data else f"<@{rival_id}>"
         rival_record = f"{rival_stats['wins']}W-{rival_stats['losses']}L"
         rival_text = f"🤝 {rival_name} ({rival_record})"
     else:
@@ -240,19 +254,29 @@ def get_tournament_summary() -> str:
     """
     Returns a small summary of all statistics (players, wins, win rate).
     """
-    global_data = load_global_data()
-    player_stats = global_data.get("player_stats", {})
+    from modules.stats_tracker import list_all_players, load_player_stats
 
-    total_players = len(player_stats)
-    total_wins = sum(player.get("wins", 0) for player in player_stats.values())
+    player_ids = list_all_players()
+    total_players = len(player_ids)
+    total_wins = 0
+    best_player_id = None
+    best_wins = 0
 
-    if player_stats:
-        best_player_id, best_player_data = max(player_stats.items(), key=lambda item: item[1].get("wins", 0))
-        best_name = best_player_data.get("name", f"<@{best_player_id}>")
-        best_wins = best_player_data.get("wins", 0)
+    # Load all player stats to calculate totals
+    for user_id in player_ids:
+        stats = load_player_stats(user_id)
+        if stats:
+            wins = stats.get("wins", 0)
+            total_wins += wins
+            if wins > best_wins:
+                best_wins = wins
+                best_player_id = user_id
+
+    if best_player_id:
+        best_player_data = load_player_stats(best_player_id)
+        best_name = best_player_data.get("display_name", best_player_data.get("mention", f"<@{best_player_id}>")) if best_player_data else f"<@{best_player_id}>"
     else:
         best_name = "Nobody"
-        best_wins = 0
 
     output = (
         f"📊 **Tournament Overview**\n\n"
@@ -301,20 +325,31 @@ def get_mvp() -> str:
     Determines the MVP (player with most wins) from global statistics.
     Returns the player name or a user mention.
     """
-    global_data = load_global_data()
-    player_stats = global_data.get("player_stats", {})
+    from modules.stats_tracker import list_all_players, load_player_stats
 
-    if not player_stats:
+    player_ids = list_all_players()
+
+    if not player_ids:
+        return None
+
+    # Load all players and find one with most wins
+    player_data = []
+    for user_id in player_ids:
+        stats = load_player_stats(user_id)
+        if stats:
+            player_data.append((user_id, stats))
+
+    if not player_data:
         return None
 
     # Find player with most wins
-    sorted_players = sorted(player_stats.items(), key=lambda item: item[1].get("wins", 0), reverse=True)
+    sorted_players = sorted(player_data, key=lambda item: item[1].get("wins", 0), reverse=True)
 
     if not sorted_players or sorted_players[0][1].get("wins", 0) == 0:
         return None  # No wins available
 
     mvp_id, mvp_data = sorted_players[0]
-    mvp_name = mvp_data.get("name", f"<@{mvp_id}>")
+    mvp_name = mvp_data.get("display_name", f"<@{mvp_id}>")
 
     return mvp_name
 
@@ -469,15 +504,31 @@ class InfoGroup(app_commands.Group):
 
         elif view.value == "summary":
             # Show tournament statistics
+            from modules.stats_tracker import list_all_players, load_player_stats
+
             global_data = load_global_data()
-            player_stats = global_data.get("player_stats", {})
             tournament_history = global_data.get("tournament_history", [])
 
-            total_players = len(player_stats)
-            total_wins = sum(player.get("wins", 0) for player in player_stats.values())
+            player_ids = list_all_players()
+            total_players = len(player_ids)
+            total_wins = 0
+            best_player_id = None
+            best_player_wins = 0
 
-            best_player_entry = max(player_stats.items(), key=lambda kv: kv[1].get("wins", 0), default=None)
-            best_player = f"{best_player_entry[1]['display_name']} ({best_player_entry[1]['wins']} wins)" if best_player_entry else "Nobody"
+            for user_id in player_ids:
+                stats = load_player_stats(user_id)
+                if stats:
+                    wins = stats.get("wins", 0)
+                    total_wins += wins
+                    if wins > best_player_wins:
+                        best_player_wins = wins
+                        best_player_id = user_id
+
+            if best_player_id:
+                best_player_data = load_player_stats(best_player_id)
+                best_player = f"{best_player_data['display_name']} ({best_player_wins} wins)"
+            else:
+                best_player = "Nobody"
 
             game_counter = Counter(entry["game"] for entry in tournament_history if "game" in entry)
             favorite_game = f"{game_counter.most_common(1)[0][0]} ({game_counter.most_common(1)[0][1]}x)" if game_counter else "No games played"
@@ -523,13 +574,14 @@ class InfoGroup(app_commands.Group):
     @app_commands.describe(target="Player (mention or name) or team name")
     async def stats_smart(self, interaction: Interaction, target: Optional[str] = None):
         """Displays statistics for yourself, a player, or a team."""
-        global_data = load_global_data()
+        from modules.stats_tracker import list_all_players, load_player_stats
+
         tournament = load_tournament_data()
 
         # 1. No input → own stats
         if not target:
             user_id = str(interaction.user.id)
-            stats = global_data.get("player_stats", {}).get(user_id)
+            stats = load_player_stats(user_id)
 
             if not stats:
                 await interaction.response.send_message("⚠️ You don't have any statistics yet.", ephemeral=True)
@@ -540,7 +592,12 @@ class InfoGroup(app_commands.Group):
             return
 
         # 2. Is it a player? (ID, mention, or display name)
-        for user_id, stats in global_data.get("player_stats", {}).items():
+        player_ids = list_all_players()
+        for user_id in player_ids:
+            stats = load_player_stats(user_id)
+            if not stats:
+                continue
+
             name_match = stats.get("display_name", "").lower()
             mention_match = stats.get("mention", "").replace("<@", "").replace(">", "")
 

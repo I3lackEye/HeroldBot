@@ -9,12 +9,20 @@ Handles advanced player statistics including:
 - Tournament participation timeline
 """
 
+import os
+import json
 from datetime import datetime
 from typing import Dict, List, Tuple, Optional
 from modules.dataStorage import load_global_data, save_global_data, load_tournament_data
 from modules.logger import logger
 from modules.config import CONFIG
 from modules.embeds import load_embed_template
+
+# Player stats directory
+PLAYER_STATS_DIR = os.path.join(os.path.dirname(__file__), "..", "data", "player_stats")
+
+# Ensure directory exists
+os.makedirs(PLAYER_STATS_DIR, exist_ok=True)
 
 
 def initialize_player_stats(user_id: str, mention: str = None, display_name: str = None) -> Dict:
@@ -65,11 +73,89 @@ def initialize_player_stats(user_id: str, mention: str = None, display_name: str
     }
 
 
+def load_player_stats(user_id: str) -> Optional[Dict]:
+    """
+    Load player statistics from individual file.
+
+    :param user_id: Discord user ID
+    :return: Player stats dictionary or None if file doesn't exist
+    """
+    file_path = os.path.join(PLAYER_STATS_DIR, f"{user_id}.json")
+
+    if not os.path.exists(file_path):
+        return None
+
+    try:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            stats = json.load(f)
+        return stats
+    except Exception as e:
+        logger.error(f"[STATS] Error loading stats for user {user_id}: {e}")
+        return None
+
+
+def save_player_stats(user_id: str, stats: Dict) -> bool:
+    """
+    Save player statistics to individual file.
+
+    :param user_id: Discord user ID
+    :param stats: Player stats dictionary
+    :return: True if successful, False otherwise
+    """
+    file_path = os.path.join(PLAYER_STATS_DIR, f"{user_id}.json")
+
+    try:
+        with open(file_path, 'w', encoding='utf-8') as f:
+            json.dump(stats, f, indent=2, ensure_ascii=False)
+        return True
+    except Exception as e:
+        logger.error(f"[STATS] Error saving stats for user {user_id}: {e}")
+        return False
+
+
+def delete_player_stats(user_id: str) -> bool:
+    """
+    Delete player statistics file (GDPR compliance).
+
+    :param user_id: Discord user ID
+    :return: True if deleted, False if file didn't exist or error
+    """
+    file_path = os.path.join(PLAYER_STATS_DIR, f"{user_id}.json")
+
+    if not os.path.exists(file_path):
+        logger.warning(f"[STATS] No stats file found for user {user_id}")
+        return False
+
+    try:
+        os.remove(file_path)
+        logger.info(f"[STATS] Deleted stats for user {user_id}")
+        return True
+    except Exception as e:
+        logger.error(f"[STATS] Error deleting stats for user {user_id}: {e}")
+        return False
+
+
+def list_all_players() -> List[str]:
+    """
+    Get list of all player IDs with stats files.
+
+    :return: List of user IDs
+    """
+    try:
+        files = os.listdir(PLAYER_STATS_DIR)
+        player_ids = [f.replace('.json', '') for f in files if f.endswith('.json')]
+        return player_ids
+    except Exception as e:
+        logger.error(f"[STATS] Error listing players: {e}")
+        return []
+
+
 def record_match_result(winner_ids: List[str], loser_ids: List[str], game: str,
                        winner_mentions: List[str] = None, loser_mentions: List[str] = None,
                        winner_names: List[str] = None, loser_names: List[str] = None):
     """
     Record the result of a single match and update all relevant statistics.
+    Uses individual player files for storage.
 
     :param winner_ids: List of winner user IDs
     :param loser_ids: List of loser user IDs
@@ -79,22 +165,16 @@ def record_match_result(winner_ids: List[str], loser_ids: List[str], game: str,
     :param winner_names: Optional list of winner display names
     :param loser_names: Optional list of loser display names
     """
-    global_data = load_global_data()
-    player_stats = global_data.setdefault("player_stats", {})
-
-    timestamp = datetime.now().isoformat()
-
     # Process winners
     for idx, user_id in enumerate(winner_ids):
         uid_str = str(user_id)
 
-        # Initialize if needed
-        if uid_str not in player_stats:
+        # Load or initialize stats
+        stats = load_player_stats(uid_str)
+        if stats is None:
             mention = winner_mentions[idx] if winner_mentions and idx < len(winner_mentions) else None
             name = winner_names[idx] if winner_names and idx < len(winner_names) else None
-            player_stats[uid_str] = initialize_player_stats(uid_str, mention, name)
-
-        stats = player_stats[uid_str]
+            stats = initialize_player_stats(uid_str, mention, name)
 
         # Update match stats
         stats["match_stats"]["total_matches"] += 1
@@ -137,17 +217,19 @@ def record_match_result(winner_ids: List[str], loser_ids: List[str], game: str,
         # Update timeline
         stats["timeline"]["last_game"] = game
 
+        # Save individual player stats
+        save_player_stats(uid_str, stats)
+
     # Process losers
     for idx, user_id in enumerate(loser_ids):
         uid_str = str(user_id)
 
-        # Initialize if needed
-        if uid_str not in player_stats:
+        # Load or initialize stats
+        stats = load_player_stats(uid_str)
+        if stats is None:
             mention = loser_mentions[idx] if loser_mentions and idx < len(loser_mentions) else None
             name = loser_names[idx] if loser_names and idx < len(loser_names) else None
-            player_stats[uid_str] = initialize_player_stats(uid_str, mention, name)
-
-        stats = player_stats[uid_str]
+            stats = initialize_player_stats(uid_str, mention, name)
 
         # Update match stats
         stats["match_stats"]["total_matches"] += 1
@@ -190,29 +272,29 @@ def record_match_result(winner_ids: List[str], loser_ids: List[str], game: str,
         # Update timeline
         stats["timeline"]["last_game"] = game
 
-    save_global_data(global_data)
+        # Save individual player stats
+        save_player_stats(uid_str, stats)
+
     logger.info(f"[STATS] Match result recorded: {len(winner_ids)} winners vs {len(loser_ids)} losers in {game}")
 
 
 def update_tournament_participation(user_ids: List[str], game: str):
     """
     Update tournament participation stats for players.
-    Called at tournament end.
+    Called at tournament end. Uses individual player files.
 
     :param user_ids: List of all participant user IDs
     :param game: Game that was played
     """
-    global_data = load_global_data()
-    player_stats = global_data.setdefault("player_stats", {})
     timestamp = datetime.now().isoformat()
 
     for user_id in user_ids:
         uid_str = str(user_id)
 
-        if uid_str not in player_stats:
-            player_stats[uid_str] = initialize_player_stats(uid_str)
-
-        stats = player_stats[uid_str]
+        # Load or initialize stats
+        stats = load_player_stats(uid_str)
+        if stats is None:
+            stats = initialize_player_stats(uid_str)
 
         # Update participation count
         stats["participations"] += 1
@@ -232,25 +314,51 @@ def update_tournament_participation(user_ids: List[str], game: str):
             stats["timeline"]["first_tournament"] = timestamp
         stats["timeline"]["last_tournament"] = timestamp
 
-    save_global_data(global_data)
+        # Save individual player stats
+        save_player_stats(uid_str, stats)
+
     logger.info(f"[STATS] Tournament participation updated for {len(user_ids)} players")
+
+
+def update_tournament_wins(winner_ids: List[str]):
+    """
+    Update tournament wins for the tournament winners.
+    Called at tournament end. Uses individual player files.
+
+    :param winner_ids: List of winner user IDs
+    """
+    for user_id in winner_ids:
+        uid_str = str(user_id)
+
+        # Load or initialize stats
+        stats = load_player_stats(uid_str)
+        if stats is None:
+            stats = initialize_player_stats(uid_str)
+
+        # Increment tournament wins
+        stats["wins"] += 1
+
+        # Save individual player stats
+        save_player_stats(uid_str, stats)
+
+    logger.info(f"[STATS] Tournament wins updated for {len(winner_ids)} winners")
 
 
 def get_nemesis(user_id: str) -> Optional[Tuple[str, Dict]]:
     """
     Find the player's nemesis (opponent with most losses against).
+    Uses individual player file.
 
     :param user_id: User ID to check
     :return: Tuple of (opponent_id, stats_dict) or None
     """
-    global_data = load_global_data()
-    player_stats = global_data.get("player_stats", {})
-
     uid_str = str(user_id)
-    if uid_str not in player_stats:
+    stats = load_player_stats(uid_str)
+
+    if stats is None:
         return None
 
-    h2h = player_stats[uid_str].get("head_to_head", {})
+    h2h = stats.get("head_to_head", {})
     if not h2h:
         return None
 
@@ -266,18 +374,18 @@ def get_nemesis(user_id: str) -> Optional[Tuple[str, Dict]]:
 def get_favorite_rival(user_id: str) -> Optional[Tuple[str, Dict]]:
     """
     Find the player's favorite rival (most matches played against).
+    Uses individual player file.
 
     :param user_id: User ID to check
     :return: Tuple of (opponent_id, stats_dict) or None
     """
-    global_data = load_global_data()
-    player_stats = global_data.get("player_stats", {})
-
     uid_str = str(user_id)
-    if uid_str not in player_stats:
+    stats = load_player_stats(uid_str)
+
+    if stats is None:
         return None
 
-    h2h = player_stats[uid_str].get("head_to_head", {})
+    h2h = stats.get("head_to_head", {})
     if not h2h:
         return None
 

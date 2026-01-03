@@ -461,17 +461,22 @@ def get_team_open_matches(team_name: str) -> list:
 
 async def autocomplete_players(interaction: Interaction, current: str):
     """Autocomplete function for player selection."""
+    from modules.stats_tracker import list_all_players, load_player_stats
+
     logger.info(f"[AUTOCOMPLETE] Called – Input: {current}")
-    global_data = load_global_data()
-    player_stats = global_data.get("player_stats", {})
+    player_ids = list_all_players()
 
     choices = []
-    for user_id, stats in player_stats.items():
+    for user_id in player_ids:
+        stats = load_player_stats(user_id)
+        if not stats:
+            continue
+
         member = interaction.guild.get_member(int(user_id))
         if member:
             display_name = member.display_name
         else:
-            display_name = stats.get("display_name") or stats.get("name") or f"Unknown ({user_id})"
+            display_name = stats.get("display_name") or f"Unknown ({user_id})"
 
         if current.lower() in display_name.lower():
             choices.append(app_commands.Choice(name=display_name, value=user_id))
