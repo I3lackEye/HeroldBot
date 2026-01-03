@@ -16,6 +16,14 @@ from modules.config import CONFIG
 from modules.dataStorage import load_global_data, load_tournament_data, save_global_data
 from modules.embeds import send_status, send_tournament_stats, load_embed_template, build_embed_from_template
 from modules.logger import logger
+from modules.stats_tracker import (
+    calculate_match_winrate,
+    calculate_game_winrate,
+    get_nemesis,
+    get_favorite_rival,
+    get_top_games,
+    format_time_since
+)
 from modules.utils import autocomplete_players, autocomplete_teams, has_permission
 
 # ----------------------------------------
@@ -46,37 +54,125 @@ def get_leaderboard() -> str:
 
 
 def build_stats_embed(user, stats: dict) -> Embed:
-    """Builds an embed with player statistics using locale template."""
+    """Builds an embed with comprehensive player statistics."""
+    # Tournament-level stats
     wins = stats.get("wins", 0)
     participations = stats.get("participations", 0)
-    winrate = f"{(wins / participations * 100):.1f}%" if participations > 0 else "–"
+    tournament_winrate = f"{(wins / participations * 100):.1f}%" if participations > 0 else "0.0%"
 
-    # Determine favorite game
-    favorite_game = "No favorite game yet"
-    game_stats = stats.get("game_stats")
-    if game_stats:
-        favorite_game = max(game_stats.items(), key=lambda x: x[1])[0]
+    # Match-level stats
+    match_stats = stats.get("match_stats", {})
+    total_matches = match_stats.get("total_matches", 0)
+    match_wins = match_stats.get("match_wins", 0)
+    match_losses = match_stats.get("match_losses", 0)
+    match_winrate = f"{calculate_match_winrate(stats):.1f}%"
 
-    # Note: Keys are lowercase, build_embed_from_template converts them to PLACEHOLDER_{KEY.upper()}
-    placeholders = {
-        "player_name": user.display_name,
-        "wins": str(wins),
-        "participations": str(participations),
-        "winrate": winrate,
-        "favorite_game": favorite_game
-    }
+    # Streaks
+    streaks = stats.get("streaks", {})
+    current_streak = streaks.get("current", 0)
+    current_type = streaks.get("current_type")
+    best_win_streak = streaks.get("best_win", 0)
 
-    template = load_embed_template("info").get("PLAYER_STATS")
-    if template:
-        return build_embed_from_template(template, placeholders)
+    if current_type == "win":
+        streak_text = f"🔥 {current_streak} Win{'s' if current_streak != 1 else ''}"
+    elif current_type == "loss":
+        streak_text = f"❄️ {current_streak} Loss{'es' if current_streak != 1 else ''}"
+    else:
+        streak_text = "–"
 
-    # Fallback if template not found
-    embed = Embed(title=f"📊 Statistics for {user.display_name}", color=0x3498DB)
-    embed.add_field(name="🏆 Wins", value=wins, inline=True)
-    embed.add_field(name="🧩 Participations", value=participations, inline=True)
-    embed.add_field(name="📈 Win Rate", value=winrate, inline=True)
-    embed.add_field(name="🎮 Favorite Game", value=favorite_game, inline=False)
-    embed.set_footer(text="Tournament Evaluation")
+    # Timeline
+    timeline = stats.get("timeline", {})
+    last_tournament = format_time_since(timeline.get("last_tournament"))
+    last_game = timeline.get("last_game", "Never")
+
+    # Per-game stats
+    top_games = get_top_games(stats, limit=3)
+    game_stats_text = ""
+    for game, game_data in top_games:
+        game_matches = game_data.get("matches", 0)
+        game_wins = game_data.get("wins", 0)
+        game_losses = game_data.get("losses", 0)
+        game_wr = calculate_game_winrate(stats, game)
+        game_stats_text += f"🎯 **{game}**: {game_wins}W-{game_losses}L ({game_wr:.1f}%)\n"
+
+    if not game_stats_text:
+        game_stats_text = "No games played yet"
+
+    # Nemesis & Rival
+    global_data = load_global_data()
+    player_stats_all = global_data.get("player_stats", {})
+
+    nemesis = get_nemesis(str(user.id))
+    if nemesis:
+        nemesis_id, nemesis_stats = nemesis
+        nemesis_data = player_stats_all.get(nemesis_id, {})
+        nemesis_name = nemesis_data.get("display_name", f"<@{nemesis_id}>")
+        nemesis_record = f"{nemesis_stats['wins']}W-{nemesis_stats['losses']}L"
+        nemesis_text = f"👿 {nemesis_name} ({nemesis_record})"
+    else:
+        nemesis_text = "–"
+
+    rival = get_favorite_rival(str(user.id))
+    if rival:
+        rival_id, rival_stats = rival
+        rival_data = player_stats_all.get(rival_id, {})
+        rival_name = rival_data.get("display_name", f"<@{rival_id}>")
+        rival_record = f"{rival_stats['wins']}W-{rival_stats['losses']}L"
+        rival_text = f"🤝 {rival_name} ({rival_record})"
+    else:
+        rival_text = "–"
+
+    # Build embed
+    embed = Embed(
+        title=f"📊 Statistics for {user.display_name}",
+        color=0x3498DB,
+        description="━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    )
+
+    # Tournament stats
+    embed.add_field(
+        name="🏆 Tournament Record",
+        value=f"**Wins:** {wins}\n**Played:** {participations}\n**Winrate:** {tournament_winrate}",
+        inline=True
+    )
+
+    # Match stats
+    embed.add_field(
+        name="⚔️ Match Record",
+        value=f"**{match_wins}W - {match_losses}L**\n**Total:** {total_matches}\n**Winrate:** {match_winrate}",
+        inline=True
+    )
+
+    # Streaks
+    embed.add_field(
+        name="🔥 Streaks",
+        value=f"**Current:** {streak_text}\n**Best:** {best_win_streak} Wins",
+        inline=True
+    )
+
+    # Per-game stats
+    embed.add_field(
+        name="━━━━ Per-Game Stats ━━━━",
+        value=game_stats_text,
+        inline=False
+    )
+
+    # Rivals
+    embed.add_field(
+        name="👥 Rivals",
+        value=f"**Nemesis:** {nemesis_text}\n**Favorite Rival:** {rival_text}",
+        inline=False
+    )
+
+    # Timeline
+    embed.add_field(
+        name="📅 Activity",
+        value=f"**Last Tournament:** {last_tournament}\n**Last Game:** {last_game}",
+        inline=False
+    )
+
+    embed.set_footer(text=f"Player since {format_time_since(timeline.get('first_tournament'))}")
+
     return embed
 
 

@@ -44,6 +44,10 @@ from modules.info import (
     get_winner_team,
     update_player_stats,
 )
+from modules.stats_tracker import (
+    record_match_result,
+    update_tournament_participation
+)
 from modules.task_manager import add_task
 from modules.utils import (
     all_matches_completed,
@@ -106,6 +110,63 @@ async def end_tournament_procedure(
 
     updated_count = await update_all_participants()
     logger.info(f"[TOURNAMENT] {updated_count} participant statistics updated.")
+
+    # Process all completed matches for detailed stats
+    try:
+        matches = tournament.get("matches", [])
+        teams = tournament.get("teams", {})
+        completed_matches = [m for m in matches if m.get("status") == "completed"]
+
+        logger.info(f"[STATS] Processing {len(completed_matches)} completed matches for stats tracking")
+
+        for match in completed_matches:
+            winner_team = match.get("winner")
+            team1 = match.get("team1")
+            team2 = match.get("team2")
+
+            if not winner_team or not team1 or not team2:
+                continue
+
+            loser_team = team2 if winner_team == team1 else team1
+
+            winner_team_data = teams.get(winner_team, {})
+            loser_team_data = teams.get(loser_team, {})
+
+            winner_members = winner_team_data.get("members", [])
+            loser_members = loser_team_data.get("members", [])
+
+            # Extract user IDs
+            winner_ids_match = [re.search(r"\d+", m).group(0) for m in winner_members if re.search(r"\d+", m)]
+            loser_ids_match = [re.search(r"\d+", m).group(0) for m in loser_members if re.search(r"\d+", m)]
+
+            if winner_ids_match and loser_ids_match and chosen_game != "Unknown":
+                record_match_result(
+                    winner_ids=winner_ids_match,
+                    loser_ids=loser_ids_match,
+                    game=chosen_game,
+                    winner_mentions=winner_members,
+                    loser_mentions=loser_members
+                )
+
+        logger.info(f"[STATS] Match history stats updated for {len(completed_matches)} matches")
+    except Exception as e:
+        logger.error(f"[STATS] Error processing match stats: {e}", exc_info=True)
+
+    # Update tournament participation for all players
+    try:
+        all_participant_ids = []
+        for team_data in tournament.get("teams", {}).values():
+            members = team_data.get("members", [])
+            for member in members:
+                match = re.search(r"\d+", member)
+                if match:
+                    all_participant_ids.append(match.group(0))
+
+        if all_participant_ids and chosen_game != "Unknown":
+            update_tournament_participation(all_participant_ids, chosen_game)
+            logger.info(f"[STATS] Tournament participation updated for {len(all_participant_ids)} players")
+    except Exception as e:
+        logger.error(f"[STATS] Error updating tournament participation: {e}", exc_info=True)
 
     if winner_ids and chosen_game != "Unknown":
         update_player_stats(winner_ids, chosen_game)

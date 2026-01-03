@@ -43,6 +43,7 @@ from modules.modals import (
 
 from modules.poll import end_poll
 from modules.reschedule import pending_reschedules
+from modules.stats_tracker import record_match_result
 from modules.tournament import end_tournament_procedure, auto_end_poll, execute_registration_close_procedure
 from modules.utils import (
     autocomplete_teams,
@@ -315,7 +316,38 @@ class AdminGroup(app_commands.Group):
 
         save_tournament_data(tournament)
 
+        # Track player stats
         loser = team2 if winner == team1 else team1
+        try:
+            teams = tournament.get("teams", {})
+            winner_team_data = teams.get(winner, {})
+            loser_team_data = teams.get(loser, {})
+
+            winner_members = winner_team_data.get("members", [])
+            loser_members = loser_team_data.get("members", [])
+
+            # Extract user IDs from mentions
+            import re
+            winner_ids = [re.search(r"\d+", m).group(0) for m in winner_members if re.search(r"\d+", m)]
+            loser_ids = [re.search(r"\d+", m).group(0) for m in loser_members if re.search(r"\d+", m)]
+
+            # Get game name
+            game = tournament.get("poll_results", {}).get("chosen_game", "Unknown")
+
+            # Record match result in stats
+            if winner_ids and loser_ids and game != "Unknown":
+                record_match_result(
+                    winner_ids=winner_ids,
+                    loser_ids=loser_ids,
+                    game=game,
+                    winner_mentions=winner_members,
+                    loser_mentions=loser_members
+                )
+                logger.info(f"[STATS] Match stats recorded for match {match_id}")
+        except Exception as e:
+            logger.error(f"[STATS] Error recording match stats: {e}")
+            # Don't fail the command if stats tracking fails
+
         await interaction.response.send_message(
             f"✅ Match {match_id} result saved:\n\n"
             f"**{team1}** vs **{team2}**\n"
