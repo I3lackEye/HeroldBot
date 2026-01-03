@@ -13,6 +13,8 @@ from datetime import datetime
 from typing import Dict, List, Tuple, Optional
 from modules.dataStorage import load_global_data, save_global_data, load_tournament_data
 from modules.logger import logger
+from modules.config import CONFIG
+from modules.embeds import load_embed_template
 
 
 def initialize_player_stats(user_id: str, mention: str = None, display_name: str = None) -> Dict:
@@ -342,15 +344,24 @@ def get_top_games(stats: Dict, limit: int = 3) -> List[Tuple[str, Dict]]:
     return sorted_games[:limit]
 
 
-def format_time_since(iso_timestamp: str) -> str:
+def format_time_since(iso_timestamp: str, language: str = None) -> str:
     """
-    Format ISO timestamp to human-readable "X days ago".
+    Format ISO timestamp to human-readable "X days ago" with locale support.
 
     :param iso_timestamp: ISO format timestamp string
+    :param language: Language code (en/de), defaults to CONFIG.bot.language
     :return: Human-readable string
     """
+    if not language:
+        language = CONFIG.bot.language
+
+    # Load locale templates
+    template = load_embed_template("player_stats", language)
+    time_format = template.get("TIME_FORMAT", {})
+    messages = template.get("MESSAGES", {})
+
     if not iso_timestamp:
-        return "Never"
+        return messages.get("never", "Never")
 
     try:
         past = datetime.fromisoformat(iso_timestamp)
@@ -359,21 +370,41 @@ def format_time_since(iso_timestamp: str) -> str:
 
         if delta.days == 0:
             if delta.seconds < 3600:
-                return "Less than an hour ago"
+                return time_format.get("less_than_hour", "Less than an hour ago")
             hours = delta.seconds // 3600
-            return f"{hours} hour{'s' if hours != 1 else ''} ago"
+            if hours == 1:
+                template_str = time_format.get("hour_singular", "PLACEHOLDER_COUNT hour ago")
+            else:
+                template_str = time_format.get("hours_plural", "PLACEHOLDER_COUNT hours ago")
+            return template_str.replace("PLACEHOLDER_COUNT", str(hours))
         elif delta.days == 1:
-            return "Yesterday"
+            return time_format.get("yesterday", "Yesterday")
         elif delta.days < 7:
-            return f"{delta.days} days ago"
+            if delta.days == 1:
+                template_str = time_format.get("day_singular", "PLACEHOLDER_COUNT day ago")
+            else:
+                template_str = time_format.get("days_plural", "PLACEHOLDER_COUNT days ago")
+            return template_str.replace("PLACEHOLDER_COUNT", str(delta.days))
         elif delta.days < 30:
             weeks = delta.days // 7
-            return f"{weeks} week{'s' if weeks != 1 else ''} ago"
+            if weeks == 1:
+                template_str = time_format.get("week_singular", "PLACEHOLDER_COUNT week ago")
+            else:
+                template_str = time_format.get("weeks_plural", "PLACEHOLDER_COUNT weeks ago")
+            return template_str.replace("PLACEHOLDER_COUNT", str(weeks))
         elif delta.days < 365:
             months = delta.days // 30
-            return f"{months} month{'s' if months != 1 else ''} ago"
+            if months == 1:
+                template_str = time_format.get("month_singular", "PLACEHOLDER_COUNT month ago")
+            else:
+                template_str = time_format.get("months_plural", "PLACEHOLDER_COUNT months ago")
+            return template_str.replace("PLACEHOLDER_COUNT", str(months))
         else:
             years = delta.days // 365
-            return f"{years} year{'s' if years != 1 else ''} ago"
+            if years == 1:
+                template_str = time_format.get("year_singular", "PLACEHOLDER_COUNT year ago")
+            else:
+                template_str = time_format.get("years_plural", "PLACEHOLDER_COUNT years ago")
+            return template_str.replace("PLACEHOLDER_COUNT", str(years))
     except (ValueError, AttributeError):
-        return "Unknown"
+        return messages.get("unknown", "Unknown")

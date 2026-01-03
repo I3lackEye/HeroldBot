@@ -54,7 +54,17 @@ def get_leaderboard() -> str:
 
 
 def build_stats_embed(user, stats: dict) -> Embed:
-    """Builds an embed with comprehensive player statistics."""
+    """Builds an embed with comprehensive player statistics using locale templates."""
+    language = CONFIG.bot.language
+
+    # Load locale template
+    template = load_embed_template("player_stats", language)
+    embed_config = template.get("PLAYER_STATS_EMBED", {})
+    field_labels = template.get("FIELD_LABELS", {})
+    stat_labels = template.get("STAT_LABELS", {})
+    messages = template.get("MESSAGES", {})
+    value_templates = template.get("VALUE_TEMPLATES", {})
+
     # Tournament-level stats
     wins = stats.get("wins", 0)
     participations = stats.get("participations", 0)
@@ -73,30 +83,39 @@ def build_stats_embed(user, stats: dict) -> Embed:
     current_type = streaks.get("current_type")
     best_win_streak = streaks.get("best_win", 0)
 
+    # Format current streak text
     if current_type == "win":
-        streak_text = f"🔥 {current_streak} Win{'s' if current_streak != 1 else ''}"
+        win_text = messages.get("win_singular") if current_streak == 1 else messages.get("wins_plural")
+        streak_text = f"🔥 {current_streak} {win_text}"
     elif current_type == "loss":
-        streak_text = f"❄️ {current_streak} Loss{'es' if current_streak != 1 else ''}"
+        loss_text = messages.get("loss_singular") if current_streak == 1 else messages.get("losses_plural")
+        streak_text = f"❄️ {current_streak} {loss_text}"
     else:
-        streak_text = "–"
+        streak_text = messages.get("no_nemesis", "–")
 
     # Timeline
     timeline = stats.get("timeline", {})
-    last_tournament = format_time_since(timeline.get("last_tournament"))
-    last_game = timeline.get("last_game", "Never")
+    last_tournament = format_time_since(timeline.get("last_tournament"), language)
+    last_game = timeline.get("last_game") or messages.get("never", "Never")
 
     # Per-game stats
     top_games = get_top_games(stats, limit=3)
     game_stats_text = ""
+    game_line_template = value_templates.get("game_stat_line", "🎯 **PLACEHOLDER_GAME**: PLACEHOLDER_WINS W-PLACEHOLDER_LOSSES L (PLACEHOLDER_WINRATE %)")
+
     for game, game_data in top_games:
-        game_matches = game_data.get("matches", 0)
         game_wins = game_data.get("wins", 0)
         game_losses = game_data.get("losses", 0)
         game_wr = calculate_game_winrate(stats, game)
-        game_stats_text += f"🎯 **{game}**: {game_wins}W-{game_losses}L ({game_wr:.1f}%)\n"
+
+        line = game_line_template.replace("PLACEHOLDER_GAME", game)
+        line = line.replace("PLACEHOLDER_WINS", str(game_wins))
+        line = line.replace("PLACEHOLDER_LOSSES", str(game_losses))
+        line = line.replace("PLACEHOLDER_WINRATE", f"{game_wr:.1f}")
+        game_stats_text += line + "\n"
 
     if not game_stats_text:
-        game_stats_text = "No games played yet"
+        game_stats_text = messages.get("no_games_played", "No games played yet")
 
     # Nemesis & Rival
     global_data = load_global_data()
@@ -110,7 +129,7 @@ def build_stats_embed(user, stats: dict) -> Embed:
         nemesis_record = f"{nemesis_stats['wins']}W-{nemesis_stats['losses']}L"
         nemesis_text = f"👿 {nemesis_name} ({nemesis_record})"
     else:
-        nemesis_text = "–"
+        nemesis_text = messages.get("no_nemesis", "–")
 
     rival = get_favorite_rival(str(user.id))
     if rival:
@@ -120,58 +139,99 @@ def build_stats_embed(user, stats: dict) -> Embed:
         rival_record = f"{rival_stats['wins']}W-{rival_stats['losses']}L"
         rival_text = f"🤝 {rival_name} ({rival_record})"
     else:
-        rival_text = "–"
+        rival_text = messages.get("no_rival", "–")
 
-    # Build embed
-    embed = Embed(
-        title=f"📊 Statistics for {user.display_name}",
-        color=0x3498DB,
-        description="━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    )
+    # Build embed using templates
+    title = embed_config.get("title", "📊 Statistics for PLACEHOLDER_PLAYER_NAME").replace("PLACEHOLDER_PLAYER_NAME", user.display_name)
+    description = embed_config.get("description", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+    color_hex = embed_config.get("color", "0x3498DB")
+    color = int(color_hex, 16)
 
-    # Tournament stats
+    embed = Embed(title=title, color=color, description=description)
+
+    # Tournament Record field
+    tournament_template = value_templates.get("tournament_record", "**PLACEHOLDER_LABEL_WINS:** PLACEHOLDER_WINS\n**PLACEHOLDER_LABEL_PLAYED:** PLACEHOLDER_PARTICIPATIONS\n**PLACEHOLDER_LABEL_WINRATE:** PLACEHOLDER_WINRATE")
+    tournament_value = tournament_template.replace("PLACEHOLDER_LABEL_WINS", stat_labels.get("wins", "Wins"))
+    tournament_value = tournament_value.replace("PLACEHOLDER_WINS", str(wins))
+    tournament_value = tournament_value.replace("PLACEHOLDER_LABEL_PLAYED", stat_labels.get("played", "Played"))
+    tournament_value = tournament_value.replace("PLACEHOLDER_PARTICIPATIONS", str(participations))
+    tournament_value = tournament_value.replace("PLACEHOLDER_LABEL_WINRATE", stat_labels.get("winrate", "Winrate"))
+    tournament_value = tournament_value.replace("PLACEHOLDER_WINRATE", tournament_winrate)
+
     embed.add_field(
-        name="🏆 Tournament Record",
-        value=f"**Wins:** {wins}\n**Played:** {participations}\n**Winrate:** {tournament_winrate}",
+        name=field_labels.get("tournament_record", "🏆 Tournament Record"),
+        value=tournament_value,
         inline=True
     )
 
-    # Match stats
+    # Match Record field
+    match_template = value_templates.get("match_record", "**PLACEHOLDER_MATCH_WINS W - PLACEHOLDER_MATCH_LOSSES L**\n**PLACEHOLDER_LABEL_TOTAL:** PLACEHOLDER_TOTAL_MATCHES\n**PLACEHOLDER_LABEL_WINRATE:** PLACEHOLDER_MATCH_WINRATE")
+    match_value = match_template.replace("PLACEHOLDER_MATCH_WINS", str(match_wins))
+    match_value = match_value.replace("PLACEHOLDER_MATCH_LOSSES", str(match_losses))
+    match_value = match_value.replace("PLACEHOLDER_LABEL_TOTAL", stat_labels.get("total", "Total"))
+    match_value = match_value.replace("PLACEHOLDER_TOTAL_MATCHES", str(total_matches))
+    match_value = match_value.replace("PLACEHOLDER_LABEL_WINRATE", stat_labels.get("winrate", "Winrate"))
+    match_value = match_value.replace("PLACEHOLDER_MATCH_WINRATE", match_winrate)
+
     embed.add_field(
-        name="⚔️ Match Record",
-        value=f"**{match_wins}W - {match_losses}L**\n**Total:** {total_matches}\n**Winrate:** {match_winrate}",
+        name=field_labels.get("match_record", "⚔️ Match Record"),
+        value=match_value,
         inline=True
     )
 
-    # Streaks
+    # Streaks field
+    wins_text = messages.get("wins_plural", "Wins")
+    streaks_template = value_templates.get("streaks", "**PLACEHOLDER_LABEL_CURRENT:** PLACEHOLDER_CURRENT_STREAK\n**PLACEHOLDER_LABEL_BEST:** PLACEHOLDER_BEST_STREAK PLACEHOLDER_WINS_TEXT")
+    streaks_value = streaks_template.replace("PLACEHOLDER_LABEL_CURRENT", stat_labels.get("current", "Current"))
+    streaks_value = streaks_value.replace("PLACEHOLDER_CURRENT_STREAK", streak_text)
+    streaks_value = streaks_value.replace("PLACEHOLDER_LABEL_BEST", stat_labels.get("best", "Best"))
+    streaks_value = streaks_value.replace("PLACEHOLDER_BEST_STREAK", str(best_win_streak))
+    streaks_value = streaks_value.replace("PLACEHOLDER_WINS_TEXT", wins_text)
+
     embed.add_field(
-        name="🔥 Streaks",
-        value=f"**Current:** {streak_text}\n**Best:** {best_win_streak} Wins",
+        name=field_labels.get("streaks", "🔥 Streaks"),
+        value=streaks_value,
         inline=True
     )
 
-    # Per-game stats
+    # Per-game stats field
     embed.add_field(
-        name="━━━━ Per-Game Stats ━━━━",
+        name=field_labels.get("per_game_stats", "━━━━ Per-Game Stats ━━━━"),
         value=game_stats_text,
         inline=False
     )
 
-    # Rivals
+    # Rivals field
+    rivals_template = value_templates.get("rivals", "**PLACEHOLDER_LABEL_NEMESIS:** PLACEHOLDER_NEMESIS\n**PLACEHOLDER_LABEL_RIVAL:** PLACEHOLDER_RIVAL")
+    rivals_value = rivals_template.replace("PLACEHOLDER_LABEL_NEMESIS", stat_labels.get("nemesis", "Nemesis"))
+    rivals_value = rivals_value.replace("PLACEHOLDER_NEMESIS", nemesis_text)
+    rivals_value = rivals_value.replace("PLACEHOLDER_LABEL_RIVAL", stat_labels.get("favorite_rival", "Favorite Rival"))
+    rivals_value = rivals_value.replace("PLACEHOLDER_RIVAL", rival_text)
+
     embed.add_field(
-        name="👥 Rivals",
-        value=f"**Nemesis:** {nemesis_text}\n**Favorite Rival:** {rival_text}",
+        name=field_labels.get("rivals", "👥 Rivals"),
+        value=rivals_value,
         inline=False
     )
 
-    # Timeline
+    # Activity field
+    activity_template = value_templates.get("activity", "**PLACEHOLDER_LABEL_LAST_TOURNAMENT:** PLACEHOLDER_LAST_TOURNAMENT\n**PLACEHOLDER_LABEL_LAST_GAME:** PLACEHOLDER_LAST_GAME")
+    activity_value = activity_template.replace("PLACEHOLDER_LABEL_LAST_TOURNAMENT", stat_labels.get("last_tournament", "Last Tournament"))
+    activity_value = activity_value.replace("PLACEHOLDER_LAST_TOURNAMENT", last_tournament)
+    activity_value = activity_value.replace("PLACEHOLDER_LABEL_LAST_GAME", stat_labels.get("last_game", "Last Game"))
+    activity_value = activity_value.replace("PLACEHOLDER_LAST_GAME", last_game)
+
     embed.add_field(
-        name="📅 Activity",
-        value=f"**Last Tournament:** {last_tournament}\n**Last Game:** {last_game}",
+        name=field_labels.get("activity", "📅 Activity"),
+        value=activity_value,
         inline=False
     )
 
-    embed.set_footer(text=f"Player since {format_time_since(timeline.get('first_tournament'))}")
+    # Footer
+    player_since = format_time_since(timeline.get("first_tournament"), language)
+    footer_template = embed_config.get("footer", "Player since PLACEHOLDER_PLAYER_SINCE")
+    footer_text = footer_template.replace("PLACEHOLDER_PLAYER_SINCE", player_since)
+    embed.set_footer(text=footer_text)
 
     return embed
 
