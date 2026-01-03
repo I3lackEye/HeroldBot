@@ -281,11 +281,17 @@ async def close_registration_after_delay(delay_seconds: int, channel: discord.Te
                 "[REGISTRATION] Availability conflicts detected. "
                 "Waiting for resolution before publishing schedule."
             )
-            await channel.send(
-                "⏸️ **Tournament schedule pending**\n"
-                "Waiting for availability conflicts to be resolved.\n"
+
+            # Load locale message
+            from modules.embeds import load_embed_template
+            template = load_embed_template("availability_conflict", CONFIG.bot.language)
+            messages = template.get("MESSAGES", {})
+            msg = messages.get(
+                "schedule_pending",
+                "⏸️ **Tournament schedule pending**\nWaiting for availability conflicts to be resolved.\n"
                 "The schedule will be published automatically once all teams have responded."
             )
+            await channel.send(msg)
         else:
             # No conflicts - publish schedule immediately
             tournament = load_tournament_data()

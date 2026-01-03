@@ -2,6 +2,7 @@
 Availability Conflict Resolver
 
 Detects and resolves availability conflicts between teams.
+Uses locale system for internationalization.
 """
 
 from typing import List, Dict, Set, Tuple, Optional
@@ -21,6 +22,7 @@ from modules.availability_conflict_view import (
     AvailabilityConflictView,
     generate_availability_suggestions
 )
+from modules.embeds import load_embed_template, build_embed_from_template
 
 
 class ConflictResolutionCoordinator:
@@ -34,6 +36,12 @@ class ConflictResolutionCoordinator:
         self.pending_resolutions: Set[int] = set()
         self.excluded_teams: Set[str] = set()
         self.resolved_matches: Dict[int, datetime] = {}
+        self.language = CONFIG.bot.language
+
+        # Load locale messages
+        template = load_embed_template("availability_conflict", self.language)
+        self.messages = template.get("MESSAGES", {})
+        self.embed_template = template.get("CONFLICT_NOTIFICATION", {})
 
     async def detect_and_resolve_conflicts(self) -> bool:
         """
@@ -85,11 +93,13 @@ class ConflictResolutionCoordinator:
 
         # Conflicts found - notify and start resolution process
         logger.warning(f"[CONFLICT-RESOLVER] Found {len(conflicts)} matches with availability conflicts!")
-        await self.channel.send(
-            f"⚠️ **Availability Conflicts Detected**\n"
-            f"Found {len(conflicts)} match(es) where teams have no overlapping availability.\n"
-            f"Starting conflict resolution process..."
+
+        msg_template = self.messages.get(
+            "conflicts_detected",
+            "⚠️ **Availability Conflicts Detected**\nFound {count} match(es) where teams have no overlapping availability.\nStarting conflict resolution process..."
         )
+        msg = msg_template.replace("PLACEHOLDER_COUNT", str(len(conflicts)))
+        await self.channel.send(msg)
 
         # Start resolution for each conflict
         for match in conflicts:
@@ -153,36 +163,21 @@ class ConflictResolutionCoordinator:
             f"for match {match_id}"
         )
 
-        # Create embed for conflict notification
-        embed = discord.Embed(
-            title=f"⚠️ Availability Conflict - Match {match_id}",
-            description=(
-                f"**{team1}** vs **{team2}**\n\n"
-                f"Your teams have no overlapping availability in their registered time windows.\n\n"
-                f"**Options:**\n"
-                f"1️⃣ Select a suggested time slot below that works for both teams\n"
-                f"2️⃣ All players must confirm the selected time\n"
-                f"3️⃣ Decline to withdraw your team from the tournament\n\n"
-                f"⏰ **Deadline:** 48 hours\n"
-                f"If no agreement is reached, both teams will be excluded."
-            ),
-            color=discord.Color.orange()
-        )
-
-        # Add team availability info
+        # Create embed for conflict notification using locale template
         team1_avail_str = self._format_availability(team1_data.get("availability", {}))
         team2_avail_str = self._format_availability(team2_data.get("availability", {}))
 
-        embed.add_field(
-            name=f"📅 {team1} - Current Availability",
-            value=team1_avail_str or "No availability set",
-            inline=False
-        )
-        embed.add_field(
-            name=f"📅 {team2} - Current Availability",
-            value=team2_avail_str or "No availability set",
-            inline=False
-        )
+        no_avail_msg = self.messages.get("no_availability", "No availability set")
+
+        placeholders = {
+            "PLACEHOLDER_MATCH_ID": str(match_id),
+            "PLACEHOLDER_TEAM1": team1,
+            "PLACEHOLDER_TEAM2": team2,
+            "PLACEHOLDER_TEAM1_AVAIL": team1_avail_str or no_avail_msg,
+            "PLACEHOLDER_TEAM2_AVAIL": team2_avail_str or no_avail_msg
+        }
+
+        embed = build_embed_from_template(self.embed_template, placeholders)
 
         # Create view
         view = AvailabilityConflictView(
@@ -239,7 +234,7 @@ class ConflictResolutionCoordinator:
         :return: Formatted string
         """
         if not availability:
-            return "No times set"
+            return self.messages.get("no_times_set", "No times set")
 
         lines = []
         for day in ["saturday", "sunday", "monday", "tuesday", "wednesday", "thursday", "friday"]:
@@ -247,7 +242,7 @@ class ConflictResolutionCoordinator:
             if time_range != "00:00-00:00":
                 lines.append(f"• {day.capitalize()}: {time_range}")
 
-        return "\n".join(lines) if lines else "No availability"
+        return "\n".join(lines) if lines else self.messages.get("no_availability", "No availability")
 
     async def _handle_resolution(
         self,
@@ -335,10 +330,13 @@ class ConflictResolutionCoordinator:
 
         save_tournament_data(tournament)
 
-        await self.channel.send(
-            f"⚠️ Team **{team_name}** has been excluded from the tournament.\n"
-            f"📊 {forfeited_count} match(es) forfeited."
+        msg_template = self.messages.get(
+            "team_excluded",
+            "⚠️ Team **{team}** has been excluded from the tournament.\n📊 {count} match(es) forfeited."
         )
+        msg = msg_template.replace("PLACEHOLDER_TEAM", team_name)
+        msg = msg.replace("PLACEHOLDER_COUNT", str(forfeited_count))
+        await self.channel.send(msg)
 
         logger.info(f"[CONFLICT-RESOLVER] Team {team_name} excluded, {forfeited_count} matches forfeited")
 
@@ -390,10 +388,14 @@ class ConflictResolutionCoordinator:
 
         save_tournament_data(tournament)
 
-        await self.channel.send(
-            f"✅ Updated availability for **{team1}** and **{team2}** to include "
-            f"**{slot.strftime('%A %d.%m.%Y %H:%M')}**"
+        msg_template = self.messages.get(
+            "availability_updated",
+            "✅ Updated availability for **{team1}** and **{team2}** to include **{slot}**"
         )
+        msg = msg_template.replace("PLACEHOLDER_TEAM1", team1)
+        msg = msg.replace("PLACEHOLDER_TEAM2", team2)
+        msg = msg.replace("PLACEHOLDER_SLOT", slot.strftime('%A %d.%m.%Y %H:%M'))
+        await self.channel.send(msg)
 
     def _merge_time_ranges(self, range1: str, range2: str) -> str:
         """
@@ -422,10 +424,11 @@ class ConflictResolutionCoordinator:
         """
         logger.info("[CONFLICT-RESOLVER] All conflicts resolved! Regenerating schedule...")
 
-        await self.channel.send(
-            "✅ All availability conflicts have been resolved!\n"
-            "🔄 Regenerating tournament schedule..."
+        msg = self.messages.get(
+            "all_resolved",
+            "✅ All availability conflicts have been resolved!\n🔄 Regenerating tournament schedule..."
         )
+        await self.channel.send(msg)
 
         # Regenerate schedule with updated availability
         from modules.matchmaker import generate_and_assign_slots, generate_schedule_overview
