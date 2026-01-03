@@ -1,0 +1,61 @@
+{
+  "PLAYER_STATS_EMBED": {
+    "title": "📊 Statistics for PLACEHOLDER_PLAYER_NAME",
+    "description": "━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+    "color": "0x3498DB",
+    "footer": "Player since PLACEHOLDER_PLAYER_SINCE"
+  },
+  "FIELD_LABELS": {
+    "tournament_record": "🏆 Tournament Record",
+    "match_record": "⚔️ Match Record",
+    "streaks": "🔥 Streaks",
+    "per_game_stats": "━━━━ Per-Game Stats ━━━━",
+    "rivals": "👥 Rivals",
+    "activity": "📅 Activity"
+  },
+  "STAT_LABELS": {
+    "wins": "Wins",
+    "played": "Played",
+    "winrate": "Winrate",
+    "total": "Total",
+    "current": "Current",
+    "best": "Best",
+    "nemesis": "Nemesis",
+    "favorite_rival": "Favorite Rival",
+    "last_tournament": "Last Tournament",
+    "last_game": "Last Game"
+  },
+  "MESSAGES": {
+    "no_games_played": "No games played yet",
+    "no_nemesis": "–",
+    "no_rival": "–",
+    "never": "Never",
+    "win_singular": "Win",
+    "wins_plural": "Wins",
+    "loss_singular": "Loss",
+    "losses_plural": "Losses",
+    "unknown": "Unknown"
+  },
+  "TIME_FORMAT": {
+    "less_than_hour": "Less than an hour ago",
+    "hour_singular": "PLACEHOLDER_COUNT hour ago",
+    "hours_plural": "PLACEHOLDER_COUNT hours ago",
+    "yesterday": "Yesterday",
+    "day_singular": "PLACEHOLDER_COUNT day ago",
+    "days_plural": "PLACEHOLDER_COUNT days ago",
+    "week_singular": "PLACEHOLDER_COUNT week ago",
+    "weeks_plural": "PLACEHOLDER_COUNT weeks ago",
+    "month_singular": "PLACEHOLDER_COUNT month ago",
+    "months_plural": "PLACEHOLDER_COUNT months ago",
+    "year_singular": "PLACEHOLDER_COUNT year ago",
+    "years_plural": "PLACEHOLDER_COUNT years ago"
+  },
+  "VALUE_TEMPLATES": {
+    "tournament_record": "**PLACEHOLDER_LABEL_WINS:** PLACEHOLDER_WINS\n**PLACEHOLDER_LABEL_PLAYED:** PLACEHOLDER_PARTICIPATIONS\n**PLACEHOLDER_LABEL_WINRATE:** PLACEHOLDER_WINRATE",
+    "match_record": "**PLACEHOLDER_MATCH_WINS W - PLACEHOLDER_MATCH_LOSSES L**\n**PLACEHOLDER_LABEL_TOTAL:** PLACEHOLDER_TOTAL_MATCHES\n**PLACEHOLDER_LABEL_WINRATE:** PLACEHOLDER_MATCH_WINRATE",
+    "streaks": "**PLACEHOLDER_LABEL_CURRENT:** PLACEHOLDER_CURRENT_STREAK\n**PLACEHOLDER_LABEL_BEST:** PLACEHOLDER_BEST_STREAK PLACEHOLDER_WINS_TEXT",
+    "game_stat_line": "🎯 **PLACEHOLDER_GAME**: PLACEHOLDER_WINS W-PLACEHOLDER_LOSSES L (PLACEHOLDER_WINRATE %)",
+    "rivals": "**PLACEHOLDER_LABEL_NEMESIS:** PLACEHOLDER_NEMESIS\n**PLACEHOLDER_LABEL_RIVAL:** PLACEHOLDER_RIVAL",
+    "activity": "**PLACEHOLDER_LABEL_LAST_TOURNAMENT:** PLACEHOLDER_LAST_TOURNAMENT\n**PLACEHOLDER_LABEL_LAST_GAME:** PLACEHOLDER_LAST_GAME"
+  }
+}
