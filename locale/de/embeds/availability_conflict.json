@@ -1,0 +1,40 @@
+{
+  "CONFLICT_NOTIFICATION": {
+    "title": "⚠️ Verfügbarkeitskonflikt - Match PLACEHOLDER_MATCH_ID",
+    "description": "**PLACEHOLDER_TEAM1** vs **PLACEHOLDER_TEAM2**\n\nEure Teams haben keine überschneidende Verfügbarkeit in ihren registrierten Zeitfenstern.\n\n**Optionen:**\n1️⃣ Wähle unten einen vorgeschlagenen Zeitslot, der für beide Teams passt\n2️⃣ Alle Spieler müssen den gewählten Zeitpunkt bestätigen\n3️⃣ Lehne ab, um dein Team vom Turnier zurückzuziehen\n\n⏰ **Deadline:** 48 Stunden\nWenn keine Einigung erreicht wird, werden beide Teams ausgeschlossen.",
+    "color": "0xFF9800",
+    "fields": [
+      {
+        "name": "📅 PLACEHOLDER_TEAM1 - Aktuelle Verfügbarkeit",
+        "value": "PLACEHOLDER_TEAM1_AVAIL",
+        "inline": false
+      },
+      {
+        "name": "📅 PLACEHOLDER_TEAM2 - Aktuelle Verfügbarkeit",
+        "value": "PLACEHOLDER_TEAM2_AVAIL",
+        "inline": false
+      }
+    ]
+  },
+  "MESSAGES": {
+    "conflicts_detected": "⚠️ **Verfügbarkeitskonflikte erkannt**\nPLACEHOLDER_COUNT Match(es) gefunden, bei denen Teams keine überschneidende Verfügbarkeit haben.\nStarte Konfliktlösungsprozess...",
+    "select_placeholder": "Wähle einen Zeitslot, der für beide Teams passt...",
+    "option_label": "Option PLACEHOLDER_NUM",
+    "no_suggestions": "Keine Vorschläge verfügbar",
+    "no_suggestions_desc": "Kann keine gemeinsame Zeit finden",
+    "selected_slot": "✅ Du hast gewählt: **PLACEHOLDER_SLOT**\nWarte auf Bestätigung aller Spieler...",
+    "no_slot_selected": "⚠️ Bitte wähle zuerst einen Zeitslot aus dem Dropdown-Menü oben.",
+    "already_confirmed": "✅ Du hast diesen Zeitslot bereits bestätigt.",
+    "confirmed_count": "✅ Bestätigt! (PLACEHOLDER_CURRENT/PLACEHOLDER_TOTAL Spieler)",
+    "not_part_of_match": "🚫 Du bist nicht Teil dieses Matches.",
+    "all_agreed": "✅ Alle Spieler haben dem neuen Zeitslot zugestimmt!\n📅 Match PLACEHOLDER_MATCH_ID wird für **PLACEHOLDER_SLOT** geplant\n⏳ Aktualisiere Team-Verfügbarkeit und generiere Spielplan neu...",
+    "declined_team": "❌ **PLACEHOLDER_USER** (Team **PLACEHOLDER_TEAM**) hat abgelehnt, die Verfügbarkeit anzupassen.\n⚠️ Team **PLACEHOLDER_TEAM** wird vom Turnier ausgeschlossen.\n🏆 Team **PLACEHOLDER_OPPONENT** erhält kampflos den Sieg für dieses Match.",
+    "timeout_both": "⌛ **Zeitüberschreitung!**\nKeine Einigung wurde innerhalb von 48 Stunden erreicht.\n⚠️ Beide Teams (**PLACEHOLDER_TEAM1**, **PLACEHOLDER_TEAM2**) werden vom Turnier ausgeschlossen.",
+    "team_excluded": "⚠️ Team **PLACEHOLDER_TEAM** wurde vom Turnier ausgeschlossen.\n📊 PLACEHOLDER_COUNT Match(es) aufgegeben.",
+    "availability_updated": "✅ Verfügbarkeit für **PLACEHOLDER_TEAM1** und **PLACEHOLDER_TEAM2** aktualisiert, um **PLACEHOLDER_SLOT** einzuschließen",
+    "all_resolved": "✅ Alle Verfügbarkeitskonflikte wurden gelöst!\n🔄 Generiere Turnier-Spielplan neu...",
+    "schedule_pending": "⏸️ **Turnier-Spielplan ausstehend**\nWarte auf Lösung der Verfügbarkeitskonflikte.\nDer Spielplan wird automatisch veröffentlicht, sobald alle Teams geantwortet haben.",
+    "no_availability": "Keine Verfügbarkeit gesetzt",
+    "no_times_set": "Keine Zeiten gesetzt"
+  }
+}

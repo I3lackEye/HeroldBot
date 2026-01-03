@@ -1,0 +1,69 @@
+{
+  "LEAVE_DURING_REGISTRATION": {
+    "title": "⚠️ Turnier verlassen - Bestätigung",
+    "description": "Du bist dabei, das Team **PLACEHOLDER_TEAM_NAME** zu verlassen.\n\n**Was wird passieren:**",
+    "color": "0xFF9800",
+    "fields": [
+      {
+        "name": "📋 Konsequenzen",
+        "value": "PLACEHOLDER_CONSEQUENCES",
+        "inline": false
+      },
+      {
+        "name": "✅ Sicher zum Verlassen",
+        "value": "Die Anmeldung ist noch offen, daher gibt es keine Strafen fürs Verlassen.",
+        "inline": false
+      }
+    ],
+    "footer": "⏰ Du hast 60 Sekunden Zeit zu entscheiden."
+  },
+  "LEAVE_AFTER_REGISTRATION": {
+    "title": "🚨 Turnier verlassen - WARNUNG",
+    "description": "Du bist dabei, das Team **PLACEHOLDER_TEAM_NAME** zu verlassen.\n\n**⚠️ SCHWERWIEGENDE KONSEQUENZEN - LIES SORGFÄLTIG:**",
+    "color": "0xE74C3C",
+    "fields": [
+      {
+        "name": "⚠️ Konsequenzen",
+        "value": "PLACEHOLDER_CONSEQUENCES",
+        "inline": false
+      },
+      {
+        "name": "👥 Auswirkung auf Partner",
+        "value": "PLACEHOLDER_PARTNER_IMPACT",
+        "inline": false
+      },
+      {
+        "name": "🛑 Bist du dir absolut sicher?",
+        "value": "Fahre nur fort, wenn du nicht weiter am Turnier teilnehmen kannst.\nÜberlege dir, vorher mit deinem Partner zu sprechen, falls zutreffend.",
+        "inline": false
+      }
+    ],
+    "footer": "⏰ Du hast 60 Sekunden Zeit zu entscheiden."
+  },
+  "MESSAGES": {
+    "consequences_team_dissolved": "🔹 Dein Team wird **aufgelöst**",
+    "consequences_partner_solo": "🔹 Dein Partner (PLACEHOLDER_PARTNER) wird in die **Solo-Warteschlange** verschoben",
+    "consequences_partner_rematched": "🔹 Er kann mit einem anderen Solo-Spieler gematcht werden",
+    "consequences_removed": "🔹 Du wirst **komplett** aus dem Turnier entfernt",
+    "consequences_can_rejoin": "🔹 Du kannst dich jederzeit **neu anmelden**, bevor die Anmeldung schließt",
+    "consequences_withdrawn": "🔹 Dein Team wird als **ZURÜCKGEZOGEN** markiert",
+    "consequences_forfeited": "🔹 **PLACEHOLDER_MATCH_COUNT Match(es)** werden **aufgegeben**",
+    "consequences_auto_loss": "🔹 Alle aufgegebenen Matches zählen als **automatische Niederlagen**",
+    "consequences_auto_win": "🔹 Deine Gegner erhalten **automatische Siege**",
+    "consequences_partner_eliminated": "🔹 Dein Partner (PLACEHOLDER_PARTNER) wird ebenfalls **eliminiert**",
+    "consequences_irreversible": "🔹 Diese Aktion **KANN NICHT RÜCKGÄNGIG GEMACHT WERDEN**",
+    "consequences_no_rejoin": "🔹 Du **KANNST NICHT** wieder diesem Turnier beitreten",
+    "partner_impact_text": "Dein Partner wird benachrichtigt und das gesamte Team wird zurückgezogen.\nIhr werdet beide aus dem Turnier entfernt.",
+    "partner_impact_none": "Dein gesamtes Team wird aus dem Turnier entfernt.",
+    "button_confirm": "✅ Ja, Turnier verlassen",
+    "button_cancel": "❌ Abbrechen",
+    "confirm_left": "✅ Du hast das Team **PLACEHOLDER_TEAM_NAME** erfolgreich verlassen.",
+    "confirm_left_forfeited": "✅ Du hast das Team **PLACEHOLDER_TEAM_NAME** verlassen.\n⚠️ Das Team wurde zurückgezogen und **PLACEHOLDER_MATCH_COUNT Match(es)** aufgegeben.",
+    "cancelled": "❌ Verlassen-Vorgang abgebrochen.",
+    "already_cancelled": "✅ Abgebrochen. Du bleibst im Turnier.",
+    "timeout": "⌛ Verlassen-Bestätigung ist abgelaufen. Du bleibst im Turnier.",
+    "only_initiator": "🚫 Nur die Person, die dies initiiert hat, kann bestätigen.",
+    "only_initiator_cancel": "🚫 Nur die Person, die dies initiiert hat, kann abbrechen.",
+    "partner_notification": "⚠️ PLACEHOLDER_PARTNER: Dein Teamkollege hat das Turnier verlassen. Team **PLACEHOLDER_TEAM_NAME** wurde zurückgezogen und alle Matches aufgegeben."
+  }
+}

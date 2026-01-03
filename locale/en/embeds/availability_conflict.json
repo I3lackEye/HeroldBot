@@ -1,0 +1,40 @@
+{
+  "CONFLICT_NOTIFICATION": {
+    "title": "⚠️ Availability Conflict - Match PLACEHOLDER_MATCH_ID",
+    "description": "**PLACEHOLDER_TEAM1** vs **PLACEHOLDER_TEAM2**\n\nYour teams have no overlapping availability in their registered time windows.\n\n**Options:**\n1️⃣ Select a suggested time slot below that works for both teams\n2️⃣ All players must confirm the selected time\n3️⃣ Decline to withdraw your team from the tournament\n\n⏰ **Deadline:** 48 hours\nIf no agreement is reached, both teams will be excluded.",
+    "color": "0xFF9800",
+    "fields": [
+      {
+        "name": "📅 PLACEHOLDER_TEAM1 - Current Availability",
+        "value": "PLACEHOLDER_TEAM1_AVAIL",
+        "inline": false
+      },
+      {
+        "name": "📅 PLACEHOLDER_TEAM2 - Current Availability",
+        "value": "PLACEHOLDER_TEAM2_AVAIL",
+        "inline": false
+      }
+    ]
+  },
+  "MESSAGES": {
+    "conflicts_detected": "⚠️ **Availability Conflicts Detected**\nFound PLACEHOLDER_COUNT match(es) where teams have no overlapping availability.\nStarting conflict resolution process...",
+    "select_placeholder": "Select a time slot that works for both teams...",
+    "option_label": "Option PLACEHOLDER_NUM",
+    "no_suggestions": "No suggestions available",
+    "no_suggestions_desc": "Cannot find common time",
+    "selected_slot": "✅ You selected: **PLACEHOLDER_SLOT**\nWaiting for all players to confirm...",
+    "no_slot_selected": "⚠️ Please select a time slot first using the dropdown menu above.",
+    "already_confirmed": "✅ You already confirmed this time slot.",
+    "confirmed_count": "✅ Confirmed! (PLACEHOLDER_CURRENT/PLACEHOLDER_TOTAL players)",
+    "not_part_of_match": "🚫 You are not part of this match.",
+    "all_agreed": "✅ All players agreed to the new time slot!\n📅 Match PLACEHOLDER_MATCH_ID will be scheduled for **PLACEHOLDER_SLOT**\n⏳ Updating team availability and regenerating schedule...",
+    "declined_team": "❌ **PLACEHOLDER_USER** (Team **PLACEHOLDER_TEAM**) declined to adjust availability.\n⚠️ Team **PLACEHOLDER_TEAM** will be excluded from the tournament.\n🏆 Team **PLACEHOLDER_OPPONENT** receives a walkover for this match.",
+    "timeout_both": "⌛ **Timeout!**\nNo agreement was reached within 48 hours.\n⚠️ Both teams (**PLACEHOLDER_TEAM1**, **PLACEHOLDER_TEAM2**) will be excluded from the tournament.",
+    "team_excluded": "⚠️ Team **PLACEHOLDER_TEAM** has been excluded from the tournament.\n📊 PLACEHOLDER_COUNT match(es) forfeited.",
+    "availability_updated": "✅ Updated availability for **PLACEHOLDER_TEAM1** and **PLACEHOLDER_TEAM2** to include **PLACEHOLDER_SLOT**",
+    "all_resolved": "✅ All availability conflicts have been resolved!\n🔄 Regenerating tournament schedule...",
+    "schedule_pending": "⏸️ **Tournament schedule pending**\nWaiting for availability conflicts to be resolved.\nThe schedule will be published automatically once all teams have responded.",
+    "no_availability": "No availability set",
+    "no_times_set": "No times set"
+  }
+}
