@@ -69,13 +69,16 @@ def update_tournament_history(winner_ids: list[str], chosen_game: str, mvp_name:
                 logger.warning("[HISTORY] tournament_history.json corrupted. Creating new file.")
                 history_data = []
 
-    # Get winner names from global_data
-    global_data = load_global_data()
-    player_stats = global_data.get("player_stats", {})
+    # Get winner names from player stats files
+    from modules.stats_tracker import load_player_stats
 
     winners = []
     for user_id in winner_ids:
-        name = player_stats.get(user_id, {}).get("name", f"<@{user_id}>")
+        stats = load_player_stats(user_id)
+        if stats:
+            name = stats.get("display_name", f"<@{user_id}>")
+        else:
+            name = f"<@{user_id}>"
         winners.append(name)
 
     # Tournament entry
