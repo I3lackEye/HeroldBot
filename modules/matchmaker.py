@@ -431,7 +431,10 @@ def generate_schedule_overview(matches: list) -> str:
             if match_status == "forfeit":
                 emoji = "⚠️"  # Forfeit match
                 winner = match.get("winner", "Unknown")
-                description += f"{emoji} {dt.strftime('%H:%M')} – **{team1}** vs **{team2}** (Forfeit → {winner} wins)\n"
+                if "both teams withdrawn" in str(winner).lower():
+                    description += f"{emoji} {dt.strftime('%H:%M')} – **{team1}** vs **{team2}** (Forfeit → No winner)\n"
+                else:
+                    description += f"{emoji} {dt.strftime('%H:%M')} – **{team1}** vs **{team2}** (Forfeit → {winner} wins)\n"
             elif match.get("rescue_assigned"):
                 emoji = "❗"
                 description += f"{emoji} {dt.strftime('%H:%M')} – **{team1}** vs **{team2}**\n"

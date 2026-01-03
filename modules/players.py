@@ -92,7 +92,7 @@ class PlayerGroup(app_commands.Group):
                 )
                 return
             else:
-                # AFTER REGISTRATION: Mark team as withdrawn, forfeit all matches
+                # AFTER REGISTRATION: Mark team as withdrawn, forfeit all open matches
                 from datetime import datetime
 
                 # Mark team as withdrawn (keep in system for match integrity)
@@ -100,16 +100,26 @@ class PlayerGroup(app_commands.Group):
                 tournament["teams"][found_team]["withdrawn_by"] = user_mention
                 tournament["teams"][found_team]["withdrawn_at"] = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
 
-                # Forfeit all matches involving this team
+                # Forfeit only OPEN matches involving this team
                 forfeited_matches = 0
                 for match in tournament.get("matches", []):
                     if found_team in (match.get("team1"), match.get("team2")):
-                        match["status"] = "forfeit"
-                        # Opponent gets automatic win
-                        opponent = match["team2"] if match["team1"] == found_team else match["team1"]
-                        match["winner"] = opponent
-                        match["forfeit_by"] = found_team
-                        forfeited_matches += 1
+                        # Only forfeit open matches - preserve completed/already forfeited matches
+                        if match.get("status") == "open":
+                            match["status"] = "forfeit"
+                            # Opponent gets automatic win
+                            opponent = match["team2"] if match["team1"] == found_team else match["team1"]
+
+                            # Check if opponent team is also withdrawn
+                            opponent_status = tournament.get("teams", {}).get(opponent, {}).get("status")
+                            if opponent_status == "withdrawn":
+                                # Both teams withdrawn - no winner
+                                match["winner"] = "None (both teams withdrawn)"
+                            else:
+                                match["winner"] = opponent
+
+                            match["forfeit_by"] = found_team
+                            forfeited_matches += 1
 
                 # Notify partner (if team has 2+ members)
                 other_members = [m for m in found_team_entry.get("members", []) if m != user_mention]
