@@ -3,13 +3,16 @@ Leave Confirmation View
 
 Provides a confirmation dialog before a player leaves the tournament.
 Shows different consequences based on tournament state.
+Uses locale system for internationalization.
 """
 
-from discord import ui, ButtonStyle, Interaction, Embed, Color
+from discord import ui, ButtonStyle, Interaction, Embed
 from datetime import datetime
 
 from modules.dataStorage import load_tournament_data, save_tournament_data
 from modules.logger import logger
+from modules.embeds import load_embed_template, build_embed_from_template
+from modules.config import CONFIG
 
 
 class LeaveConfirmationView(ui.View):
@@ -27,15 +30,26 @@ class LeaveConfirmationView(ui.View):
         self.is_during_registration = is_during_registration
         self.confirmed = False
         self.message = None
+        self.language = CONFIG.bot.language
 
-    @ui.button(label="✅ Yes, Leave Tournament", style=ButtonStyle.danger)
+        # Load locale messages
+        self.template = load_embed_template("leave_confirmation", self.language)
+        self.messages = self.template.get("MESSAGES", {})
+
+        # Update button labels from locale
+        for item in self.children:
+            if isinstance(item, ui.Button):
+                if item.custom_id == "confirm_leave":
+                    item.label = self.messages.get("button_confirm", "✅ Yes, Leave Tournament")
+                elif item.custom_id == "cancel_leave":
+                    item.label = self.messages.get("button_cancel", "❌ Cancel")
+
+    @ui.button(label="✅ Yes, Leave Tournament", style=ButtonStyle.danger, custom_id="confirm_leave")
     async def confirm_leave(self, interaction: Interaction, button: ui.Button):
         """Confirm leaving the tournament."""
         if interaction.user.mention != self.user_mention:
-            await interaction.response.send_message(
-                "🚫 Only the person who initiated this can confirm.",
-                ephemeral=True
-            )
+            msg = self.messages.get("only_initiator", "🚫 Only the person who initiated this can confirm.")
+            await interaction.response.send_message(msg, ephemeral=True)
             return
 
         await interaction.response.defer()
@@ -45,27 +59,20 @@ class LeaveConfirmationView(ui.View):
         await self._execute_leave(interaction)
         self.stop()
 
-    @ui.button(label="❌ Cancel", style=ButtonStyle.secondary)
+    @ui.button(label="❌ Cancel", style=ButtonStyle.secondary, custom_id="cancel_leave")
     async def cancel_leave(self, interaction: Interaction, button: ui.Button):
         """Cancel the leave operation."""
         if interaction.user.mention != self.user_mention:
-            await interaction.response.send_message(
-                "🚫 Only the person who initiated this can cancel.",
-                ephemeral=True
-            )
+            msg = self.messages.get("only_initiator_cancel", "🚫 Only the person who initiated this can cancel.")
+            await interaction.response.send_message(msg, ephemeral=True)
             return
 
-        await interaction.response.send_message(
-            "✅ Cancelled. You remain in the tournament.",
-            ephemeral=True
-        )
+        msg = self.messages.get("already_cancelled", "✅ Cancelled. You remain in the tournament.")
+        await interaction.response.send_message(msg, ephemeral=True)
 
         if self.message:
-            await self.message.edit(
-                content="❌ Leave operation cancelled.",
-                embed=None,
-                view=None
-            )
+            cancelled_msg = self.messages.get("cancelled", "❌ Leave operation cancelled.")
+            await self.message.edit(content=cancelled_msg, embed=None, view=None)
 
         self.stop()
 
@@ -112,11 +119,9 @@ class LeaveConfirmationView(ui.View):
 
         # Send confirmation
         if self.message:
-            await self.message.edit(
-                content=f"✅ You have successfully left team **{self.team_name}**.",
-                embed=None,
-                view=None
-            )
+            msg = self.messages.get("confirm_left", "✅ You have successfully left team **{team}**.")
+            msg = msg.replace("PLACEHOLDER_TEAM_NAME", self.team_name)
+            await self.message.edit(content=msg, embed=None, view=None)
 
     async def _leave_after_registration(self, interaction: Interaction, tournament: dict):
         """Handle leaving after registration has closed."""
@@ -154,97 +159,81 @@ class LeaveConfirmationView(ui.View):
         if other_members:
             try:
                 partner_mention = other_members[0]
-                await interaction.channel.send(
-                    f"⚠️ {partner_mention}: Your teammate has left the tournament. "
-                    f"Team **{self.team_name}** has been withdrawn and all matches forfeited."
-                )
+                msg = self.messages.get("partner_notification", "⚠️ {partner}: Your teammate has left the tournament.")
+                msg = msg.replace("PLACEHOLDER_PARTNER", partner_mention)
+                msg = msg.replace("PLACEHOLDER_TEAM_NAME", self.team_name)
+                await interaction.channel.send(msg)
             except Exception as e:
                 logger.warning(f"[LEAVE] Failed to notify partner: {e}")
 
         # Send confirmation
         if self.message:
-            await self.message.edit(
-                content=(
-                    f"✅ You have left team **{self.team_name}**.\n"
-                    f"⚠️ The team has been withdrawn and **{forfeited_matches} match(es)** forfeited."
-                ),
-                embed=None,
-                view=None
-            )
+            msg = self.messages.get("confirm_left_forfeited", "✅ You have left team **{team}**.\n⚠️ {count} match(es) forfeited.")
+            msg = msg.replace("PLACEHOLDER_TEAM_NAME", self.team_name)
+            msg = msg.replace("PLACEHOLDER_MATCH_COUNT", str(forfeited_matches))
+            await self.message.edit(content=msg, embed=None, view=None)
 
     async def on_timeout(self):
         """Handle timeout - cancel the operation."""
         logger.info(f"[LEAVE] Timeout for {self.user_name} leave confirmation - cancelled.")
 
         if self.message:
-            await self.message.edit(
-                content="⌛ Leave confirmation timed out. You remain in the tournament.",
-                embed=None,
-                view=None
-            )
+            msg = self.messages.get("timeout", "⌛ Leave confirmation timed out. You remain in the tournament.")
+            await self.message.edit(content=msg, embed=None, view=None)
 
 
 def create_leave_confirmation_embed(
     team_name: str,
     team_data: dict,
     user_mention: str,
-    is_during_registration: bool
+    is_during_registration: bool,
+    language: str = None
 ) -> Embed:
     """
-    Create an embed showing the consequences of leaving.
+    Create an embed showing the consequences of leaving using locale templates.
 
     :param team_name: Name of the team
     :param team_data: Team data dict
     :param user_mention: User mention string
     :param is_during_registration: Whether registration is still open
+    :param language: Language code (defaults to CONFIG.bot.language)
     :return: Discord Embed
     """
+    if not language:
+        language = CONFIG.bot.language
+
+    template = load_embed_template("leave_confirmation", language)
+    messages = template.get("MESSAGES", {})
+
     other_members = [m for m in team_data.get("members", []) if m != user_mention]
     has_partner = len(other_members) > 0
 
     if is_during_registration:
         # During registration - lighter consequences
-        embed = Embed(
-            title="⚠️ Leave Tournament - Confirmation",
-            description=(
-                f"You are about to leave team **{team_name}**.\n\n"
-                f"**What will happen:**"
-            ),
-            color=Color.orange()
-        )
+        embed_template = template.get("LEAVE_DURING_REGISTRATION", {})
 
+        # Build consequences list
         consequences = []
-        consequences.append("🔹 Your team will be **dissolved**")
+        consequences.append(messages.get("consequences_team_dissolved", "🔹 Your team will be dissolved"))
 
         if has_partner:
-            consequences.append(f"🔹 Your partner ({other_members[0]}) will be moved to the **solo queue**")
-            consequences.append("🔹 They may be matched with another solo player")
+            msg = messages.get("consequences_partner_solo", "🔹 Your partner will be moved to solo queue")
+            msg = msg.replace("PLACEHOLDER_PARTNER", other_members[0])
+            consequences.append(msg)
+            consequences.append(messages.get("consequences_partner_rematched", "🔹 They may be matched with another solo player"))
 
-        consequences.append("🔹 You will be **completely removed** from the tournament")
-        consequences.append("🔹 You can **re-register** at any time before registration closes")
+        consequences.append(messages.get("consequences_removed", "🔹 You will be completely removed"))
+        consequences.append(messages.get("consequences_can_rejoin", "🔹 You can re-register"))
 
-        embed.add_field(
-            name="📋 Consequences",
-            value="\n".join(consequences),
-            inline=False
-        )
-
-        embed.add_field(
-            name="✅ Safe to Leave",
-            value="Registration is still open, so there are no penalties for leaving now.",
-            inline=False
-        )
+        # Replace placeholders in template
+        placeholders = {
+            "PLACEHOLDER_TEAM_NAME": team_name,
+            "PLACEHOLDER_CONSEQUENCES": "\n".join(consequences)
+        }
 
     else:
         # After registration - serious consequences
-        embed = Embed(
-            title="🚨 Leave Tournament - WARNING",
-            description=(
-                f"You are about to leave team **{team_name}**.\n\n"
-                f"**⚠️ SERIOUS CONSEQUENCES - READ CAREFULLY:**"
-            ),
-            color=Color.red()
-        )
+        embed_template = template.get("LEAVE_AFTER_REGISTRATION", {})
 
         tournament = load_tournament_data()
         matches = tournament.get("matches", [])
@@ -255,43 +244,36 @@ def create_leave_confirmation_embed(
             if team_name in (m.get("team1"), m.get("team2")) and m.get("status") == "open"
         )
 
+        # Build consequences list
         consequences = []
-        consequences.append("🔹 Your team will be marked as **WITHDRAWN**")
-        consequences.append(f"🔹 **{open_match_count} match(es)** will be **forfeited**")
-        consequences.append("🔹 All forfeited matches count as **automatic losses**")
-        consequences.append("🔹 Your opponents will receive **automatic wins**")
+        consequences.append(messages.get("consequences_withdrawn", "🔹 Your team will be marked as WITHDRAWN"))
+
+        msg = messages.get("consequences_forfeited", "🔹 {count} match(es) will be forfeited")
+        msg = msg.replace("PLACEHOLDER_MATCH_COUNT", str(open_match_count))
+        consequences.append(msg)
+
+        consequences.append(messages.get("consequences_auto_loss", "🔹 All forfeited matches count as automatic losses"))
+        consequences.append(messages.get("consequences_auto_win", "🔹 Your opponents will receive automatic wins"))
 
         if has_partner:
-            consequences.append(f"🔹 Your partner ({other_members[0]}) will also be **eliminated**")
+            msg = messages.get("consequences_partner_eliminated", "🔹 Your partner will also be eliminated")
+            msg = msg.replace("PLACEHOLDER_PARTNER", other_members[0])
+            consequences.append(msg)
 
-        consequences.append("🔹 This action **CANNOT BE UNDONE**")
-        consequences.append("🔹 You **CANNOT re-join** this tournament")
+        consequences.append(messages.get("consequences_irreversible", "🔹 This action CANNOT BE UNDONE"))
+        consequences.append(messages.get("consequences_no_rejoin", "🔹 You CANNOT re-join this tournament"))
 
-        embed.add_field(
-            name="⚠️ Consequences",
-            value="\n".join(consequences),
-            inline=False
-        )
-
+        # Partner impact
         if has_partner:
-            embed.add_field(
-                name="👥 Impact on Partner",
-                value=(
-                    f"Your partner will be notified and the entire team will be withdrawn.\n"
-                    f"Both of you will be removed from the tournament."
-                ),
-                inline=False
-            )
+            partner_impact = messages.get("partner_impact_text", "Your partner will be notified...")
+        else:
+            partner_impact = messages.get("partner_impact_none", "Your team will be removed...")
 
-        embed.add_field(
-            name="🛑 Are you absolutely sure?",
-            value=(
-                "Only proceed if you cannot continue playing in this tournament.\n"
-                "Consider discussing with your partner first if applicable."
-            ),
-            inline=False
-        )
+        # Replace placeholders in template
+        placeholders = {
+            "PLACEHOLDER_TEAM_NAME": team_name,
+            "PLACEHOLDER_CONSEQUENCES": "\n".join(consequences),
+            "PLACEHOLDER_PARTNER_IMPACT": partner_impact
+        }
 
-    embed.set_footer(text="⏰ You have 60 seconds to decide.")
-
-    return embed
+    return build_embed_from_template(embed_template, placeholders)

@@ -3,6 +3,7 @@ Availability Conflict Resolution System
 
 Handles cases where teams have no overlapping availability.
 Provides suggestions for alternative time slots and manages team responses.
+Uses locale system for internationalization.
 """
 
 from discord import ui, ButtonStyle, Interaction, Member, SelectOption, Embed
@@ -15,6 +16,7 @@ from modules.dataStorage import load_tournament_data, save_tournament_data
 from modules.logger import logger
 from modules.config import CONFIG
 from modules.matchmaker import AvailabilityChecker
+from modules.embeds import load_embed_template
 
 
 class AvailabilityConflictView(ui.View):
@@ -42,10 +44,15 @@ class AvailabilityConflictView(ui.View):
         self.all_members = team1_members + team2_members
         self.suggested_slots = suggested_slots
         self.on_resolution_callback = on_resolution_callback
+        self.language = CONFIG.bot.language
 
         self.approved = set()  # Track who approved
         self.selected_slot = None
         self.message = None
+
+        # Load locale messages
+        template = load_embed_template("availability_conflict", self.language)
+        self.messages = template.get("MESSAGES", {})
 
         # Create select menu with suggested slots
         self._add_slot_selector()
@@ -58,21 +65,28 @@ class AvailabilityConflictView(ui.View):
         for i, slot in enumerate(self.suggested_slots[:10]):
             label = slot.strftime("%a %d.%m.%Y %H:%M")
             value = slot.isoformat()
+
+            desc_template = self.messages.get("option_label", "Option {num}")
+            desc = desc_template.replace("PLACEHOLDER_NUM", str(i + 1))
+
             options.append(SelectOption(
                 label=label,
                 value=value,
-                description=f"Option {i+1}"
+                description=desc
             ))
 
         if not options:
+            no_sugg = self.messages.get("no_suggestions", "No suggestions available")
+            no_sugg_desc = self.messages.get("no_suggestions_desc", "Cannot find common time")
             options.append(SelectOption(
-                label="No suggestions available",
+                label=no_sugg,
                 value="none",
-                description="Cannot find common time"
+                description=no_sugg_desc
             ))
 
+        placeholder = self.messages.get("select_placeholder", "Select a time slot that works for both teams...")
         select = ui.Select(
-            placeholder="Select a time slot that works for both teams...",
+            placeholder=placeholder,
             options=options,
             min_values=1,
             max_values=1
@@ -83,10 +97,8 @@ class AvailabilityConflictView(ui.View):
     async def interaction_check(self, interaction: Interaction) -> bool:
         """Only team members can interact."""
         if interaction.user not in self.all_members:
-            await interaction.response.send_message(
-                "🚫 You are not part of this match.",
-                ephemeral=True
-            )
+            msg = self.messages.get("not_part_of_match", "🚫 You are not part of this match.")
+            await interaction.response.send_message(msg, ephemeral=True)
             return False
         return True
 
@@ -95,19 +107,15 @@ class AvailabilityConflictView(ui.View):
         selected_value = interaction.data["values"][0]
 
         if selected_value == "none":
-            await interaction.response.send_message(
-                "❌ No time slots available. Please decline to withdraw from the tournament.",
-                ephemeral=True
-            )
+            msg = self.messages.get("no_slot_selected", "❌ No time slots available. Please decline to withdraw from the tournament.")
+            await interaction.response.send_message(msg, ephemeral=True)
             return
 
         self.selected_slot = datetime.fromisoformat(selected_value)
 
-        await interaction.response.send_message(
-            f"✅ You selected: **{self.selected_slot.strftime('%A %d.%m.%Y %H:%M')}**\n"
-            f"Waiting for all players to confirm...",
-            ephemeral=True
-        )
+        msg_template = self.messages.get("selected_slot", "✅ You selected: **{slot}**\nWaiting for all players to confirm...")
+        msg = msg_template.replace("PLACEHOLDER_SLOT", self.selected_slot.strftime('%A %d.%m.%Y %H:%M'))
+        await interaction.response.send_message(msg, ephemeral=True)
 
         # Automatically "approve" for this user
         if interaction.user not in self.approved:
@@ -124,17 +132,13 @@ class AvailabilityConflictView(ui.View):
     async def confirm(self, interaction: Interaction, button: ui.Button):
         """Confirm the currently selected time slot."""
         if not self.selected_slot:
-            await interaction.response.send_message(
-                "⚠️ Please select a time slot first using the dropdown menu above.",
-                ephemeral=True
-            )
+            msg = self.messages.get("no_slot_selected", "⚠️ Please select a time slot first using the dropdown menu above.")
+            await interaction.response.send_message(msg, ephemeral=True)
             return
 
         if interaction.user in self.approved:
-            await interaction.response.send_message(
-                "✅ You already confirmed this time slot.",
-                ephemeral=True
-            )
+            msg = self.messages.get("already_confirmed", "✅ You already confirmed this time slot.")
+            await interaction.response.send_message(msg, ephemeral=True)
             return
 
         self.approved.add(interaction.user)
@@ -143,10 +147,10 @@ class AvailabilityConflictView(ui.View):
             f"slot {self.selected_slot} for match {self.match_id}"
         )
 
-        await interaction.response.send_message(
-            f"✅ Confirmed! ({len(self.approved)}/{len(self.all_members)} players)",
-            ephemeral=True
-        )
+        msg_template = self.messages.get("confirmed_count", "✅ Confirmed! ({current}/{total} players)")
+        msg = msg_template.replace("PLACEHOLDER_CURRENT", str(len(self.approved)))
+        msg = msg_template.replace("PLACEHOLDER_TOTAL", str(len(self.all_members)))
+        await interaction.response.send_message(msg, ephemeral=True)
 
         # Check if all players approved
         await self._check_full_approval()
@@ -189,15 +193,17 @@ class AvailabilityConflictView(ui.View):
         opponent = self.team2 if decliner_team == self.team1 else self.team1
 
         if self.message:
-            await self.message.edit(
-                content=(
-                    f"❌ **{interaction.user.mention}** (Team **{decliner_team}**) declined to adjust availability.\n"
-                    f"⚠️ Team **{decliner_team}** will be excluded from the tournament.\n"
-                    f"🏆 Team **{opponent}** receives a walkover for this match."
-                ),
-                embed=None,
-                view=None
+            msg_template = self.messages.get(
+                "declined_team",
+                "❌ **{user}** (Team **{team}**) declined to adjust availability.\n"
+                "⚠️ Team **{team}** will be excluded from the tournament.\n"
+                "🏆 Team **{opponent}** receives a walkover for this match."
             )
+            msg = msg_template.replace("PLACEHOLDER_USER", interaction.user.mention)
+            msg = msg.replace("PLACEHOLDER_TEAM", decliner_team)
+            msg = msg.replace("PLACEHOLDER_OPPONENT", opponent)
+
+            await self.message.edit(content=msg, embed=None, view=None)
 
         # Call resolution callback with exclusion
         await self.on_resolution_callback(
@@ -222,16 +228,16 @@ class AvailabilityConflictView(ui.View):
         )
 
         if self.message:
-            await self.message.edit(
-                content=(
-                    f"✅ All players agreed to the new time slot!\n"
-                    f"📅 Match {self.match_id} will be scheduled for "
-                    f"**{self.selected_slot.strftime('%A %d.%m.%Y %H:%M')}**\n"
-                    f"⏳ Updating team availability and regenerating schedule..."
-                ),
-                embed=None,
-                view=None
+            msg_template = self.messages.get(
+                "all_agreed",
+                "✅ All players agreed to the new time slot!\n"
+                "📅 Match {match_id} will be scheduled for **{slot}**\n"
+                "⏳ Updating team availability and regenerating schedule..."
             )
+            msg = msg_template.replace("PLACEHOLDER_MATCH_ID", str(self.match_id))
+            msg = msg.replace("PLACEHOLDER_SLOT", self.selected_slot.strftime('%A %d.%m.%Y %H:%M'))
+
+            await self.message.edit(content=msg, embed=None, view=None)
 
         # Call resolution callback
         await self.on_resolution_callback(
@@ -253,15 +259,16 @@ class AvailabilityConflictView(ui.View):
         )
 
         if self.message:
-            await self.message.edit(
-                content=(
-                    f"⌛ **Timeout!**\n"
-                    f"No agreement was reached within 48 hours.\n"
-                    f"⚠️ Both teams (**{self.team1}**, **{self.team2}**) will be excluded from the tournament."
-                ),
-                embed=None,
-                view=None
+            msg_template = self.messages.get(
+                "timeout_both",
+                "⌛ **Timeout!**\n"
+                "No agreement was reached within 48 hours.\n"
+                "⚠️ Both teams (**{team1}**, **{team2}**) will be excluded from the tournament."
             )
+            msg = msg_template.replace("PLACEHOLDER_TEAM1", self.team1)
+            msg = msg.replace("PLACEHOLDER_TEAM2", self.team2)
+
+            await self.message.edit(content=msg, embed=None, view=None)
 
         # Exclude both teams
         await self.on_resolution_callback(
