@@ -211,13 +211,19 @@ class ConflictResolutionCoordinator:
         members = []
         for member_mention in team_data.get("members", []):
             try:
-                user_id = int(member_mention.strip("<@!>"))
-                member = self.channel.guild.get_member(user_id)
-                if member:
-                    members.append(member)
+                from modules.utils import extract_user_id
+                user_id = extract_user_id(member_mention)
+                if user_id:
+                    member = self.channel.guild.get_member(user_id)
+                    if member:
+                        members.append(member)
+                    else:
+                        logger.warning(
+                            f"[CONFLICT-RESOLVER] Could not find member {user_id} in guild"
+                        )
                 else:
-                    logger.warning(
-                        f"[CONFLICT-RESOLVER] Could not find member {user_id} in guild"
+                    logger.error(
+                        f"[CONFLICT-RESOLVER] Could not extract user ID from mention: {member_mention}"
                     )
             except (ValueError, AttributeError) as e:
                 logger.error(

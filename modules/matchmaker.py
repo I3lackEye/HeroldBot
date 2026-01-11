@@ -17,7 +17,7 @@ from modules.config import CONFIG
 from modules.dataStorage import DEBUG_MODE, load_tournament_data, save_tournament_data
 # Removed: send_cleanup_summary import - function deleted to reduce spam
 from modules.logger import logger
-from modules.utils import generate_team_name, get_active_days_config
+from modules.utils import generate_team_name, get_active_days_config, get_default_availability
 
 # Tournament configuration (from centralized config)
 MATCH_DURATION = CONFIG.tournament.match_duration
@@ -330,7 +330,7 @@ async def cleanup_orphan_teams(channel: TextChannel):
             solo.append(
                 {
                     "player": player,
-                    "availability": team_data.get("availability", {"saturday": "00:00-23:59", "sunday": "00:00-23:59"}),
+                    "availability": team_data.get("availability", get_default_availability()),
                     "unavailable_dates": team_data.get("unavailable_dates", [])
                 }
             )

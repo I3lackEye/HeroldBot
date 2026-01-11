@@ -224,19 +224,22 @@ async def handle_request_reschedule(interaction: Interaction, match_id: int):
         mentions = members1 + members2
 
         # Fetch valid members
+        from modules.utils import extract_user_id
         valid_members = []
         for mention in mentions:
-            if mention.startswith("<@"):
-                try:
-                    uid = int(mention.replace("<@", "").replace("!", "").replace(">", ""))
+            try:
+                uid = extract_user_id(mention)
+                if uid:
                     member = await interaction.guild.fetch_member(uid)
                     valid_members.append(member)
-                except discord.NotFound:
-                    logger.warning(f"[RESCHEDULE] ⚠️ Member {uid} not found.")
-                except discord.Forbidden:
-                    logger.error(f"[RESCHEDULE] ❌ No permission to fetch member {uid}.")
-                except Exception as e:
-                    logger.error(f"[RESCHEDULE] ❌ Error fetching member {uid}: {e}")
+                else:
+                    logger.warning(f"[RESCHEDULE] ⚠️ Could not extract user ID from mention: {mention}")
+            except discord.NotFound:
+                logger.warning(f"[RESCHEDULE] ⚠️ Member {uid} not found.")
+            except discord.Forbidden:
+                logger.error(f"[RESCHEDULE] ❌ No permission to fetch member {uid}.")
+            except Exception as e:
+                logger.error(f"[RESCHEDULE] ❌ Error fetching member {uid}: {e}")
 
         if not valid_members:
             logger.error(f"[RESCHEDULE] No valid members found for match {match_id}")
