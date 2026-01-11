@@ -89,9 +89,15 @@ class SetupModal(Modal, title="🎮 HeroldBot Setup"):
         else:
             errors.append(f"❌ Winner role not found: `{self.winner_role.value}`")
 
-        # Validate timezone (basic check)
+        # Validate timezone
         tz_value = self.timezone.value.strip() or "Europe/Berlin"
-        config_data["timezone"] = tz_value
+        try:
+            # Test if timezone is valid
+            from zoneinfo import ZoneInfo
+            ZoneInfo(tz_value)
+            config_data["timezone"] = tz_value
+        except Exception:
+            errors.append(f"❌ Invalid timezone: `{tz_value}`. Use IANA timezone names (e.g., 'Europe/Berlin').")
 
         # If errors, show them
         if errors:

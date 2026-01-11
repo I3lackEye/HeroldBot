@@ -46,6 +46,38 @@ def extract_user_id(mention: str) -> Optional[int]:
     return None
 
 
+def validate_user_id(user_id: str) -> bool:
+    """
+    Validates that a user ID string is safe for use in file paths.
+
+    Discord user IDs are 15-20 digit numbers. This function ensures:
+    - Only digits
+    - Reasonable length (prevents overflow and path traversal)
+    - No special characters that could cause path traversal
+
+    :param user_id: User ID string to validate
+    :return: True if valid and safe, False otherwise
+    """
+    if not user_id:
+        return False
+
+    # Must be purely numeric
+    if not user_id.isdigit():
+        return False
+
+    # Discord IDs are 15-20 digits (Snowflake format)
+    # We allow 10-25 to be safe for future-proofing
+    if not (10 <= len(user_id) <= 25):
+        return False
+
+    # No path traversal characters (defense in depth)
+    dangerous_chars = ['/', '\\', '..', '\0', '\n', '\r']
+    if any(char in user_id for char in dangerous_chars):
+        return False
+
+    return True
+
+
 def has_permission(member: discord.Member, *required_permissions: str) -> bool:
     """
     Checks if the member has at least one of the roles specified in the configuration

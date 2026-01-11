@@ -404,14 +404,39 @@ class AddGameModal(discord.ui.Modal):
             )
             return
 
+        is_valid, error_msg = validate_string(name, max_length=50)
+        if not is_valid:
+            await interaction.response.send_message(
+                f"❌ Invalid game name: {error_msg}", ephemeral=True
+            )
+            return
+
+        # Validate genre
+        genre = self.genre.value.strip()
+        is_valid, error_msg = validate_string(genre, max_length=30)
+        if not is_valid:
+            await interaction.response.send_message(
+                f"❌ Invalid genre: {error_msg}", ephemeral=True
+            )
+            return
+
+        # Validate platform
+        platform = self.platform.value.strip()
+        is_valid, error_msg = validate_string(platform, max_length=20)
+        if not is_valid:
+            await interaction.response.send_message(
+                f"❌ Invalid platform: {error_msg}", ephemeral=True
+            )
+            return
+
         try:
             game_id = name.replace(" ", "_")
 
             add_game(
                 game_id=game_id,
                 name=name,
-                genre=self.genre.value.strip(),
-                platform=self.platform.value.strip(),
+                genre=genre,
+                platform=platform,
                 match_duration_minutes=duration,
                 pause_minutes=30,
                 min_players_per_team=team_size_int,
