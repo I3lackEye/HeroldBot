@@ -20,6 +20,7 @@ poll_message_id = None
 poll_channel_id = None
 poll_votes = {}  # user_id -> emoji
 poll_options = {}  # emoji -> game_name
+_poll_lock = asyncio.Lock()  # Prevent race conditions
 
 emoji_list = ["🇦", "🇧", "🇨", "🇩", "🇪", "🇫", "🇬", "🇭", "🇮", "🇯"]
 
@@ -41,7 +42,7 @@ async def start_poll(
     global poll_message_id, poll_channel_id, poll_votes, poll_options
 
     description = ""
-    poll_options = {}
+    temp_poll_options = {}
 
     for idx, (game_id, game_data) in enumerate(options.items()):
         if idx >= len(emoji_list):
@@ -49,7 +50,7 @@ async def start_poll(
         emoji = emoji_list[idx]
         game_name = game_data.get("name", game_id)  # Fallback: Key if no name exists
         description += f"{emoji} {game_name}\n"
-        poll_options[emoji] = game_id  # Important: Keep ID as reference
+        temp_poll_options[emoji] = game_id  # Important: Keep ID as reference
 
     # Calculate end time
     poll_end_time = datetime.now(ZoneInfo("Europe/Berlin")) + timedelta(hours=registration_hours)
@@ -65,13 +66,15 @@ async def start_poll(
 
     message = await channel.send(embed=embed)
 
-    for emoji in poll_options.keys():
+    for emoji in temp_poll_options.keys():
         await message.add_reaction(emoji)
 
-    poll_message_id = message.id
-    poll_channel_id = message.channel.id
-    poll_votes = {}
-    logger.info(f"[POLL] New poll started with {len(options)} options.")
+    async with _poll_lock:
+        poll_message_id = message.id
+        poll_channel_id = message.channel.id
+        poll_votes = {}
+        poll_options = temp_poll_options
+        logger.info(f"[POLL] New poll started with {len(options)} options.")
 
 
 async def end_poll(bot: discord.Client, channel: discord.TextChannel):
@@ -81,12 +84,17 @@ async def end_poll(bot: discord.Client, channel: discord.TextChannel):
     """
     global poll_message_id, poll_options
 
-    if not poll_message_id:
+    # Check if poll exists (thread-safe)
+    async with _poll_lock:
+        current_poll_id = poll_message_id
+        current_options = dict(poll_options)
+
+    if not current_poll_id:
         await channel.send("❌ No active poll found.")
         return
 
     try:
-        message = await channel.fetch_message(poll_message_id)
+        message = await channel.fetch_message(current_poll_id)
     except Exception as e:
         logger.error(f"[POLL] Error fetching poll message: {e}")
         await channel.send("❌ Error fetching poll message.")
@@ -95,10 +103,10 @@ async def end_poll(bot: discord.Client, channel: discord.TextChannel):
     real_votes = {}
 
     for reaction in message.reactions:
-        if str(reaction.emoji) in poll_options:
+        if str(reaction.emoji) in current_options:
             async for user in reaction.users():
                 if not user.bot:
-                    game = poll_options[str(reaction.emoji)]
+                    game = current_options[str(reaction.emoji)]
                     real_votes[game] = real_votes.get(game, 0) + 1
 
     # Load games for name conversion
@@ -162,9 +170,10 @@ async def end_poll(bot: discord.Client, channel: discord.TextChannel):
 
     logger.info(f"[POLL] Poll ended. Chosen game: {chosen_game_name}")
 
-    # Reset
-    poll_message_id = None
-    poll_options = {}
+    # Reset (thread-safe)
+    async with _poll_lock:
+        poll_message_id = None
+        poll_options = {}
 
     tournament = load_tournament_data()
     registration_end_str = tournament.get("registration_end")
@@ -208,10 +217,11 @@ async def on_raw_reaction_add(payload: discord.RawReactionActionEvent):
 
     emoji = str(payload.emoji)
 
-    if emoji not in poll_options:
-        return  # Not a valid option
+    async with _poll_lock:
+        if emoji not in poll_options:
+            return  # Not a valid option
 
-    # Save vote
-    poll_votes[payload.user_id] = emoji
+        # Save vote
+        poll_votes[payload.user_id] = emoji
 
-    logger.info(f"[POLL] Vote registered: User {payload.user_id} for {emoji}.")
+        logger.info(f"[POLL] Vote registered: User {payload.user_id} for {emoji}.")

@@ -29,7 +29,7 @@ async def match_reminder_loop(channel: TextChannel):
 
         tournament = load_tournament_data()
         matches = tournament.get("matches", [])
-        now = datetime.now(timezone.utc)
+        now = datetime.now(tz=ZoneInfo(CONFIG.bot.timezone))
 
         for match in matches:
             scheduled_time_str = match.get("scheduled_time")
@@ -41,7 +41,7 @@ async def match_reminder_loop(channel: TextChannel):
             try:
                 scheduled_time = datetime.fromisoformat(scheduled_time_str)
                 if scheduled_time.tzinfo is None:
-                    scheduled_time = scheduled_time.replace(tzinfo=timezone.utc)
+                    scheduled_time = scheduled_time.replace(tzinfo=ZoneInfo(CONFIG.bot.timezone))
             except ValueError:
                 logger.warning(f"[REMINDER] ❌ Invalid time format for match {match.get('match_id')}: {scheduled_time_str}")
                 continue
@@ -59,7 +59,7 @@ async def match_reminder_loop(channel: TextChannel):
                     "match_id": match.get("match_id", "???"),
                     "team1": match.get("team1", "Team 1"),
                     "team2": match.get("team2", "Team 2"),
-                    "time": scheduled_time.astimezone(ZoneInfo("Europe/Berlin")).strftime("%d.%m.%Y %H:%M"),
+                    "time": scheduled_time.astimezone(ZoneInfo(CONFIG.bot.timezone)).strftime("%d.%m.%Y %H:%M"),
                 }
 
                 # Prepare mentions directly

@@ -265,7 +265,9 @@ def auto_match_solo():
         avail1 = p1.get("availability", {})
         avail2 = p2.get("availability", {})
 
-        overlap = AvailabilityChecker.merge_availability(avail1, avail2)
+        # Use configured active days instead of hardcoded saturday/sunday
+        active_days = get_active_days_config()
+        overlap = AvailabilityChecker.merge_availability(avail1, avail2, days=active_days)
 
         # Validate that there's at least one day with actual overlap
         if not AvailabilityChecker.has_any_overlap(overlap):

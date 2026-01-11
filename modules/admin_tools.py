@@ -42,7 +42,7 @@ from modules.modals import (
 )
 
 from modules.poll import end_poll
-from modules.reschedule import pending_reschedules
+from modules.reschedule import pending_reschedules, _reschedule_lock
 from modules.stats_tracker import record_match_result
 from modules.tournament import end_tournament_procedure, auto_end_poll, execute_registration_close_procedure
 from modules.utils import (
@@ -317,7 +317,7 @@ class AdminGroup(app_commands.Group):
         match["status"] = "completed"
         match["winner"] = winner
         match["reported_by"] = interaction.user.mention
-        match["reported_at"] = datetime.now().isoformat()
+        match["reported_at"] = datetime.now(tz=ZoneInfo(CONFIG.bot.timezone)).isoformat()
 
         save_tournament_data(tournament)
 
@@ -331,10 +331,19 @@ class AdminGroup(app_commands.Group):
             winner_members = winner_team_data.get("members", [])
             loser_members = loser_team_data.get("members", [])
 
-            # Extract user IDs from mentions
+            # Extract user IDs from mentions (safe regex execution)
             import re
-            winner_ids = [re.search(r"\d+", m).group(0) for m in winner_members if re.search(r"\d+", m)]
-            loser_ids = [re.search(r"\d+", m).group(0) for m in loser_members if re.search(r"\d+", m)]
+            winner_ids = []
+            for m in winner_members:
+                match = re.search(r"\d+", m)
+                if match:
+                    winner_ids.append(match.group(0))
+
+            loser_ids = []
+            for m in loser_members:
+                match = re.search(r"\d+", m)
+                if match:
+                    loser_ids.append(match.group(0))
 
             # Get game name
             game = tournament.get("poll_results", {}).get("chosen_game", "Unknown")
@@ -438,16 +447,17 @@ class AdminGroup(app_commands.Group):
             await interaction.response.send_message("🚫 You don't have permission for this command.", ephemeral=True)
             return
 
-        if match_id in pending_reschedules:
-            pending_reschedules.discard(match_id)
-            await interaction.response.send_message(
-                f"✅ Reschedule request for match {match_id} was reset.",
-                ephemeral=True,
-            )
-        else:
-            await interaction.response.send_message(
-                f"⚠️ No pending request for match {match_id} found.", ephemeral=True
-            )
+        async with _reschedule_lock:
+            if match_id in pending_reschedules:
+                pending_reschedules.discard(match_id)
+                await interaction.response.send_message(
+                    f"✅ Reschedule request for match {match_id} was reset.",
+                    ephemeral=True,
+                )
+            else:
+                await interaction.response.send_message(
+                    f"⚠️ No pending request for match {match_id} found.", ephemeral=True
+                )
 
     @app_commands.command(
         name="end_poll",
