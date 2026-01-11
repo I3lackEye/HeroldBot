@@ -145,8 +145,9 @@ class RescheduleView(ui.View):
             logger.info(f"[RESCHEDULE] Match {self.match_id} forfeited by {decliner_team}. Winner: {opponent}")
 
         # Import at runtime to avoid circular dependency
-        from modules.reschedule import pending_reschedules
-        pending_reschedules.discard(self.match_id)
+        from modules.reschedule import pending_reschedules, _reschedule_lock
+        async with _reschedule_lock:
+            pending_reschedules.discard(self.match_id)
 
         if self.message:
             await self.message.edit(
@@ -174,8 +175,9 @@ class RescheduleView(ui.View):
             logger.info(f"[RESCHEDULE] Match {self.match_id} successfully rescheduled to {self.new_datetime}.")
 
         # Import at runtime to avoid circular dependency
-        from modules.reschedule import pending_reschedules
-        pending_reschedules.discard(self.match_id)
+        from modules.reschedule import pending_reschedules, _reschedule_lock
+        async with _reschedule_lock:
+            pending_reschedules.discard(self.match_id)
 
         await self.message.edit(
             content=f"✅ All players accepted! Match {self.match_id} rescheduled to **{self.new_datetime.strftime('%d.%m.%Y %H:%M')}**!",
@@ -194,5 +196,6 @@ class RescheduleView(ui.View):
                 view=None
             )
         # Import at runtime to avoid circular dependency
-        from modules.reschedule import pending_reschedules
-        pending_reschedules.discard(self.match_id)
+        from modules.reschedule import pending_reschedules, _reschedule_lock
+        async with _reschedule_lock:
+            pending_reschedules.discard(self.match_id)

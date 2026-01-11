@@ -8,6 +8,7 @@ Uses locale system for internationalization.
 
 from discord import ui, ButtonStyle, Interaction, Embed
 from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from modules.dataStorage import load_tournament_data, save_tournament_data
 from modules.logger import logger
@@ -128,7 +129,7 @@ class LeaveConfirmationView(ui.View):
         # Mark team as withdrawn
         tournament["teams"][self.team_name]["status"] = "withdrawn"
         tournament["teams"][self.team_name]["withdrawn_by"] = self.user_mention
-        tournament["teams"][self.team_name]["withdrawn_at"] = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+        tournament["teams"][self.team_name]["withdrawn_at"] = datetime.now(tz=ZoneInfo(CONFIG.bot.timezone)).strftime("%Y-%m-%dT%H:%M:%S")
 
         # Forfeit only OPEN matches
         forfeited_matches = 0
