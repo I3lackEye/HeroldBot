@@ -131,9 +131,18 @@ async def end_tournament_procedure(
             winner_members = winner_team_data.get("members", [])
             loser_members = loser_team_data.get("members", [])
 
-            # Extract user IDs
-            winner_ids_match = [re.search(r"\d+", m).group(0) for m in winner_members if re.search(r"\d+", m)]
-            loser_ids_match = [re.search(r"\d+", m).group(0) for m in loser_members if re.search(r"\d+", m)]
+            # Extract user IDs (safe regex execution)
+            winner_ids_match = []
+            for m in winner_members:
+                match = re.search(r"\d+", m)
+                if match:
+                    winner_ids_match.append(match.group(0))
+
+            loser_ids_match = []
+            for m in loser_members:
+                match = re.search(r"\d+", m)
+                if match:
+                    loser_ids_match.append(match.group(0))
 
             if winner_ids_match and loser_ids_match and chosen_game != "Unknown":
                 record_match_result(

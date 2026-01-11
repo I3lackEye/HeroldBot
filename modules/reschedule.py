@@ -27,6 +27,7 @@ from modules.reschedule_view import RescheduleView, SlotSelectView
 
 # Global state for pending reschedule requests
 pending_reschedules = set()
+_reschedule_lock = asyncio.Lock()  # Prevent race conditions
 
 RESCHEDULE_TIMEOUT_HOURS = CONFIG.tournament.reschedule_timeout_hours
 
@@ -129,18 +130,16 @@ async def handle_request_reschedule(interaction: Interaction, match_id: int):
         await interaction.response.send_message("🚫 Invalid match ID or not your match!", ephemeral=True)
         return
 
-    if match_id in pending_reschedules:
-        await interaction.response.send_message(
-            "🚫 A reschedule request is already pending for this match!", ephemeral=True
-        )
-        return
+    async with _reschedule_lock:
+        if match_id in pending_reschedules:
+            await interaction.response.send_message(
+                "🚫 A reschedule request is already pending for this match!", ephemeral=True
+            )
+            return
 
     match = next((m for m in tournament.get("matches", []) if m.get("match_id") == match_id), None,)
     if not match:
         await interaction.response.send_message("🚫 Match not found.", ephemeral=True)
-        return
-    if match.get("rescheduled_once", False):
-        await interaction.response.send_message("🚫 This match has already been rescheduled and cannot be rescheduled again.", ephemeral=True)
         return
 
     # Check if this team has already requested a reschedule for this match
@@ -291,7 +290,8 @@ async def handle_request_reschedule(interaction: Interaction, match_id: int):
             return
 
         # Start timer
-        pending_reschedules.add(match_id)
+        async with _reschedule_lock:
+            pending_reschedules.add(match_id)
         interaction.client.loop.create_task(start_reschedule_timer(interaction.client, match_id))
 
     # Show slot selection view
@@ -357,7 +357,8 @@ async def neuer_zeitpunkt_autocomplete(interaction: Interaction, current: str):
     free_slots = [slot for slot in allowed_iso if slot not in booked_slots]
 
     # Only future slots
-    free_slots = [slot for slot in free_slots if datetime.fromisoformat(slot) > datetime.now()]
+    tz = ZoneInfo(CONFIG.bot.timezone)
+    free_slots = [slot for slot in free_slots if datetime.fromisoformat(slot) > datetime.now(tz=tz)]
 
     if current:
         free_slots = [slot for slot in free_slots if current in slot]
@@ -379,8 +380,9 @@ async def start_reschedule_timer(bot, match_id: int):
     """
     await asyncio.sleep(RESCHEDULE_TIMEOUT_HOURS * 3600)  # Wait for timeout
 
-    if match_id in pending_reschedules:
-        pending_reschedules.discard(match_id)
+    async with _reschedule_lock:
+        if match_id in pending_reschedules:
+            pending_reschedules.discard(match_id)
         logger.info(
             f"[RESCHEDULE] Automatic cleanup: Match {match_id} was reset (timeout after {RESCHEDULE_TIMEOUT_HOURS} hours)."
         )

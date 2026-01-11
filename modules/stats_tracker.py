@@ -96,20 +96,41 @@ def load_player_stats(user_id: str) -> Optional[Dict]:
 
 def save_player_stats(user_id: str, stats: Dict) -> bool:
     """
-    Save player statistics to individual file.
+    Save player statistics to individual file atomically using tempfile + rename.
 
     :param user_id: Discord user ID
     :param stats: Player stats dictionary
     :return: True if successful, False otherwise
     """
+    import tempfile
+
     file_path = os.path.join(PLAYER_STATS_DIR, f"{user_id}.json")
 
     try:
-        with open(file_path, 'w', encoding='utf-8') as f:
-            json.dump(stats, f, indent=2, ensure_ascii=False)
+        # Write to temporary file first (atomic operation)
+        with tempfile.NamedTemporaryFile(
+            mode='w',
+            encoding='utf-8',
+            dir=PLAYER_STATS_DIR,
+            delete=False,
+            suffix='.tmp'
+        ) as tmp_file:
+            json.dump(stats, tmp_file, indent=2, ensure_ascii=False)
+            tmp_file.flush()
+            os.fsync(tmp_file.fileno())
+            tmp_path = tmp_file.name
+
+        # Atomic rename (replaces old file)
+        os.replace(tmp_path, file_path)
         return True
     except Exception as e:
         logger.error(f"[STATS] Error saving stats for user {user_id}: {e}")
+        # Clean up temp file if it exists
+        if 'tmp_path' in locals() and os.path.exists(tmp_path):
+            try:
+                os.remove(tmp_path)
+            except:
+                pass
         return False
 
 
@@ -142,9 +163,18 @@ def list_all_players() -> List[str]:
     :return: List of user IDs
     """
     try:
+        # Check if directory exists before listing
+        if not os.path.exists(PLAYER_STATS_DIR):
+            logger.warning(f"[STATS] Player stats directory does not exist: {PLAYER_STATS_DIR}")
+            os.makedirs(PLAYER_STATS_DIR, exist_ok=True)
+            return []
+
         files = os.listdir(PLAYER_STATS_DIR)
         player_ids = [f.replace('.json', '') for f in files if f.endswith('.json')]
         return player_ids
+    except PermissionError as e:
+        logger.error(f"[STATS] Permission denied when accessing stats directory: {e}")
+        return []
     except Exception as e:
         logger.error(f"[STATS] Error listing players: {e}")
         return []
@@ -286,7 +316,8 @@ def update_tournament_participation(user_ids: List[str], game: str):
     :param user_ids: List of all participant user IDs
     :param game: Game that was played
     """
-    timestamp = datetime.now().isoformat()
+    from zoneinfo import ZoneInfo
+    timestamp = datetime.now(tz=ZoneInfo(CONFIG.bot.timezone)).isoformat()
 
     for user_id in user_ids:
         uid_str = str(user_id)
@@ -473,7 +504,8 @@ def format_time_since(iso_timestamp: str, language: str = None) -> str:
 
     try:
         past = datetime.fromisoformat(iso_timestamp)
-        now = datetime.now()
+        from zoneinfo import ZoneInfo
+        now = datetime.now(tz=ZoneInfo(CONFIG.bot.timezone))
         delta = now - past
 
         if delta.days == 0:
