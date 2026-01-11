@@ -199,9 +199,13 @@ async def end_tournament_procedure(
 
     if mvp:  # If MVP exists
         try:
+            from modules.utils import extract_user_id
             guild = channel.guild  # Get guild from channel
-            mvp_id = int(mvp.strip("<@!>"))  # Extract MVP from mention
-            await update_champion_role(guild, mvp_id)
+            mvp_id = extract_user_id(mvp)  # Extract MVP from mention safely
+            if mvp_id:
+                await update_champion_role(guild, mvp_id)
+            else:
+                logger.error(f"[CHAMPION] Could not extract valid user ID from MVP mention: {mvp}")
         except Exception as e:
             logger.error(f"[CHAMPION] Error updating champion role: {e}")
 

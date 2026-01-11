@@ -22,6 +22,62 @@ from modules.dataStorage import (
 from modules.logger import logger
 
 
+def extract_user_id(mention: str) -> Optional[int]:
+    """
+    Safely extracts user ID from Discord mention string.
+
+    Handles formats: <@123>, <@!123>, @123
+
+    :param mention: Discord mention string
+    :return: User ID as int, or None if invalid format
+    """
+    if not mention:
+        return None
+
+    # Try regex extraction first (most robust)
+    import re
+    match = re.search(r'(\d{15,20})', mention)
+    if match:
+        try:
+            return int(match.group(1))
+        except ValueError:
+            return None
+
+    return None
+
+
+def validate_user_id(user_id: str) -> bool:
+    """
+    Validates that a user ID string is safe for use in file paths.
+
+    Discord user IDs are 15-20 digit numbers. This function ensures:
+    - Only digits
+    - Reasonable length (prevents overflow and path traversal)
+    - No special characters that could cause path traversal
+
+    :param user_id: User ID string to validate
+    :return: True if valid and safe, False otherwise
+    """
+    if not user_id:
+        return False
+
+    # Must be purely numeric
+    if not user_id.isdigit():
+        return False
+
+    # Discord IDs are 15-20 digits (Snowflake format)
+    # We allow 10-25 to be safe for future-proofing
+    if not (10 <= len(user_id) <= 25):
+        return False
+
+    # No path traversal characters (defense in depth)
+    dangerous_chars = ['/', '\\', '..', '\0', '\n', '\r']
+    if any(char in user_id for char in dangerous_chars):
+        return False
+
+    return True
+
+
 def has_permission(member: discord.Member, *required_permissions: str) -> bool:
     """
     Checks if the member has at least one of the roles specified in the configuration
@@ -620,6 +676,19 @@ def get_active_days_config() -> dict:
     return {
         day: {"start": day_config.start, "end": day_config.end}
         for day, day_config in CONFIG.tournament.active_days.items()
+    }
+
+
+def get_default_availability() -> dict:
+    """
+    Gets default full availability based on configured tournament days.
+    Returns dict with day names as keys and "00:00-23:59" as values for each active day.
+
+    :return: Availability dict matching active tournament days
+    """
+    return {
+        day: "00:00-23:59"
+        for day in CONFIG.tournament.active_days.keys()
     }
 
 

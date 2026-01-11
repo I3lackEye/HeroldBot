@@ -106,9 +106,14 @@ class LeaveConfirmationView(ui.View):
 
             # Resolve partner name for logging
             try:
-                other_id = int(other_members[0].strip("<@!>"))
-                other_member = interaction.guild.get_member(other_id)
-                other_name = other_member.display_name if other_member else other_members[0]
+                from modules.utils import extract_user_id
+                other_id = extract_user_id(other_members[0])
+                if other_id:
+                    other_member = interaction.guild.get_member(other_id)
+                    other_name = other_member.display_name if other_member else other_members[0]
+                else:
+                    other_name = other_members[0]
+                    logger.error(f"[LEAVE] Failed to parse member ID: {other_members[0]}")
             except (ValueError, AttributeError):
                 other_name = other_members[0]
                 logger.error(f"[LEAVE] Failed to parse member ID: {other_members[0]}")

@@ -80,6 +80,12 @@ def load_player_stats(user_id: str) -> Optional[Dict]:
     :param user_id: Discord user ID
     :return: Player stats dictionary or None if file doesn't exist
     """
+    from modules.utils import validate_user_id
+
+    if not validate_user_id(user_id):
+        logger.error(f"[STATS] Invalid user ID format for file path: {user_id}")
+        return None
+
     file_path = os.path.join(PLAYER_STATS_DIR, f"{user_id}.json")
 
     if not os.path.exists(file_path):
@@ -103,6 +109,11 @@ def save_player_stats(user_id: str, stats: Dict) -> bool:
     :return: True if successful, False otherwise
     """
     import tempfile
+    from modules.utils import validate_user_id
+
+    if not validate_user_id(user_id):
+        logger.error(f"[STATS] Invalid user ID format for file path: {user_id}")
+        return False
 
     file_path = os.path.join(PLAYER_STATS_DIR, f"{user_id}.json")
 
@@ -141,6 +152,12 @@ def delete_player_stats(user_id: str) -> bool:
     :param user_id: Discord user ID
     :return: True if deleted, False if file didn't exist or error
     """
+    from modules.utils import validate_user_id
+
+    if not validate_user_id(user_id):
+        logger.error(f"[STATS] Invalid user ID format for file path: {user_id}")
+        return False
+
     file_path = os.path.join(PLAYER_STATS_DIR, f"{user_id}.json")
 
     if not os.path.exists(file_path):
