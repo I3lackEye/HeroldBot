@@ -53,7 +53,7 @@ async def start_poll(
         temp_poll_options[emoji] = game_id  # Important: Keep ID as reference
 
     # Calculate end time
-    poll_end_time = datetime.now(ZoneInfo("Europe/Berlin")) + timedelta(hours=registration_hours)
+    poll_end_time = datetime.now(tz=ZoneInfo(CONFIG.bot.timezone)) + timedelta(hours=registration_hours)
     poll_end_str = poll_end_time.strftime("%d.%m.%Y %H:%M")
 
     embed = discord.Embed(

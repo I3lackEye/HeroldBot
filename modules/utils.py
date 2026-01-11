@@ -4,6 +4,7 @@ import random
 import re
 from datetime import datetime, time, timedelta
 from typing import Optional, Tuple
+from zoneinfo import ZoneInfo
 
 import discord
 from discord import Embed, Interaction, app_commands
@@ -309,7 +310,7 @@ def finalize_tournament(winning_team: str, winners: list[int], game: str, points
         "winning_team": winning_team,
         "points": points,
         "game": game,
-        "ended_at": datetime.now().isoformat(),
+        "ended_at": datetime.now(tz=ZoneInfo(CONFIG.bot.timezone)).isoformat(),
     }
 
     # Increase stats
@@ -554,7 +555,10 @@ async def update_all_participants() -> None:
     # Teams
     for team_entry in tournament.get("teams", {}).values():
         for member in team_entry.get("members", []):
-            user_id = re.search(r"\d+", member).group(0)
+            match = re.search(r"\d+", member)
+            if not match:
+                continue
+            user_id = match.group(0)
             stats = player_stats.get(user_id)
             if stats is None:
                 stats = {
@@ -569,7 +573,11 @@ async def update_all_participants() -> None:
 
     # Solo players
     for solo_entry in tournament.get("solo", []):
-        user_id = re.search(r"\d+", solo_entry.get("player")).group(0)
+        player_str = solo_entry.get("player", "")
+        match = re.search(r"\d+", player_str)
+        if not match:
+            continue
+        user_id = match.group(0)
         stats = player_stats.get(user_id)
         if stats is None:
             stats = {

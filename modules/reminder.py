@@ -7,6 +7,7 @@ from zoneinfo import ZoneInfo
 
 from discord import TextChannel
 
+from modules.config import CONFIG
 from modules.dataStorage import load_tournament_data, save_tournament_data, REMINDER_ENABLED
 from modules.embeds import send_match_reminder
 from modules.logger import logger
