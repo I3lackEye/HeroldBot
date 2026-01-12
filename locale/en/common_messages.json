@@ -1,0 +1,41 @@
+{
+  "PERMISSION": {
+    "no_permission": "🚫 You do not have permission for this command.",
+    "no_permission_short": "🚫 No permission.",
+    "not_allowed": "🚫 You are not allowed to use this command."
+  },
+  "ERRORS": {
+    "no_tournament": "🚫 No active tournament.",
+    "tournament_running": "🚫 A tournament is already running! please finish all matches, or end it with `/admin end_tournament`",
+    "registration_closed": "❌ The registration is closed. You can't register anymore",
+    "not_registered": "🚫 You are not registered in a team",
+    "match_not_found": "🚫 Couldn't find match.",
+    "invalid_match": "🚫 Wrong Match-ID or not your match",
+    "player_not_found": "❌ No player or team found",
+    "no_games_available": "⚠️ No games where found for the poll.",
+    "no_active_poll": "❌ No active poll found.",
+    "poll_fetch_error": "❌ Error while loading Pollmassage",
+    "matches_incomplete": "⚠️ Not all matches haven been completed. Tournament stays active",
+    "no_tournament_running": "⚠️ No tournament is running. Registration can't be closed",
+    "match_planning_error": "⚠️ An error has occured during matchplanning: {error}",
+    "template_missing": "🚫 Template missing.",
+    "embed_error": "❌ Error while creating Embed.",
+    "validation_error": "❌ Validiationerror: {error}",
+    "save_failed": "❌ Error while saving: {error}",
+    "no_matches_scheduled": "⚠️ Not matches scheduled.",
+    "no_stats": "⚠️ You do not have any statistics yet.",
+    "no_matches_found": "⚠️ No matches found."
+  },
+  "SUCCESS": {
+    "archived": "✅ Tournament archived: `{file_path}`",
+    "accepted": "✅ Accepted!",
+    "poll_ended": "✅ Poll finished!",
+    "reschedule_reset": "✅ Rescheduling request for match {match_id} has been reset ",
+    "dm_sent": "✅ ZIP-File has been sent to your DM.",
+    "saved": "✅ Sucessfully saved!"
+  },
+  "WARNINGS": {
+    "no_pending_request": "⚠️ No pending requests for match {match_id} have been found",
+    "dm_failed": "⚠️ Wasn't able to send DM. Please make sure that you allow DM's from Bots"
+  }
+}
