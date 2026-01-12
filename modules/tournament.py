@@ -29,6 +29,7 @@ from modules.embeds import (
     send_registration_closed,
     send_tournament_announcement,
     send_tournament_end_announcement,
+    get_message,
 )
 from modules.logger import logger
 from modules.matchmaker import (
@@ -83,7 +84,7 @@ async def end_tournament_procedure(
 
     if not manual_trigger and not all_matches_completed():
         logger.info("[TOURNAMENT] Not all matches completed. Aborting automatic end.")
-        await channel.send("⚠️ Not all matches are completed yet. Tournament remains open.")
+        await channel.send(get_message("ERRORS", "matches_incomplete"))
         return
 
     # Archive tournament data
@@ -273,7 +274,7 @@ async def execute_registration_close_procedure(channel: discord.TextChannel):
     tournament = load_tournament_data()
 
     if not tournament.get("running", False):
-        await channel.send("⚠️ No tournament is running – registration cannot be closed.")
+        await channel.send(get_message("ERRORS", "no_tournament_running"))
         return
 
     # Close registration if still open
@@ -356,7 +357,7 @@ async def execute_registration_close_procedure(channel: discord.TextChannel):
 
     except Exception as e:
         logger.error(f"[REGISTRATION] Error during close procedure: {e}", exc_info=True)
-        await channel.send(f"⚠️ An error occurred during match planning: {e}")
+        await channel.send(get_message("ERRORS", "match_planning_error", error=e))
         raise
 
 

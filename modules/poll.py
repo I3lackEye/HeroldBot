@@ -4,6 +4,7 @@ import random
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
+from modules.embeds import get_message
 import discord
 from discord.ext import commands
 
@@ -90,14 +91,14 @@ async def end_poll(bot: discord.Client, channel: discord.TextChannel):
         current_options = dict(poll_options)
 
     if not current_poll_id:
-        await channel.send("❌ No active poll found.")
+        await channel.send(get_message("ERRORS", "no_active_poll"))
         return
 
     try:
         message = await channel.fetch_message(current_poll_id)
     except Exception as e:
         logger.error(f"[POLL] Error fetching poll message: {e}")
-        await channel.send("❌ Error fetching poll message.")
+        await channel.send(get_message("ERRORS", "poll_fetch_error"))
         return
 
     real_votes = {}

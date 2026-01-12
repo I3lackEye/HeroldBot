@@ -25,7 +25,7 @@ from modules.dataStorage import (
     save_tournament_data,
     load_games
 )
-from modules.embeds import send_match_schedule, load_embed_template, build_embed_from_template
+from modules.embeds import send_match_schedule, load_embed_template, build_embed_from_template, get_message
 from modules.logger import logger
 from modules.task_manager import add_task
 from modules.matchmaker import (
@@ -81,7 +81,7 @@ async def handle_start_tournament_modal(
     logger.debug("[MODAL] handle_start_tournament_modal() was called")
 
     if not has_permission(interaction.user, "Moderator", "Admin"):
-        await interaction.followup.send("🚫 No permission.", ephemeral=True)
+        await interaction.followup.send( get_message("PERMISSION", "no_permission_short"), ephemeral=True)
         return
 
     # Reset registration closed flag for new tournament
@@ -139,7 +139,7 @@ async def handle_start_tournament_modal(
             k: v for k, v in poll_options.items() if v.get("visible_in_poll", True)
         }
         if not visible_games:
-            await interaction.followup.send("⚠️ No games available for the poll.", ephemeral=True)
+            await interaction.followup.send(get_message("ERRORS", "no_games_available"), ephemeral=True)
             logger.warning("[MODAL] No games with visible_in_poll=True found.")
             return
 
@@ -189,7 +189,7 @@ class AdminGroup(app_commands.Group):
         from modules.stats_tracker import load_player_stats, save_player_stats, initialize_player_stats
 
         if not has_permission(interaction.user, "Moderator", "Admin"):
-            await interaction.response.send_message("🚫 You don't have permission for this command.", ephemeral=True)
+            await interaction.response.send_message(get_message("PERMISSION", "no_permission"), ephemeral=True)
             return
 
         user_id = str(user.id)
@@ -218,7 +218,7 @@ class AdminGroup(app_commands.Group):
     )
     async def start_tournament(self, interaction: Interaction):
         if not has_permission(interaction.user, "Moderator", "Admin"):
-            await interaction.response.send_message("🚫 No permission.", ephemeral=True)
+            await interaction.response.send_message( get_message("PERMISSION", "no_permission_short"), ephemeral=True)
             return
 
         await interaction.response.send_modal(StartTournamentModal(interaction))
@@ -227,7 +227,7 @@ class AdminGroup(app_commands.Group):
     @app_commands.command(name="end_tournament", description="Admin command: Ends the current tournament.")
     async def end_tournament(self, interaction: Interaction):
         if not has_permission(interaction.user, "Moderator", "Admin"):
-            await interaction.response.send_message("🚫 You don't have permission for this command.", ephemeral=True)
+            await interaction.response.send_message(get_message("PERMISSION", "no_permission"), ephemeral=True)
             return
 
         await interaction.response.defer(ephemeral=True)
@@ -249,7 +249,7 @@ class AdminGroup(app_commands.Group):
     @app_commands.autocomplete(game=games_autocomplete)
     async def manage_game(self, interaction: Interaction, action: str, game: str):
         if not has_permission(interaction.user, "Moderator", "Admin"):
-            await interaction.response.send_message("🚫 No permission.", ephemeral=True)
+            await interaction.response.send_message( get_message("PERMISSION", "no_permission_short"), ephemeral=True)
             return
 
         if action == "add":
@@ -275,7 +275,7 @@ class AdminGroup(app_commands.Group):
         Sets the match status to completed and records the winner.
         """
         if not has_permission(interaction.user, "Moderator", "Admin"):
-            await interaction.response.send_message("🚫 You don't have permission for this command.", ephemeral=True)
+            await interaction.response.send_message(get_message("PERMISSION", "no_permission"), ephemeral=True)
             return
 
         tournament = load_tournament_data()
@@ -376,7 +376,7 @@ class AdminGroup(app_commands.Group):
     @app_commands.command(name="reload", description="Synchronizes all slash commands.")
     async def reload_commands(self, interaction: Interaction):
         if not has_permission(interaction.user, "Moderator", "Admin"):
-            await interaction.response.send_message("🚫 You don't have permission for this command.", ephemeral=True)
+            await interaction.response.send_message(get_message("PERMISSION", "no_permission"), ephemeral=True)
             return
 
         await interaction.response.send_message("🔄 Synchronizing slash commands...", ephemeral=True)
@@ -399,7 +399,7 @@ class AdminGroup(app_commands.Group):
         Uses shared procedure from tournament.py to ensure consistency.
         """
         if not has_permission(interaction.user, "Moderator", "Admin"):
-            await interaction.response.send_message("🚫 You don't have permission for this command.", ephemeral=True)
+            await interaction.response.send_message(get_message("PERMISSION", "no_permission"), ephemeral=True)
             return
 
         try:
@@ -410,7 +410,7 @@ class AdminGroup(app_commands.Group):
         tournament = load_tournament_data()
 
         if not tournament.get("running", False):
-            await interaction.followup.send("🚫 No tournament active.", ephemeral=True)
+            await interaction.followup.send(get_message("ERRORS", "no_tournament"), ephemeral=True)
             return
 
         if not tournament.get("registration_open", True):
@@ -427,11 +427,11 @@ class AdminGroup(app_commands.Group):
     @app_commands.command(name="archive_tournament", description="Archives the current tournament.")
     async def archive_tournament(self, interaction: Interaction):
         if not has_permission(interaction.user, "Moderator", "Admin"):
-            await interaction.response.send_message("🚫 You don't have permission for this command.", ephemeral=True)
+            await interaction.response.send_message(get_message("PERMISSION", "no_permission"), ephemeral=True)
             return
 
         file_path = archive_current_tournament()
-        await interaction.response.send_message(f"✅ Tournament archived: `{file_path}`", ephemeral=True)
+        await interaction.response.send_message(get_message("SUCCESS", "archived", file_path=file_path), ephemeral=True)
 
         logger.info(f"[ARCHIVE] Tournament successfully archived at {file_path}")
 
@@ -444,19 +444,19 @@ class AdminGroup(app_commands.Group):
     async def reset_reschedule(self, interaction: Interaction, match_id: int):
         global pending_reschedules
         if not has_permission(interaction.user, "Moderator", "Admin"):
-            await interaction.response.send_message("🚫 You don't have permission for this command.", ephemeral=True)
+            await interaction.response.send_message(get_message("PERMISSION", "no_permission"), ephemeral=True)
             return
 
         async with _reschedule_lock:
             if match_id in pending_reschedules:
                 pending_reschedules.discard(match_id)
                 await interaction.response.send_message(
-                    f"✅ Reschedule request for match {match_id} was reset.",
+                    get_message("SUCCESS", "reschedule_reset", match_id=match_id),
                     ephemeral=True,
                 )
             else:
                 await interaction.response.send_message(
-                    f"⚠️ No pending request for match {match_id} found.", ephemeral=True
+                    get_message("WARNINGS", "no_pending_request", match_id=match_id), ephemeral=True
                 )
 
     @app_commands.command(
@@ -465,17 +465,17 @@ class AdminGroup(app_commands.Group):
     )
     async def end_poll_command(self, interaction: discord.Interaction):
         if not has_permission(interaction.user, "Moderator", "Admin"):
-            await interaction.response.send_message("🚫 You don't have permission for this.", ephemeral=True)
+            await interaction.response.send_message(get_message("PERMISSION", "no_permission"), ephemeral=True)
             return
 
         await interaction.response.defer(ephemeral=True)
         try:
             await end_poll(interaction.client, interaction.channel)
             logger.info("[END_POLL] end_poll() successfully completed.")
-            await interaction.edit_original_response(content="✅ Poll has been ended!")
+            await interaction.edit_original_response(content=get_message("SUCCESS", "poll_ended"))
         except Exception as e:
             logger.error(f"[END_POLL] Error ending poll: {e}")
-            await interaction.edit_original_response(content=f"❌ Error ending poll: {e}")
+            await interaction.edit_original_response(content=get_message("ERRORS", "save_failed", error=e))
 
     @app_commands.command(
         name="export_data",
@@ -483,7 +483,7 @@ class AdminGroup(app_commands.Group):
     )
     async def export_data(self, interaction: Interaction):
         if not has_permission(interaction.user, "Moderator", "Admin"):
-            await interaction.response.send_message("🚫 No permission.", ephemeral=True)
+            await interaction.response.send_message( get_message("PERMISSION", "no_permission_short"), ephemeral=True)
             return
 
         export_dir = "exports"
@@ -503,10 +503,10 @@ class AdminGroup(app_commands.Group):
         # ✅ Try to send via DM
         try:
             await interaction.user.send(content="📦 Here is your tournament export:", file=file)
-            await interaction.response.send_message("✅ ZIP file was sent to you via DM.", ephemeral=True)
+            await interaction.response.send_message(get_message("SUCCESS", "dm_sent"), ephemeral=True)
         except discord.Forbidden:
             await interaction.response.send_message(
-                "⚠️ Could not send you a DM. Make sure DMs from the server are allowed.",
+                get_message("WARNINGS", "dm_failed"),
                 ephemeral=True,
             )
 

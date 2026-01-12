@@ -1,5 +1,6 @@
 # modules/dev_tools.py
 
+from modules.embeds import get_message
 import asyncio
 import random
 import discord
@@ -65,7 +66,7 @@ class DevGroup(app_commands.Group):
     ):
         """Generates dummy data for testing purposes with various scenarios."""
         if not has_permission(interaction.user, "Dev"):
-            await interaction.response.send_message("🚫 You don't have permission for this.", ephemeral=True)
+            await interaction.response.send_message(get_message("PERMISSION", "no_permission"), ephemeral=True)
             return
 
         tournament = load_tournament_data()
@@ -215,7 +216,7 @@ class DevGroup(app_commands.Group):
     async def test_reminder(self, interaction: Interaction):
         """Sends a test reminder embed."""
         if not has_permission(interaction.user, "Dev"):
-            await interaction.response.send_message("🚫 You don't have permission for this command.", ephemeral=True)
+            await interaction.response.send_message(get_message("PERMISSION", "no_permission"), ephemeral=True)
             return
 
         reminder_channel_id = CONFIG.get_channel_id("reminder")
@@ -294,7 +295,7 @@ class DevGroup(app_commands.Group):
     async def simulate_poll_end(self, interaction: Interaction):
         """Simulates poll ending for testing."""
         if not has_permission(interaction.user, "Dev"):
-            await interaction.response.send_message("🚫 You don't have permission for this.", ephemeral=True)
+            await interaction.response.send_message(get_message("PERMISSION", "no_permission"), ephemeral=True)
             return
 
         await interaction.response.send_message("⏳ Simulating poll end in 10 seconds...", ephemeral=True)
@@ -311,7 +312,7 @@ class DevGroup(app_commands.Group):
     async def simulate_registration_close(self, interaction: Interaction):
         """Simulates registration closing for testing."""
         if not has_permission(interaction.user, "Dev"):
-            await interaction.response.send_message("🚫 You don't have permission for this.", ephemeral=True)
+            await interaction.response.send_message(get_message("PERMISSION", "no_permission"), ephemeral=True)
             return
 
         await interaction.response.send_message(
@@ -330,7 +331,7 @@ class DevGroup(app_commands.Group):
     async def simulate_full_flow(self, interaction: Interaction):
         """Runs a complete tournament simulation."""
         if not has_permission(interaction.user, "Dev"):
-            await interaction.response.send_message("🚫 You don't have permission for this.", ephemeral=True)
+            await interaction.response.send_message(get_message("PERMISSION", "no_permission"), ephemeral=True)
             return
 
         await interaction.response.defer(ephemeral=True)
@@ -421,7 +422,7 @@ class DevGroup(app_commands.Group):
     async def reset_tournament(self, interaction: Interaction):
         """Resets tournament to clean state."""
         if not has_permission(interaction.user, "Dev"):
-            await interaction.response.send_message("🚫 You don't have permission for this.", ephemeral=True)
+            await interaction.response.send_message(get_message("PERMISSION", "no_permission"), ephemeral=True)
             return
 
         from modules.dataStorage import DEFAULT_TOURNAMENT_DATA
@@ -443,7 +444,7 @@ class DevGroup(app_commands.Group):
     async def show_state(self, interaction: Interaction):
         """Displays current tournament state for debugging."""
         if not has_permission(interaction.user, "Dev"):
-            await interaction.response.send_message("🚫 You don't have permission for this.", ephemeral=True)
+            await interaction.response.send_message(get_message("PERMISSION", "no_permission"), ephemeral=True)
             return
 
         tournament = load_tournament_data()
@@ -532,7 +533,7 @@ class DevGroup(app_commands.Group):
     async def test_matchmaker(self, interaction: Interaction):
         """Runs matchmaker in test mode to see what it would generate."""
         if not has_permission(interaction.user, "Dev"):
-            await interaction.response.send_message("🚫 You don't have permission for this.", ephemeral=True)
+            await interaction.response.send_message(get_message("PERMISSION", "no_permission"), ephemeral=True)
             return
 
         await interaction.response.defer(ephemeral=True)
@@ -612,7 +613,7 @@ class DevGroup(app_commands.Group):
     async def generate_matches(self, interaction: Interaction):
         """Generates and schedules matches for the current tournament."""
         if not has_permission(interaction.user, "Dev"):
-            await interaction.response.send_message("🚫 You don't have permission for this.", ephemeral=True)
+            await interaction.response.send_message(get_message("PERMISSION", "no_permission"), ephemeral=True)
             return
 
         await interaction.response.defer(ephemeral=True)
@@ -706,7 +707,7 @@ class DevGroup(app_commands.Group):
     async def diagnose(self, interaction: Interaction):
         """Performs a system diagnosis check."""
         if not has_permission(interaction.user, "Dev"):
-            await interaction.response.send_message("🚫 No permission.", ephemeral=True)
+            await interaction.response.send_message(get_message("PERMISSION", "no_permission_short"), ephemeral=True)
             return
 
         await interaction.response.defer(ephemeral=True)
@@ -800,7 +801,7 @@ class DevGroup(app_commands.Group):
     async def tasks(self, interaction: Interaction):
         """Lists all active background tasks."""
         if not has_permission(interaction.user, "Dev"):
-            await interaction.response.send_message("🚫 No permission.", ephemeral=True)
+            await interaction.response.send_message(get_message("PERMISSION", "no_permission_short"), ephemeral=True)
             return
         tasks = get_all_tasks()
         if not tasks:
@@ -825,7 +826,7 @@ class DevGroup(app_commands.Group):
         """Stops the bot gracefully."""
         # Check permissions
         if not has_permission(interaction.user, "Dev"):
-            await interaction.response.send_message("🚫 You are not allowed to use this command.", ephemeral=True)
+            await interaction.response.send_message(get_message("PERMISSION", "not_allowed"), ephemeral=True)
             logger.warning(f"[SECURITY] {interaction.user.display_name} ({interaction.user.id}) tried to stop the bot.")
             return
 
