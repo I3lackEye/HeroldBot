@@ -18,7 +18,8 @@ from modules.embeds import (
     build_embed_from_template,
     send_notify_team_members,
     send_request_reschedule,
-    load_embed_template
+    load_embed_template,
+    get_message
 )
 from modules.logger import logger
 from modules.matchmaker import generate_slot_matrix, get_valid_slots_for_match, assign_slots_with_matrix
@@ -139,7 +140,7 @@ async def handle_request_reschedule(interaction: Interaction, match_id: int):
 
     match = next((m for m in tournament.get("matches", []) if m.get("match_id") == match_id), None,)
     if not match:
-        await interaction.response.send_message("🚫 Match not found.", ephemeral=True)
+        await interaction.response.send_message(get_message("ERRORS", "match_not_found"), ephemeral=True)
         return
 
     # Check if this team has already requested a reschedule for this match
@@ -263,7 +264,7 @@ async def handle_request_reschedule(interaction: Interaction, match_id: int):
             final_embed = build_embed_from_template(template, placeholders)
         except Exception as e:
             logger.error(f"[RESCHEDULE] ❌ Error building embed: {e}")
-            await slot_interaction.followup.send("❌ Error creating embed.", ephemeral=True)
+            await slot_interaction.followup.send(get_message("ERRORS", "embed_error"), ephemeral=True)
             return
 
         # Mark that this team has requested a reschedule for this match

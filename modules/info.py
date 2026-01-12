@@ -1,5 +1,6 @@
 # modules/info.py
 
+from modules.embeds import get_message
 import re
 from collections import Counter
 from datetime import datetime
@@ -488,7 +489,7 @@ class InfoGroup(app_commands.Group):
     async def stats_overview(self, interaction: Interaction, view: Choice[str]):
         """Displays tournament overview, leaderboard, or match history."""
         if not has_permission(interaction.user, "Moderator", "Admin"):
-            await interaction.response.send_message("🚫 No permission.", ephemeral=True)
+            await interaction.response.send_message(get_message("PERMISSION", "no_permission_short"), ephemeral=True)
             return
 
         if view.value == "leaderboard":
@@ -541,7 +542,7 @@ class InfoGroup(app_commands.Group):
             matches = tournament.get("matches", [])
 
             if not matches:
-                await interaction.response.send_message("⚠️ No matches found.", ephemeral=True)
+                await interaction.response.send_message(get_message("ERRORS", "no_matches_found"), ephemeral=True)
                 return
 
             template = load_embed_template("info").get("MATCH_HISTORY")
@@ -584,7 +585,7 @@ class InfoGroup(app_commands.Group):
             stats = load_player_stats(user_id)
 
             if not stats:
-                await interaction.response.send_message("⚠️ You don't have any statistics yet.", ephemeral=True)
+                await interaction.response.send_message(get_message("ERRORS", "no_stats"), ephemeral=True)
                 return
 
             embed = build_stats_embed(interaction.user, stats)
@@ -639,7 +640,7 @@ class InfoGroup(app_commands.Group):
             return
 
         # 4. Nothing found
-        await interaction.response.send_message("❌ No player or team found.", ephemeral=True)
+        await interaction.response.send_message(get_message("ERRORS", "player_not_found"), ephemeral=True)
 
 
     @app_commands.command(name="tournament", description="Shows the current tournament status.")

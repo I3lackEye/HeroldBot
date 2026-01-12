@@ -18,6 +18,66 @@ from modules.config import CONFIG
 from modules.utils import smart_send
 from modules.reschedule_view import RescheduleView
 
+# Cache for common messages
+_common_messages_cache = None
+
+
+def load_common_messages(language: str = None) -> dict:
+    """
+    Loads common user-facing messages from locale/{language}/common_messages.json
+
+    These are short messages like permission denials, errors, etc. that don't need full embeds.
+
+    :param language: Language code (default: from CONFIG)
+    :return: Dictionary with message categories
+    """
+    global _common_messages_cache
+
+    if not language:
+        language = CONFIG.bot.language
+
+    # Return cached if already loaded
+    if _common_messages_cache is not None:
+        return _common_messages_cache
+
+    path = os.path.join("locale", language, "common_messages.json")
+
+    if os.path.isfile(path):
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                _common_messages_cache = json.load(f)
+                return _common_messages_cache
+        except json.JSONDecodeError as e:
+            logger.error(f"[MESSAGE LOADER] Error parsing {path}: {e}")
+            return {}
+
+    logger.warning(f"[MESSAGE LOADER] common_messages.json not found for language '{language}'.")
+    return {}
+
+
+def get_message(category: str, key: str, **kwargs) -> str:
+    """
+    Get a localized message from common_messages.json
+
+    :param category: Category like 'PERMISSION', 'ERRORS', 'SUCCESS'
+    :param key: Message key within category
+    :param kwargs: Optional format parameters
+    :return: Formatted message string
+    """
+    messages = load_common_messages()
+
+    try:
+        message = messages.get(category, {}).get(key, f"[Missing: {category}.{key}]")
+
+        # Format with kwargs if provided
+        if kwargs:
+            message = message.format(**kwargs)
+
+        return message
+    except Exception as e:
+        logger.error(f"[MESSAGE LOADER] Error getting message {category}.{key}: {e}")
+        return f"[Error loading message: {category}.{key}]"
+
 
 def load_embed_template(template_name: str, language: str = None) -> dict:
     """

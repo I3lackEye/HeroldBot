@@ -7,6 +7,7 @@ from typing import Optional, Tuple
 
 # Local modules
 from modules.dataStorage import add_game, load_tournament_data, save_tournament_data
+from modules.embeds import get_message
 from modules.logger import logger
 from modules.utils import (
     generate_team_name,
@@ -277,12 +278,12 @@ class TeamFullJoinModal(Modal):
 
         valid, err = validate_time_range(saturday)
         if not valid:
-            await interaction.response.send_message(f"❌ Error with Saturday: {err}", ephemeral=True)
+            await interaction.response.send_message(get_message("ERRORS", "validation_error", error=err), ephemeral=True)
             return
 
         valid, err = validate_time_range(sunday)
         if not valid:
-            await interaction.response.send_message(f"❌ Error with Sunday: {err}", ephemeral=True)
+            await interaction.response.send_message(get_message("ERRORS", "validation_error", error=err), ephemeral=True)
             return
 
         # 4. Validate blocked days
@@ -292,7 +293,7 @@ class TeamFullJoinModal(Modal):
         for d in unavailable_list:
             valid, err = validate_date(d)
             if not valid:
-                await interaction.response.send_message(f"❌ {err}", ephemeral=True)
+                await interaction.response.send_message(get_message("ERRORS", "validation_error", error=err), ephemeral=True)
                 return
 
         # 5. Validate teammate (if provided)
@@ -455,10 +456,10 @@ class AddGameModal(discord.ui.Modal):
 
         except ValueError as e:
             logger.error(f"[ADD_GAME] Validation error: {e}")
-            await interaction.response.send_message(f"❌ Validation error: {e}", ephemeral=True)
+            await interaction.response.send_message(get_message("ERRORS", "validation_error", error=e), ephemeral=True)
         except Exception as e:
             logger.error(f"[ADD_GAME] Unexpected error: {e}")
-            await interaction.response.send_message(f"❌ Failed to save game: {e}", ephemeral=True)
+            await interaction.response.send_message(get_message("ERRORS", "save_failed", error=e), ephemeral=True)
 
 
 class StartTournamentModal(discord.ui.Modal, title="Start Tournament"):
