@@ -55,6 +55,17 @@ async def on_ready():
     logger.info("═" * 70)
     logger.info(f"[STARTUP] 🤖 Bot: {bot.user.name} (ID: {bot.user.id})")
     logger.info(f"[STARTUP] 🌍 Language: {language} | DEBUG: {'ON' if DEBUG_MODE else 'OFF'}")
+
+    # Show connected servers
+    if len(bot.guilds) == 0:
+        logger.warning("[STARTUP] ⚠️  Servers: Not connected to any server!")
+    elif len(bot.guilds) == 1:
+        guild = bot.guilds[0]
+        logger.info(f"[STARTUP] 🏠 Server: {guild.name} ({len(guild.members)} members)")
+    else:
+        guild_names = ", ".join([f"{g.name}" for g in bot.guilds])
+        logger.info(f"[STARTUP] 🏠 Servers: {len(bot.guilds)} ({guild_names})")
+
     logger.info("═" * 70)
 
     # Check important folders (only log errors or creation)
