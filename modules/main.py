@@ -152,24 +152,30 @@ async def on_ready():
     # Check tournament status
     try:
         tournament_data = load_tournament_data()
-        if tournament_data:
+        teams_count = len(tournament_data.get("teams", {}))
+        matches_count = len(tournament_data.get("matches", []))
+
+        # Check if there's an active tournament (teams exist or matches scheduled)
+        has_tournament = teams_count > 0 or matches_count > 0
+
+        if has_tournament:
             from datetime import datetime
             from zoneinfo import ZoneInfo
 
             tz = ZoneInfo(CONFIG.bot.timezone)
             now = datetime.now(tz)
 
-            registration_end = datetime.fromisoformat(tournament_data.get("registration_end", ""))
-            if registration_end.tzinfo is None:
-                registration_end = registration_end.replace(tzinfo=tz)
+            # Support both old and new format
+            phase = tournament_data.get("phase")
 
-            tournament_end = datetime.fromisoformat(tournament_data.get("tournament_end", ""))
-            if tournament_end.tzinfo is None:
-                tournament_end = tournament_end.replace(tzinfo=tz)
-
-            phase = tournament_data.get("phase", "unknown")
-            teams_count = len(tournament_data.get("teams", {}))
-            matches_count = len(tournament_data.get("matches", []))
+            # Fallback to old format if no phase field
+            if not phase:
+                if tournament_data.get("running"):
+                    phase = "running"
+                elif tournament_data.get("registration_open"):
+                    phase = "registration"
+                elif matches_count > 0:
+                    phase = "finished"
 
             # Determine tournament state
             if phase == "registration":
@@ -178,12 +184,19 @@ async def on_ready():
                 completed_matches = sum(1 for m in tournament_data.get("matches", []) if m.get("scheduled_time"))
                 logger.info(f"[STARTUP] 🏆 Tournament: RUNNING ({completed_matches}/{matches_count} matches scheduled)")
 
-                if now > tournament_end:
-                    logger.warning(f"[STARTUP] ⚠️  Tournament end date has passed! ({tournament_end.strftime('%Y-%m-%d')})")
+                # Check if tournament end date exists and has passed
+                tournament_end_str = tournament_data.get("tournament_end")
+                if tournament_end_str:
+                    tournament_end = datetime.fromisoformat(tournament_end_str)
+                    if tournament_end.tzinfo is None:
+                        tournament_end = tournament_end.replace(tzinfo=tz)
+
+                    if now > tournament_end:
+                        logger.warning(f"[STARTUP] ⚠️  Tournament end date has passed! ({tournament_end.strftime('%Y-%m-%d')})")
             elif phase == "finished":
                 logger.info(f"[STARTUP] 🏆 Tournament: FINISHED ({matches_count} matches total)")
             else:
-                logger.info(f"[STARTUP] 🏆 Tournament: Phase '{phase}'")
+                logger.info(f"[STARTUP] 🏆 Tournament: Setup incomplete ({teams_count} teams, {matches_count} matches)")
         else:
             logger.info("[STARTUP] ℹ️  No active tournament")
     except Exception as e:
