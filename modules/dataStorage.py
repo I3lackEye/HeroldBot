@@ -136,33 +136,36 @@ async def validate_channels(bot: discord.Client) -> None:
     """
     Validates that all channels specified in config exist and are accessible.
     """
-    logger.info("[CHANNEL CHECKER] Starting channel validation...")
-
-    # Debug: Show bot connection status
-    logger.info(f"[CHANNEL CHECKER] Bot user: {bot.user.name if bot.user else 'Not connected'} (ID: {bot.user.id if bot.user else 'N/A'})")
-    logger.info(f"[CHANNEL CHECKER] Bot is connected to {len(bot.guilds)} server(s)")
+    if DEBUG_MODE:
+        logger.debug("[CHANNEL CHECKER] Starting channel validation...")
+        logger.debug(f"[CHANNEL CHECKER] Bot user: {bot.user.name if bot.user else 'Not connected'} (ID: {bot.user.id if bot.user else 'N/A'})")
+        logger.debug(f"[CHANNEL CHECKER] Bot is connected to {len(bot.guilds)} server(s)")
 
     if len(bot.guilds) == 0:
         logger.error("[CHANNEL CHECKER] ❌ Bot is not connected to any servers!")
         logger.error("[CHANNEL CHECKER]    Please invite the bot to your Discord server first.")
         return
 
-    for guild in bot.guilds:
-        logger.info(f"[CHANNEL CHECKER]   - Server: '{guild.name}' (ID: {guild.id})")
-        logger.info(f"[CHANNEL CHECKER]     Text channels visible: {len([c for c in guild.channels if isinstance(c, discord.TextChannel)])}")
+    if DEBUG_MODE:
+        for guild in bot.guilds:
+            logger.debug(f"[CHANNEL CHECKER]   - Server: '{guild.name}' (ID: {guild.id})")
+            logger.debug(f"[CHANNEL CHECKER]     Text channels visible: {len([c for c in guild.channels if isinstance(c, discord.TextChannel)])}")
 
     # Get all channel names from the Channels dataclass
     channel_names = ["limits", "reminder", "reschedule"]
 
+    channel_errors = []
     for name in channel_names:
         try:
             channel_id = CONFIG.get_channel_id(name)
         except ValueError as e:
             logger.error(f"[CHANNEL CHECKER] {e}")
+            channel_errors.append(name)
             continue
 
         if channel_id == 0:
             logger.error(f"[CHANNEL CHECKER] Channel '{name}' has invalid ID: 0")
+            channel_errors.append(name)
             continue
 
         channel = bot.get_channel(channel_id)
@@ -174,6 +177,7 @@ async def validate_channels(bot: discord.Client) -> None:
             logger.error(f"[CHANNEL CHECKER]    2. Channel ID is wrong in configs/bot.json")
             logger.error(f"[CHANNEL CHECKER]    3. Channel was deleted from Discord")
             logger.error(f"[CHANNEL CHECKER]    4. Bot lacks 'View Channels' permission")
+            channel_errors.append(name)
             continue
 
         if not isinstance(channel, discord.TextChannel):
@@ -183,13 +187,17 @@ async def validate_channels(bot: discord.Client) -> None:
 
         if not perms.view_channel:
             logger.error(f"[CHANNEL CHECKER] ❌ Bot has NO visibility on '{name}' (ID {channel_id})!")
+            channel_errors.append(name)
 
         if not perms.send_messages:
             logger.error(f"[CHANNEL CHECKER] ❌ Bot can NOT write in '{name}' (ID {channel_id})!")
+            channel_errors.append(name)
 
-        logger.info(f"[CHANNEL CHECKER] ✅ OK: '{name}' in '{channel.guild.name}' (ID {channel_id})")
+        if DEBUG_MODE:
+            logger.debug(f"[CHANNEL CHECKER] ✅ OK: '{name}' in '{channel.guild.name}' (ID {channel_id})")
 
-    logger.info("[CHANNEL CHECKER] Channel validation completed.")
+    if channel_errors and DEBUG_MODE:
+        logger.debug(f"[CHANNEL CHECKER] Channel validation completed with {len(channel_errors)} error(s)")
 
 
 async def validate_permissions(guild: discord.Guild) -> None:
@@ -197,7 +205,8 @@ async def validate_permissions(guild: discord.Guild) -> None:
     Checks if all roles specified in the config exist on the server.
     Outputs warnings for missing roles.
     """
-    logger.info(f"[PERMISSION CHECKER] Starting permission validation for server '{guild.name}'...")
+    if DEBUG_MODE:
+        logger.debug(f"[PERMISSION CHECKER] Starting permission validation for server '{guild.name}'...")
 
     # Get all role groups from CONFIG
     role_groups = {
@@ -207,20 +216,30 @@ async def validate_permissions(guild: discord.Guild) -> None:
         "Winner": CONFIG.bot.roles.winner,
     }
 
+    missing_roles = []
     for permission_group, entries in role_groups.items():
-        logger.info(f"[PERMISSION CHECKER] Group '{permission_group}': Allowed roles/IDs: {entries}")
+        if DEBUG_MODE:
+            logger.debug(f"[PERMISSION CHECKER] Group '{permission_group}': Allowed roles/IDs: {entries}")
         for entry in entries:
             if entry.isdigit() and len(entry) > 10:
-                logger.info(
-                    f"[PERMISSION CHECKER] User ID '{entry}' recognized as Dev/Permission (no role check needed)."
-                )
+                if DEBUG_MODE:
+                    logger.debug(
+                        f"[PERMISSION CHECKER] User ID '{entry}' recognized as Dev/Permission (no role check needed)."
+                    )
             else:
                 role = discord.utils.get(guild.roles, name=entry)
                 if role:
-                    logger.info(f"[PERMISSION CHECKER] Role '{entry}' found (ID: {role.id})")
+                    if DEBUG_MODE:
+                        logger.debug(f"[PERMISSION CHECKER] Role '{entry}' found (ID: {role.id})")
                 else:
                     logger.warning(f"[PERMISSION CHECKER] ⚠️ Role '{entry}' NOT found in server '{guild.name}'!")
-    logger.info("[PERMISSION CHECKER] Permission validation completed.")
+                    missing_roles.append(entry)
+
+    if DEBUG_MODE:
+        if missing_roles:
+            logger.debug(f"[PERMISSION CHECKER] Permission validation completed with {len(missing_roles)} missing role(s)")
+        else:
+            logger.debug("[PERMISSION CHECKER] Permission validation completed")
 
 
 def init_file(file_path: str, default_content: Dict[str, Any]) -> None:

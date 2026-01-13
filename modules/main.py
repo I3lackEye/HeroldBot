@@ -52,27 +52,34 @@ EXTENSIONS = [
 async def on_ready():
     language = CONFIG.bot.language.lower()
 
-    logger.info(f"[STARTUP] Bot is online as {bot.user.name} (ID: {bot.user.id})")
-    logger.info(f"[STARTUP] Language from config: {language}")
-    logger.info(f"[STARTUP] DEBUG mode: {'active' if DEBUG_MODE else 'inactive'}")
+    logger.info("═" * 70)
+    logger.info(f"[STARTUP] 🤖 Bot: {bot.user.name} (ID: {bot.user.id})")
+    logger.info(f"[STARTUP] 🌍 Language: {language} | DEBUG: {'ON' if DEBUG_MODE else 'OFF'}")
+    logger.info("═" * 70)
 
-    # Check important folders
+    # Check important folders (only log errors or creation)
     startup_folders = [
         "logs", "backups", "archive", "data", "locale", "configs",
         os.path.join("locale", language, "embeds")
     ]
 
+    folders_created = []
     for folder in startup_folders:
         if not os.path.exists(folder):
             try:
                 os.makedirs(folder)
-                logger.info(f"[STARTUP] Folder created: {folder}")
+                folders_created.append(folder)
             except (OSError, PermissionError) as e:
-                logger.error(f"[STARTUP] Error creating {folder}: {e}")
-        else:
-            logger.info(f"[STARTUP] Folder exists: {folder}")
+                logger.error(f"[STARTUP] ❌ Error creating {folder}: {e}")
+        elif DEBUG_MODE:
+            logger.debug(f"[STARTUP] Folder exists: {folder}")
 
-    # Check essential files
+    if folders_created:
+        logger.info(f"[STARTUP] 📁 Created folders: {', '.join(folders_created)}")
+    elif DEBUG_MODE:
+        logger.debug(f"[STARTUP] ✅ All {len(startup_folders)} folders exist")
+
+    # Check essential files (only log errors)
     required_files = [
         "configs/bot.json",
         "configs/tournament.json",
@@ -83,24 +90,30 @@ async def on_ready():
         f"locale/{language}/names_{language}.json",
     ]
 
-    logger.info("[STARTUP] File validation starting...")
+    file_errors = []
     for path in required_files:
         if not os.path.exists(path):
             logger.error(f"[STARTUP] ❌ File missing: {path}")
+            file_errors.append(path)
         else:
             try:
                 with open(path, "r", encoding="utf-8") as f:
                     json.load(f)
-                logger.info(f"[STARTUP] ✅ File OK: {path}")
+                if DEBUG_MODE:
+                    logger.debug(f"[STARTUP] ✅ File OK: {path}")
             except (json.JSONDecodeError, IOError) as e:
                 logger.error(f"[STARTUP] ❌ Error parsing {path}: {e}")
-    logger.info("[STARTUP] File validation completed.")
+                file_errors.append(path)
 
-    # Validate channels and permissions
-    logger.info("[STARTUP] Validating channels and permissions...")
+    if not file_errors:
+        logger.info(f"[STARTUP] ✅ All {len(required_files)} files validated")
+    else:
+        logger.error(f"[STARTUP] ❌ {len(file_errors)} file(s) failed validation")
+
+    # Validate channels and permissions (compact logging)
     try:
         await validate_channels(bot)
-        logger.info("[STARTUP] ✅ Channel validation passed")
+        logger.info("[STARTUP] ✅ Channels validated")
     except Exception as e:
         logger.error(f"[STARTUP] ❌ Channel validation failed: {e}")
 
@@ -108,15 +121,57 @@ async def on_ready():
     try:
         for guild in bot.guilds:
             await validate_permissions(guild)
-        logger.info("[STARTUP] ✅ Permission validation passed")
+        logger.info("[STARTUP] ✅ Permissions validated")
     except Exception as e:
         logger.error(f"[STARTUP] ❌ Permission validation failed: {e}")
 
 
-     # Stop old tasks
+    # Check tournament status
+    try:
+        tournament_data = load_tournament_data()
+        if tournament_data:
+            from datetime import datetime
+            from zoneinfo import ZoneInfo
+
+            tz = ZoneInfo(CONFIG.bot.timezone)
+            now = datetime.now(tz)
+
+            registration_end = datetime.fromisoformat(tournament_data.get("registration_end", ""))
+            if registration_end.tzinfo is None:
+                registration_end = registration_end.replace(tzinfo=tz)
+
+            tournament_end = datetime.fromisoformat(tournament_data.get("tournament_end", ""))
+            if tournament_end.tzinfo is None:
+                tournament_end = tournament_end.replace(tzinfo=tz)
+
+            phase = tournament_data.get("phase", "unknown")
+            teams_count = len(tournament_data.get("teams", {}))
+            matches_count = len(tournament_data.get("matches", []))
+
+            # Determine tournament state
+            if phase == "registration":
+                logger.info(f"[STARTUP] 🏆 Tournament: REGISTRATION phase ({teams_count} teams)")
+            elif phase == "running":
+                completed_matches = sum(1 for m in tournament_data.get("matches", []) if m.get("scheduled_time"))
+                logger.info(f"[STARTUP] 🏆 Tournament: RUNNING ({completed_matches}/{matches_count} matches scheduled)")
+
+                if now > tournament_end:
+                    logger.warning(f"[STARTUP] ⚠️  Tournament end date has passed! ({tournament_end.strftime('%Y-%m-%d')})")
+            elif phase == "finished":
+                logger.info(f"[STARTUP] 🏆 Tournament: FINISHED ({matches_count} matches total)")
+            else:
+                logger.info(f"[STARTUP] 🏆 Tournament: Phase '{phase}'")
+        else:
+            logger.info("[STARTUP] ℹ️  No active tournament")
+    except Exception as e:
+        if DEBUG_MODE:
+            logger.error(f"[STARTUP] ⚠️ Error checking tournament status: {e}")
+
+    # Stop old tasks
     try:
         cancel_all_tasks()
-        logger.info("[STARTUP] ✅ Old background tasks terminated")
+        if DEBUG_MODE:
+            logger.debug("[STARTUP] ✅ Old background tasks terminated")
     except Exception as e:
         logger.error(f"[STARTUP] ⚠️ Error terminating old tasks: {e}")
 
@@ -127,9 +182,9 @@ async def on_ready():
 
         if channel:
             add_task("reminder_loop", bot.loop.create_task(match_reminder_loop(channel)))
-            logger.info("[STARTUP] ✅ Reminder subsystem started")
+            logger.info("[STARTUP] ✅ Reminder system started")
         else:
-            logger.error(f"[STARTUP] ❌ Reminder channel with ID {reminder_channel_id} not found!")
+            logger.error(f"[STARTUP] ❌ Reminder channel (ID: {reminder_channel_id}) not found")
     except Exception as e:
         logger.error(f"[STARTUP] ❌ Failed to start reminder system: {e}")
 
@@ -137,13 +192,15 @@ async def on_ready():
     try:
         synced = await bot.tree.sync()
         if len(synced) == 0:
-            logger.warning("[STARTUP] ⚠️ No slash commands synchronized.")
+            logger.warning("[STARTUP] ⚠️ No slash commands synchronized")
         else:
-            logger.info(f"[STARTUP] ✅ Slash commands synchronized ({len(synced)} commands).")
+            logger.info(f"[STARTUP] ✅ Slash commands synced ({len(synced)} commands)")
     except Exception as e:
         logger.error(f"[STARTUP] ❌ Slash command sync failed: {e}")
 
-    logger.info("[STARTUP] ✅ Initialization completed.\n")
+    logger.info("═" * 70)
+    logger.info("[STARTUP] ✅ Bot initialization completed")
+    logger.info("═" * 70 + "\n")
 
 
 @bot.event
@@ -187,7 +244,9 @@ async def on_app_command_error(interaction: discord.Interaction, error: app_comm
 # ========== LOAD EXTENSIONS & START BOT ==========
 async def main():
     """Main entry point for the bot. Loads extensions and starts the bot."""
-    logger.info("[SYSTEM] Starting bot initialization...")
+    logger.info("═" * 70)
+    logger.info("[SYSTEM] 🚀 Initializing HeroldBot...")
+    logger.info("═" * 70)
 
     # Track extension loading
     loaded_extensions = []
@@ -198,15 +257,16 @@ async def main():
         try:
             await bot.load_extension(ext)
             loaded_extensions.append(ext)
-            logger.info(f"[SYSTEM] ✅ Extension loaded: {ext}")
+            if DEBUG_MODE:
+                logger.debug(f"[SYSTEM] ✅ Extension loaded: {ext}")
         except Exception as e:
             failed_extensions.append(ext)
             logger.error(f"[SYSTEM] ❌ Error loading extension {ext}: {e}")
 
     # Summary of extension loading
-    logger.info(f"[SYSTEM] Extension loading summary: {len(loaded_extensions)}/{len(EXTENSIONS)} loaded successfully")
+    logger.info(f"[SYSTEM] ✅ Extensions: {len(loaded_extensions)}/{len(EXTENSIONS)} loaded successfully")
     if failed_extensions:
-        logger.warning(f"[SYSTEM] Failed extensions: {', '.join(failed_extensions)}")
+        logger.warning(f"[SYSTEM] ⚠️  Failed: {', '.join(failed_extensions)}")
 
     # Validate TOKEN before starting
     if not TOKEN:
@@ -215,7 +275,7 @@ async def main():
 
     # Start bot (blocks until the end)
     try:
-        logger.info("[SYSTEM] Starting Discord bot connection...")
+        logger.info("[SYSTEM] 🔌 Connecting to Discord...")
         await bot.start(TOKEN)
     except discord.LoginFailure:
         logger.critical("[SYSTEM] ❌ CRITICAL: Login failed - invalid bot token!")
