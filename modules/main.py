@@ -120,6 +120,36 @@ async def on_ready():
     else:
         logger.error(f"[STARTUP] ❌ {len(file_errors)} file(s) failed validation")
 
+    # Check localization embeds
+    try:
+        embed_dir = os.path.join("locale", language, "embeds")
+        reference_dir = os.path.join("locale", "en", "embeds")  # Use English as reference
+
+        # Get expected embeds from English locale (should be complete)
+        if os.path.exists(reference_dir):
+            expected_embeds = set(f for f in os.listdir(reference_dir) if f.endswith(".json"))
+        else:
+            expected_embeds = set()
+
+        # Check which embeds exist for the selected language
+        if os.path.exists(embed_dir):
+            existing_embeds = set(f for f in os.listdir(embed_dir) if f.endswith(".json"))
+            missing_embeds = expected_embeds - existing_embeds
+
+            if not missing_embeds:
+                logger.info(f"[STARTUP] ✅ Localization: All {len(existing_embeds)} embeds present ({language})")
+            else:
+                coverage_percent = (len(existing_embeds) / len(expected_embeds) * 100) if expected_embeds else 0
+                logger.warning(f"[STARTUP] ⚠️  Localization: {coverage_percent:.0f}% complete ({len(existing_embeds)}/{len(expected_embeds)} embeds)")
+                if DEBUG_MODE:
+                    missing_list = ", ".join(sorted(missing_embeds)[:5])
+                    logger.debug(f"[STARTUP]    Missing: {missing_list}{'...' if len(missing_embeds) > 5 else ''}")
+        else:
+            logger.error(f"[STARTUP] ❌ Localization: Embed directory missing for language '{language}'")
+    except Exception as e:
+        if DEBUG_MODE:
+            logger.debug(f"[STARTUP] ⚠️ Error checking localization: {e}")
+
     # Check player stats
     player_stats_dir = os.path.join("data", "player_stats")
     if os.path.exists(player_stats_dir):
