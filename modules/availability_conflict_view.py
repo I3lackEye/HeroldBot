@@ -15,7 +15,7 @@ import asyncio
 from modules.dataStorage import load_tournament_data, save_tournament_data
 from modules.logger import logger
 from modules.config import CONFIG
-from modules.matchmaker import AvailabilityChecker
+from modules.utils import AvailabilityChecker
 from modules.embeds import load_embed_template
 
 

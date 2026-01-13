@@ -13,8 +13,8 @@ import discord
 from modules.dataStorage import load_tournament_data, save_tournament_data
 from modules.logger import logger
 from modules.config import CONFIG
+from modules.utils import AvailabilityChecker
 from modules.matchmaker import (
-    AvailabilityChecker,
     get_valid_slots_for_match,
     generate_slot_matrix
 )
