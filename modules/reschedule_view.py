@@ -153,9 +153,16 @@ class RescheduleView(ui.View):
             logger.info(f"[RESCHEDULE] Match {self.match_id} forfeited by {decliner_team}. Winner: {opponent}")
 
         # Import at runtime to avoid circular dependency
-        from modules.reschedule import pending_reschedules, _reschedule_lock
+        from modules.reschedule import pending_reschedules, pending_timer_tasks, _reschedule_lock
         async with _reschedule_lock:
             pending_reschedules.discard(self.match_id)
+
+            # Cancel the timer task if it exists
+            if self.match_id in pending_timer_tasks:
+                timer_task = pending_timer_tasks.pop(self.match_id)
+                if not timer_task.done():
+                    timer_task.cancel()
+                    logger.debug(f"[RESCHEDULE] Cancelled timer task for match {self.match_id} after decline")
 
         if self.message:
             await self.message.edit(
@@ -209,6 +216,36 @@ class RescheduleView(ui.View):
             self.stop()
             return
 
+        # Validate all voting players are still in their teams
+        team1_members = set(teams[self.team1].get("members", []))
+        team2_members = set(teams[self.team2].get("members", []))
+        current_players = {member.mention for member in self.players}
+
+        expected_players = team1_members | team2_members
+
+        if current_players != expected_players:
+            logger.error(f"[RESCHEDULE] ❌ Player membership changed for match {self.match_id}")
+            logger.error(f"[RESCHEDULE]    Expected: {expected_players}")
+            logger.error(f"[RESCHEDULE]    Got: {current_players}")
+
+            missing_players = expected_players - current_players
+            extra_players = current_players - expected_players
+
+            error_msg = "❌ **Team membership has changed since the reschedule request:**\n"
+            if missing_players:
+                error_msg += f"Missing players: {', '.join(missing_players)}\n"
+            if extra_players:
+                error_msg += f"Unexpected players: {', '.join(extra_players)}\n"
+            error_msg += "\nThe reschedule request is now invalid. Please submit a new request."
+
+            await self.message.edit(
+                content=error_msg,
+                embed=None,
+                view=None
+            )
+            self.stop()
+            return
+
         # Critical: Check if slot is still free (prevent double booking)
         new_slot_iso = self.new_datetime.astimezone(ZoneInfo("UTC")).isoformat()
         booked_slots = {
@@ -249,9 +286,16 @@ class RescheduleView(ui.View):
         logger.info(f"[RESCHEDULE] ✅ Match {self.match_id} successfully rescheduled to {self.new_datetime}.")
 
         # Import at runtime to avoid circular dependency
-        from modules.reschedule import pending_reschedules, _reschedule_lock
+        from modules.reschedule import pending_reschedules, pending_timer_tasks, _reschedule_lock
         async with _reschedule_lock:
             pending_reschedules.discard(self.match_id)
+
+            # Cancel the timer task if it exists
+            if self.match_id in pending_timer_tasks:
+                timer_task = pending_timer_tasks.pop(self.match_id)
+                if not timer_task.done():
+                    timer_task.cancel()
+                    logger.debug(f"[RESCHEDULE] Cancelled timer task for match {self.match_id} after success")
 
         await self.message.edit(
             content=f"✅ All players accepted! Match {self.match_id} rescheduled to **{self.new_datetime.strftime('%d.%m.%Y %H:%M')}**!",
@@ -294,6 +338,10 @@ class RescheduleView(ui.View):
                 logger.error(f"[RESCHEDULE] Error editing message on timeout: {e}")
 
         # Import at runtime to avoid circular dependency
-        from modules.reschedule import pending_reschedules, _reschedule_lock
+        from modules.reschedule import pending_reschedules, pending_timer_tasks, _reschedule_lock
         async with _reschedule_lock:
             pending_reschedules.discard(self.match_id)
+
+            # Timer task already completed (that's why we're here), just clean up
+            pending_timer_tasks.pop(self.match_id, None)
+            logger.debug(f"[RESCHEDULE] Cleaned up timer task reference for match {self.match_id} after on_timeout")

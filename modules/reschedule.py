@@ -28,6 +28,7 @@ from modules.reschedule_view import RescheduleView, SlotSelectView
 
 # Global state for pending reschedule requests
 pending_reschedules = set()
+pending_timer_tasks = {}  # match_id -> asyncio.Task for cancellable timers
 _reschedule_lock = asyncio.Lock()  # Prevent race conditions
 
 RESCHEDULE_TIMEOUT_HOURS = CONFIG.tournament.reschedule_timeout_hours
@@ -68,10 +69,15 @@ def get_free_slots_for_match(tournament, match_id: int) -> list[datetime]:
     return [slot for slot in all_valid if slot.isoformat() not in booked]
 
 
-def extend_tournament_and_reschedule_match(match: dict, days: int = 2) -> bool:
+def extend_tournament_and_reschedule_match(match: dict, days: int = 2, max_attempts: int = 3) -> bool:
     """
     Extends the tournament end date and tries to generate and assign new slots for the given match.
-    Returns True if successful, otherwise False.
+    Uses retry logic similar to matchmaker auto-extension.
+
+    :param match: Match dict to reschedule
+    :param days: Days to extend per attempt (default 2)
+    :param max_attempts: Maximum extension attempts (default 3)
+    :return: True if successful, otherwise False
     """
     tournament = load_tournament_data()
     end_str = tournament.get("tournament_end")
@@ -82,24 +88,45 @@ def extend_tournament_and_reschedule_match(match: dict, days: int = 2) -> bool:
         logger.error(f"[RESCHEDULE] ❌ Error reading tournament end time: {e}")
         return False
 
-    new_end = current_end + timedelta(days=days)
-    tournament["tournament_end"] = new_end.isoformat()
-    logger.warning(f"[RESCHEDULE] ⚠️ Tournament end extended to {new_end.isoformat()}.")
+    original_end = current_end
+    match_id = match.get("match_id")
 
-    # Reset match
-    match["scheduled_time"] = None
+    for attempt in range(1, max_attempts + 1):
+        logger.info(f"[RESCHEDULE-EXTEND] 🔄 Extension attempt {attempt}/{max_attempts} for match {match_id}")
 
-    # Reschedule only this match
-    slot_matrix = generate_slot_matrix(tournament)
-    success = not assign_slots_with_matrix([match], slot_matrix)[1]
+        # Extend tournament
+        new_end = current_end + timedelta(days=days)
+        tournament["tournament_end"] = new_end.isoformat()
+        logger.warning(f"[RESCHEDULE-EXTEND] ⏰ Tournament end extended: {current_end.date()} → {new_end.date()} (+{days} days)")
+
+        # Reset match scheduled_time
+        match["scheduled_time"] = None
+
+        # Try to reschedule this match
+        slot_matrix = generate_slot_matrix(tournament)
+        updated_matches, unassigned = assign_slots_with_matrix([match], slot_matrix)
+        success = len(unassigned) == 0
+
+        if success:
+            save_tournament_data(tournament)
+            logger.info(f"[RESCHEDULE-EXTEND] ✅ Match {match_id} successfully scheduled after extension (attempt {attempt})")
+            total_extension_days = (new_end - original_end).days
+            logger.info(f"[RESCHEDULE-EXTEND] 📊 Total tournament extension: +{total_extension_days} days")
+            return True
+        else:
+            logger.warning(f"[RESCHEDULE-EXTEND] ⚠️  Attempt {attempt} failed - no slot found despite extension")
+            # Prepare for next iteration
+            current_end = new_end
+
+    # All attempts exhausted
+    logger.error(f"[RESCHEDULE-EXTEND] ❌ Failed to schedule match {match_id} after {max_attempts} extension attempts")
+    total_extension_days = (current_end - original_end).days
+    logger.error(f"[RESCHEDULE-EXTEND] Tournament was extended by {total_extension_days} days total, but no slot could be found")
+
+    # Save the extended tournament even though scheduling failed
     save_tournament_data(tournament)
 
-    if success:
-        logger.info(f"[RESCHEDULE] ✅ New slot assigned for match {match['match_id']} after extension.")
-    else:
-        logger.warning(f"[RESCHEDULE] ❌ No slot found despite tournament extension.")
-
-    return success
+    return False
 
 
 # ---------------------------------------
@@ -299,10 +326,13 @@ async def handle_request_reschedule(interaction: Interaction, match_id: int):
             logger.error(f"[RESCHEDULE] ❌ Error posting request: {e}")
             return
 
-        # Start timer
+        # Start timer and store task for potential cancellation
         async with _reschedule_lock:
             pending_reschedules.add(match_id)
-        interaction.client.loop.create_task(start_reschedule_timer(interaction.client, match_id))
+
+        timer_task = interaction.client.loop.create_task(start_reschedule_timer(interaction.client, match_id))
+        pending_timer_tasks[match_id] = timer_task
+        logger.debug(f"[RESCHEDULE] Timer task created for match {match_id}")
 
     # Show slot selection view
     view = SlotSelectView(match_id, interaction.user, future_slots, post_reschedule_request)
@@ -387,15 +417,21 @@ async def start_reschedule_timer(bot, match_id: int):
     """
     Waits a certain time and then automatically removes the reschedule request.
     Optionally notifies the reschedule channel.
+    Can be cancelled early if reschedule is resolved before timeout.
     """
-    await asyncio.sleep(RESCHEDULE_TIMEOUT_HOURS * 3600)  # Wait for timeout
+    try:
+        await asyncio.sleep(RESCHEDULE_TIMEOUT_HOURS * 3600)  # Wait for timeout
 
-    async with _reschedule_lock:
-        if match_id in pending_reschedules:
-            pending_reschedules.discard(match_id)
-        logger.info(
-            f"[RESCHEDULE] Automatic cleanup: Match {match_id} was reset (timeout after {RESCHEDULE_TIMEOUT_HOURS} hours)."
-        )
+        async with _reschedule_lock:
+            if match_id in pending_reschedules:
+                pending_reschedules.discard(match_id)
+
+            # Clean up timer task reference
+            pending_timer_tasks.pop(match_id, None)
+
+            logger.info(
+                f"[RESCHEDULE] Automatic cleanup: Match {match_id} was reset (timeout after {RESCHEDULE_TIMEOUT_HOURS} hours)."
+            )
 
         # ➔ Send message in reschedule channel
         reschedule_channel = bot.get_channel(RESCHEDULE_CHANNEL_ID)
@@ -403,3 +439,7 @@ async def start_reschedule_timer(bot, match_id: int):
             await reschedule_channel.send(
                 f"❗ The reschedule request for match `{match_id}` was automatically ended as no agreement was reached within {RESCHEDULE_TIMEOUT_HOURS} hours."
             )
+    except asyncio.CancelledError:
+        logger.debug(f"[RESCHEDULE] Timer for match {match_id} was cancelled (reschedule resolved early)")
+        # Don't propagate the exception, just exit cleanly
+        pass
