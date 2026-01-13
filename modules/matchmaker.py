@@ -17,7 +17,7 @@ from modules.config import CONFIG
 from modules.dataStorage import DEBUG_MODE, load_tournament_data, save_tournament_data
 # Removed: send_cleanup_summary import - function deleted to reduce spam
 from modules.logger import logger
-from modules.utils import generate_team_name, get_active_days_config, get_default_availability
+from modules.utils import generate_team_name, get_active_days_config, get_default_availability, validate_time_range
 
 # Tournament configuration (from centralized config)
 MATCH_DURATION = CONFIG.tournament.match_duration
@@ -197,6 +197,7 @@ class AvailabilityChecker:
     def validate_availability(availability: dict) -> bool:
         """
         Validates that availability dict has properly formatted time ranges.
+        Uses validate_time_range() from utils.py for consistency.
 
         :param availability: Availability dict to validate
         :return: True if all time ranges are valid, False otherwise
@@ -212,10 +213,10 @@ class AvailabilityChecker:
             if time_range == "00:00-00:00":
                 continue  # Empty availability is valid
 
-            try:
-                AvailabilityChecker.parse_time_range(time_range)
-            except ValueError as e:
-                logger.warning(f"[AVAILABILITY] Invalid time range for {day}: {time_range} - {e}")
+            # Use existing validate_time_range from utils.py
+            is_valid, error_msg = validate_time_range(time_range)
+            if not is_valid:
+                logger.warning(f"[AVAILABILITY] Invalid time range for {day}: {time_range} - {error_msg}")
                 return False
 
         return True
