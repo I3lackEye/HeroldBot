@@ -305,7 +305,7 @@ def get_team_time_budget(team_name: str, date: datetime.date, matches: list) -> 
 # SLOT GENERATION FUNCTIONS
 # =======================================
 
-def generate_slot_matrix(tournament: dict, slot_interval_minutes: int = 60) -> dict:
+def generate_slot_matrix(tournament: dict, slot_interval_minutes: int = 60, log_prefix: str = "SLOT-MATRIX") -> dict:
     """
     Creates a global slot matrix that indicates which teams are available at which slots.
 
@@ -336,21 +336,21 @@ def generate_slot_matrix(tournament: dict, slot_interval_minutes: int = 60) -> d
 
     # Validate tournament dates
     if from_date >= to_date:
-        logger.error(f"[SLOT-MATRIX] ❌ Invalid tournament dates: registration_end ({from_date}) must be before tournament_end ({to_date})")
-        logger.error(f"[SLOT-MATRIX]    💡 Please check your tournament configuration in tournament.json")
+        logger.error(f"[{log_prefix}] ❌ Invalid tournament dates: registration_end ({from_date}) must be before tournament_end ({to_date})")
+        logger.error(f"[{log_prefix}]    💡 Please check your tournament configuration in tournament.json")
         return {}
 
     teams = tournament.get("teams", {})
 
     if not teams:
-        logger.warning("[SLOT-MATRIX] No teams found, returning empty matrix.")
+        logger.warning(f"[{log_prefix}] No teams found, returning empty matrix.")
         return {}
 
     slot_matrix = defaultdict(set)
     slot_interval = timedelta(minutes=slot_interval_minutes)
 
-    logger.info(f"[SLOT-MATRIX] Generating slots from {from_date} to {to_date} with {slot_interval_minutes}min intervals")
-    logger.info(f"[SLOT-MATRIX] Using timezone: {CONFIG.bot.timezone}")
+    logger.info(f"[{log_prefix}] Generating slots from {from_date} to {to_date} with {slot_interval_minutes}min intervals")
+    logger.info(f"[{log_prefix}] Using timezone: {CONFIG.bot.timezone}")
 
     current = from_date
     total_slots_generated = 0
@@ -400,13 +400,13 @@ def generate_slot_matrix(tournament: dict, slot_interval_minutes: int = 60) -> d
 
         current += timedelta(days=1)
 
-    logger.info(f"[SLOT-MATRIX] Generated {slots_with_teams} usable slots (from {total_slots_generated} checked)")
-    logger.info(f"[SLOT-MATRIX] Average teams per slot: {sum(len(teams) for teams in slot_matrix.values()) / max(len(slot_matrix), 1):.1f}")
+    logger.info(f"[{log_prefix}] Generated {slots_with_teams} usable slots (from {total_slots_generated} checked)")
+    logger.info(f"[{log_prefix}] Average teams per slot: {sum(len(teams) for teams in slot_matrix.values()) / max(len(slot_matrix), 1):.1f}")
 
     # Early warning if slot matrix is empty or too small
     if len(slot_matrix) == 0:
-        logger.error("[SLOT-MATRIX] ❌ CRITICAL: Slot matrix is completely empty!")
-        logger.error("[SLOT-MATRIX]    💡 Possible causes:")
+        logger.error(f"[{log_prefix}] ❌ CRITICAL: Slot matrix is completely empty!")
+        logger.error(f"[{log_prefix}]    💡 Possible causes:")
 
         # Diagnostic: Check if teams have any availability
         teams_with_availability = 0
@@ -420,27 +420,27 @@ def generate_slot_matrix(tournament: dict, slot_interval_minutes: int = 60) -> d
                 teams_without_availability.append(team_name)
 
         if teams_with_availability == 0:
-            logger.error(f"[SLOT-MATRIX]    1. NO teams have any availability (all are 00:00-00:00)")
-            logger.error(f"[SLOT-MATRIX]       → Check team registration and availability data")
+            logger.error(f"[{log_prefix}]    1. NO teams have any availability (all are 00:00-00:00)")
+            logger.error(f"[{log_prefix}]       → Check team registration and availability data")
         else:
-            logger.error(f"[SLOT-MATRIX]    1. {teams_without_availability.__len__()} teams have no availability: {', '.join(teams_without_availability[:5])}")
+            logger.error(f"[{log_prefix}]    1. {teams_without_availability.__len__()} teams have no availability: {', '.join(teams_without_availability[:5])}")
 
         # Check if tournament dates are valid
-        logger.error(f"[SLOT-MATRIX]    2. Tournament date range: {from_date.date()} to {to_date.date()} ({(to_date - from_date).days} days)")
+        logger.error(f"[{log_prefix}]    2. Tournament date range: {from_date.date()} to {to_date.date()} ({(to_date - from_date).days} days)")
         if (to_date - from_date).days < 1:
-            logger.error(f"[SLOT-MATRIX]       → Tournament duration is too short!")
+            logger.error(f"[{log_prefix}]       → Tournament duration is too short!")
 
-        logger.error(f"[SLOT-MATRIX]    3. Check if team availability days match tournament active days")
-        logger.error(f"[SLOT-MATRIX]    4. Verify teams have enough time to fit matches (minimum {int(MATCH_DURATION.total_seconds() / 60)} minutes required)")
+        logger.error(f"[{log_prefix}]    3. Check if team availability days match tournament active days")
+        logger.error(f"[{log_prefix}]    4. Verify teams have enough time to fit matches (minimum {int(MATCH_DURATION.total_seconds() / 60)} minutes required)")
 
         return {}
 
     # Warning if slot matrix is very small
     min_slots_needed = len(tournament["matches"]) if "matches" in tournament else len(teams) * (len(teams) - 1) // 2
     if len(slot_matrix) < min_slots_needed * 0.1:  # Less than 10% of needed slots
-        logger.warning(f"[SLOT-MATRIX] ⚠️  WARNING: Only {len(slot_matrix)} slots available, but ~{min_slots_needed} matches need scheduling")
-        logger.warning(f"[SLOT-MATRIX]    This may lead to scheduling conflicts and failed match assignments")
-        logger.warning(f"[SLOT-MATRIX]    💡 Consider extending tournament duration or checking team availability windows")
+        logger.warning(f"[{log_prefix}] ⚠️  WARNING: Only {len(slot_matrix)} slots available, but ~{min_slots_needed} matches need scheduling")
+        logger.warning(f"[{log_prefix}]    This may lead to scheduling conflicts and failed match assignments")
+        logger.warning(f"[{log_prefix}]    💡 Consider extending tournament duration or checking team availability windows")
 
     # Optional: Save JSON debug
     if DEBUG_MODE:
@@ -467,9 +467,9 @@ def generate_slot_matrix(tournament: dict, slot_interval_minutes: int = 60) -> d
             with open("debug/slot_matrix_debug.json", "w", encoding="utf-8") as f:
                 json.dump(debug_summary, f, indent=2, ensure_ascii=False)
 
-            logger.info("[SLOT-MATRIX] slot_matrix_debug.json saved.")
+            logger.info(f"[{log_prefix}] slot_matrix_debug.json saved.")
         except Exception as e:
-            logger.warning(f"[SLOT-MATRIX] Error saving debug data: {e}")
+            logger.warning(f"[{log_prefix}] Error saving debug data: {e}")
 
     return dict(slot_matrix)
 
@@ -833,7 +833,7 @@ async def generate_and_assign_slots():
 
             # Reload tournament and regenerate slot matrix
             tournament = load_tournament_data()
-            slot_matrix = generate_slot_matrix(tournament)
+            slot_matrix = generate_slot_matrix(tournament, log_prefix="EXTEND-MATRIX")
 
             # Retry failed matches with expanded slot matrix
             logger.info(f"[EXTEND] 🎯 Retrying {len(extendable_matches)} matches with expanded time window...")
