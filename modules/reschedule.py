@@ -131,16 +131,16 @@ async def handle_request_reschedule(interaction: Interaction, match_id: int):
         await interaction.response.send_message("🚫 Invalid match ID or not your match!", ephemeral=True)
         return
 
-    async with _reschedule_lock:
-        if match_id in pending_reschedules:
-            await interaction.response.send_message(
-                "🚫 A reschedule request is already pending for this match!", ephemeral=True
-            )
-            return
-
     match = next((m for m in tournament.get("matches", []) if m.get("match_id") == match_id), None,)
     if not match:
         await interaction.response.send_message(get_message("ERRORS", "match_not_found"), ephemeral=True)
+        return
+
+    # Check if reschedule is already pending (persisted state)
+    if match.get("reschedule_pending"):
+        await interaction.response.send_message(
+            "🚫 A reschedule request is already pending for this match!", ephemeral=True
+        )
         return
 
     # Check if this team has already requested a reschedule for this match
@@ -275,8 +275,14 @@ async def handle_request_reschedule(interaction: Interaction, match_id: int):
             if team_name not in reschedule_requested_by:
                 reschedule_requested_by.append(team_name)
                 match_updated["reschedule_requested_by"] = reschedule_requested_by
-                save_tournament_data(tournament_updated)
-                logger.info(f"[RESCHEDULE] Marked {team_name} as having requested reschedule for match {match_id}")
+
+            # Mark reschedule as pending (persisted state for bot restart resilience)
+            match_updated["reschedule_pending"] = True
+            match_updated["reschedule_pending_since"] = datetime.now(tz=tz).isoformat()
+
+            save_tournament_data(tournament_updated)
+            logger.info(f"[RESCHEDULE] Marked {team_name} as having requested reschedule for match {match_id}")
+            logger.info(f"[RESCHEDULE] Set reschedule_pending=True for match {match_id}")
 
         # Post in reschedule channel
         channel = interaction.guild.get_channel(RESCHEDULE_CHANNEL_ID)

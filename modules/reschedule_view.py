@@ -141,6 +141,14 @@ class RescheduleView(ui.View):
             opponent = self.team2 if self.team1 == decliner_team else self.team1
             match["winner"] = opponent
 
+            # Clear reschedule state fields
+            if "reschedule_requested_by" in match:
+                del match["reschedule_requested_by"]
+            if "reschedule_pending" in match:
+                del match["reschedule_pending"]
+            if "reschedule_pending_since" in match:
+                del match["reschedule_pending_since"]
+
             save_tournament_data(tournament)
             logger.info(f"[RESCHEDULE] Match {self.match_id} forfeited by {decliner_team}. Winner: {opponent}")
 
@@ -164,15 +172,81 @@ class RescheduleView(ui.View):
 
     async def success(self):
         """Wenn alle zugestimmt haben: Match verschieben."""
+        # Reload tournament data to avoid race conditions
         tournament = load_tournament_data()
 
         match = next((m for m in tournament.get("matches", []) if m.get("match_id") == self.match_id), None)
-        if match:
-            match["scheduled_time"] = self.new_datetime.astimezone(ZoneInfo("UTC")).isoformat()
-            match["rescheduled_once"] = True
-            logger.debug(f"[RESCHEDULE] UTC saved: {match['scheduled_time']}")
-            save_tournament_data(tournament)
-            logger.info(f"[RESCHEDULE] Match {self.match_id} successfully rescheduled to {self.new_datetime}.")
+        if not match:
+            logger.error(f"[RESCHEDULE] ❌ Match {self.match_id} not found during success()")
+            await self.message.edit(
+                content=f"❌ Error: Match {self.match_id} no longer exists.",
+                embed=None,
+                view=None
+            )
+            self.stop()
+            return
+
+        # Validate match status
+        if match.get("status") in ["completed", "forfeit"]:
+            logger.warning(f"[RESCHEDULE] ❌ Match {self.match_id} already {match.get('status')} - cannot reschedule")
+            await self.message.edit(
+                content=f"❌ Match {self.match_id} is already {match.get('status')} and cannot be rescheduled.",
+                embed=None,
+                view=None
+            )
+            self.stop()
+            return
+
+        # Validate teams still exist
+        teams = tournament.get("teams", {})
+        if self.team1 not in teams or self.team2 not in teams:
+            logger.error(f"[RESCHEDULE] ❌ One or both teams no longer exist: {self.team1}, {self.team2}")
+            await self.message.edit(
+                content=f"❌ Error: One or both teams no longer exist in the tournament.",
+                embed=None,
+                view=None
+            )
+            self.stop()
+            return
+
+        # Critical: Check if slot is still free (prevent double booking)
+        new_slot_iso = self.new_datetime.astimezone(ZoneInfo("UTC")).isoformat()
+        booked_slots = {
+            m["scheduled_time"]
+            for m in tournament.get("matches", [])
+            if m.get("scheduled_time") and m["match_id"] != self.match_id  # Exclude current match
+        }
+
+        if new_slot_iso in booked_slots:
+            logger.error(f"[RESCHEDULE] ❌ RACE CONDITION PREVENTED: Slot {new_slot_iso} already booked by another match!")
+            await self.message.edit(
+                content=(
+                    f"❌ **Slot conflict detected!**\n"
+                    f"The selected time slot **{self.new_datetime.strftime('%d.%m.%Y %H:%M')}** was booked by another match "
+                    f"while you were voting.\n"
+                    f"Please request a new reschedule with a different time."
+                ),
+                embed=None,
+                view=None
+            )
+            self.stop()
+            return
+
+        # All validations passed - assign slot
+        match["scheduled_time"] = new_slot_iso
+        match["rescheduled_once"] = True
+
+        # Clear reschedule state fields after successful reschedule
+        if "reschedule_requested_by" in match:
+            del match["reschedule_requested_by"]
+        if "reschedule_pending" in match:
+            del match["reschedule_pending"]
+        if "reschedule_pending_since" in match:
+            del match["reschedule_pending_since"]
+
+        logger.debug(f"[RESCHEDULE] UTC saved: {match['scheduled_time']}")
+        save_tournament_data(tournament)
+        logger.info(f"[RESCHEDULE] ✅ Match {self.match_id} successfully rescheduled to {self.new_datetime}.")
 
         # Import at runtime to avoid circular dependency
         from modules.reschedule import pending_reschedules, _reschedule_lock
@@ -189,12 +263,36 @@ class RescheduleView(ui.View):
     async def on_timeout(self):
         """Timeout nach 24h - kein Forfeit, nur Abbruch."""
         logger.warning(f"[RESCHEDULE] Timeout for match {self.match_id}. Request automatically cancelled.")
+
+        # Clear reschedule state fields to allow team to request again
+        tournament = load_tournament_data()
+        match = next((m for m in tournament.get("matches", []) if m.get("match_id") == self.match_id), None)
+        if match:
+            fields_cleared = []
+            if "reschedule_requested_by" in match:
+                del match["reschedule_requested_by"]
+                fields_cleared.append("reschedule_requested_by")
+            if "reschedule_pending" in match:
+                del match["reschedule_pending"]
+                fields_cleared.append("reschedule_pending")
+            if "reschedule_pending_since" in match:
+                del match["reschedule_pending_since"]
+                fields_cleared.append("reschedule_pending_since")
+
+            if fields_cleared:
+                save_tournament_data(tournament)
+                logger.info(f"[RESCHEDULE] Cleared {', '.join(fields_cleared)} for match {self.match_id} after timeout")
+
         if self.message:
-            await self.message.edit(
-                content=f"⌛ Reschedule request for match {self.match_id} has expired. Match remains at original time.",
-                embed=None,
-                view=None
-            )
+            try:
+                await self.message.edit(
+                    content=f"⌛ Reschedule request for match {self.match_id} has expired. Match remains at original time.",
+                    embed=None,
+                    view=None
+                )
+            except Exception as e:
+                logger.error(f"[RESCHEDULE] Error editing message on timeout: {e}")
+
         # Import at runtime to avoid circular dependency
         from modules.reschedule import pending_reschedules, _reschedule_lock
         async with _reschedule_lock:
