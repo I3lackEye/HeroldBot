@@ -95,7 +95,6 @@ async def on_ready():
         "configs/bot.json",
         "configs/tournament.json",
         "configs/features.json",
-        "data/data.json",
         "data/tournament.json",
         "data/games.json",
         f"locale/{language}/names_{language}.json",
@@ -120,6 +119,19 @@ async def on_ready():
         logger.info(f"[STARTUP] ✅ All {len(required_files)} files validated")
     else:
         logger.error(f"[STARTUP] ❌ {len(file_errors)} file(s) failed validation")
+
+    # Check player stats
+    player_stats_dir = os.path.join("data", "player_stats")
+    if os.path.exists(player_stats_dir):
+        try:
+            stats_files = [f for f in os.listdir(player_stats_dir) if f.endswith(".json")]
+            logger.info(f"[STARTUP] 📊 Player stats: {len(stats_files)} unique player(s)")
+        except Exception as e:
+            if DEBUG_MODE:
+                logger.debug(f"[STARTUP] ⚠️ Error reading player stats: {e}")
+    else:
+        if DEBUG_MODE:
+            logger.debug("[STARTUP] ℹ️  No player stats yet (directory will be created on first use)")
 
     # Validate channels and permissions (compact logging)
     try:
