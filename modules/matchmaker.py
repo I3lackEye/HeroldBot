@@ -436,7 +436,7 @@ def generate_slot_matrix(tournament: dict, slot_interval_minutes: int = 60) -> d
         return {}
 
     # Warning if slot matrix is very small
-    min_slots_needed = len(matches) if "matches" in tournament else len(teams) * (len(teams) - 1) // 2
+    min_slots_needed = len(tournament["matches"]) if "matches" in tournament else len(teams) * (len(teams) - 1) // 2
     if len(slot_matrix) < min_slots_needed * 0.1:  # Less than 10% of needed slots
         logger.warning(f"[SLOT-MATRIX] ⚠️  WARNING: Only {len(slot_matrix)} slots available, but ~{min_slots_needed} matches need scheduling")
         logger.warning(f"[SLOT-MATRIX]    This may lead to scheduling conflicts and failed match assignments")
