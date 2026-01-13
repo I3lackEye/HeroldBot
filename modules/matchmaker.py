@@ -194,6 +194,33 @@ class AvailabilityChecker:
         return [day for day, time_range in availability.items() if time_range != "00:00-00:00"]
 
     @staticmethod
+    def validate_availability(availability: dict) -> bool:
+        """
+        Validates that availability dict has properly formatted time ranges.
+
+        :param availability: Availability dict to validate
+        :return: True if all time ranges are valid, False otherwise
+        """
+        if not availability:
+            return False
+
+        for day, time_range in availability.items():
+            if not isinstance(time_range, str):
+                logger.warning(f"[AVAILABILITY] Invalid type for {day}: {type(time_range)}")
+                return False
+
+            if time_range == "00:00-00:00":
+                continue  # Empty availability is valid
+
+            try:
+                AvailabilityChecker.parse_time_range(time_range)
+            except ValueError as e:
+                logger.warning(f"[AVAILABILITY] Invalid time range for {day}: {time_range} - {e}")
+                return False
+
+        return True
+
+    @staticmethod
     def can_fit_match(team_data: dict, slot_datetime: datetime, match_duration: timedelta) -> bool:
         """
         Checks if a team has enough time remaining in their availability window
@@ -265,6 +292,17 @@ def auto_match_solo():
         avail1 = p1.get("availability", {})
         avail2 = p2.get("availability", {})
 
+        # Validate availability data
+        if not AvailabilityChecker.validate_availability(avail1):
+            logger.error(f"[MATCHMAKER] ❌ Invalid availability data for {name1} – Cannot create team.")
+            logger.error(f"[MATCHMAKER]    💡 Please check time range format (must be HH:MM-HH:MM)")
+            continue
+
+        if not AvailabilityChecker.validate_availability(avail2):
+            logger.error(f"[MATCHMAKER] ❌ Invalid availability data for {name2} – Cannot create team.")
+            logger.error(f"[MATCHMAKER]    💡 Please check time range format (must be HH:MM-HH:MM)")
+            continue
+
         # Use configured active days instead of hardcoded saturday/sunday
         active_days = get_active_days_config()
         overlap = AvailabilityChecker.merge_availability(avail1, avail2, days=active_days)
@@ -278,18 +316,27 @@ def auto_match_solo():
         overlapping_days = AvailabilityChecker.get_available_days(overlap)
         logger.debug(f"[MATCHMAKER] ✅ Overlap found on: {', '.join(overlapping_days)}")
 
+        # Generate unique team name with improved retry logic
         team_name = generate_team_name()
         attempts = 0
+        max_attempts = 100  # Increased from 10 to handle larger tournaments
+
         while team_name in used_names or team_name in new_teams:
             team_name = generate_team_name()
             attempts += 1
-            if attempts > 10:
-                logger.error("[MATCHMAKER] ❌ No unique team name found – Aborting this pairing.")
+
+            if attempts > max_attempts:
+                logger.error(f"[MATCHMAKER] ❌ No unique team name found after {max_attempts} attempts – Aborting this pairing.")
                 logger.error(f"[MATCHMAKER]    Players {name1} and {name2} will remain in solo queue.")
+                logger.error(f"[MATCHMAKER]    💡 This may indicate too many teams with similar names ({len(used_names)} existing teams)")
                 # Return players to solo queue instead of losing them
                 solo_players.append(p1)
                 solo_players.append(p2)
                 break
+
+            # Log periodic warnings for debugging
+            if attempts % 25 == 0:
+                logger.warning(f"[MATCHMAKER] ⚠️  Team name collision: {attempts} attempts so far for {name1} + {name2}")
         else:
             # Only create team if we successfully found a unique name
             used_names.add(team_name)
@@ -298,6 +345,9 @@ def auto_match_solo():
                 "members": [name1, name2],
                 "availability": overlap,
             }
+
+            if attempts > 0:
+                logger.debug(f"[MATCHMAKER] Team name '{team_name}' found after {attempts + 1} attempts")
 
     if new_teams:
         tournament.setdefault("teams", {}).update(new_teams)
@@ -518,6 +568,12 @@ def generate_slot_matrix(tournament: dict, slot_interval_minutes: int = 60) -> d
     if to_date.tzinfo is None:
         to_date = to_date.replace(tzinfo=tz)
 
+    # Validate tournament dates
+    if from_date >= to_date:
+        logger.error(f"[SLOT-MATRIX] ❌ Invalid tournament dates: registration_end ({from_date}) must be before tournament_end ({to_date})")
+        logger.error(f"[SLOT-MATRIX]    💡 Please check your tournament configuration in tournament.json")
+        return {}
+
     teams = tournament.get("teams", {})
 
     if not teams:
@@ -580,6 +636,45 @@ def generate_slot_matrix(tournament: dict, slot_interval_minutes: int = 60) -> d
 
     logger.info(f"[SLOT-MATRIX] Generated {slots_with_teams} usable slots (from {total_slots_generated} checked)")
     logger.info(f"[SLOT-MATRIX] Average teams per slot: {sum(len(teams) for teams in slot_matrix.values()) / max(len(slot_matrix), 1):.1f}")
+
+    # Early warning if slot matrix is empty or too small
+    if len(slot_matrix) == 0:
+        logger.error("[SLOT-MATRIX] ❌ CRITICAL: Slot matrix is completely empty!")
+        logger.error("[SLOT-MATRIX]    💡 Possible causes:")
+
+        # Diagnostic: Check if teams have any availability
+        teams_with_availability = 0
+        teams_without_availability = []
+
+        for team_name, team_data in teams.items():
+            availability = team_data.get("availability", {})
+            if AvailabilityChecker.has_any_overlap(availability):
+                teams_with_availability += 1
+            else:
+                teams_without_availability.append(team_name)
+
+        if teams_with_availability == 0:
+            logger.error(f"[SLOT-MATRIX]    1. NO teams have any availability (all are 00:00-00:00)")
+            logger.error(f"[SLOT-MATRIX]       → Check team registration and availability data")
+        else:
+            logger.error(f"[SLOT-MATRIX]    1. {teams_without_availability.__len__()} teams have no availability: {', '.join(teams_without_availability[:5])}")
+
+        # Check if tournament dates are valid
+        logger.error(f"[SLOT-MATRIX]    2. Tournament date range: {from_date.date()} to {to_date.date()} ({(to_date - from_date).days} days)")
+        if (to_date - from_date).days < 1:
+            logger.error(f"[SLOT-MATRIX]       → Tournament duration is too short!")
+
+        logger.error(f"[SLOT-MATRIX]    3. Check if team availability days match tournament active days")
+        logger.error(f"[SLOT-MATRIX]    4. Verify teams have enough time to fit matches (minimum {int(MATCH_DURATION.total_seconds() / 60)} minutes required)")
+
+        return {}
+
+    # Warning if slot matrix is very small
+    min_slots_needed = len(matches) if "matches" in tournament else len(teams) * (len(teams) - 1) // 2
+    if len(slot_matrix) < min_slots_needed * 0.1:  # Less than 10% of needed slots
+        logger.warning(f"[SLOT-MATRIX] ⚠️  WARNING: Only {len(slot_matrix)} slots available, but ~{min_slots_needed} matches need scheduling")
+        logger.warning(f"[SLOT-MATRIX]    This may lead to scheduling conflicts and failed match assignments")
+        logger.warning(f"[SLOT-MATRIX]    💡 Consider extending tournament duration or checking team availability windows")
 
     # Optional: Save JSON debug
     if DEBUG_MODE:
@@ -778,6 +873,7 @@ def assign_rescue_slots(unassigned_matches, matches, slot_matrix, teams):
 
     logger.info(f"[RESCUE] 🚨 Starting rescue mode for {len(unassigned_matches)} unscheduled matches")
     logger.info(f"[RESCUE] 🔧 Rescue mode relaxes: pause rules, time budget limits (but NOT availability)")
+    logger.info(f"[RESCUE] 📊 Currently {len(used_slots)} slots are already occupied")
 
     for problem in unassigned_matches:
         match_id = problem["match_id"]
@@ -792,11 +888,37 @@ def assign_rescue_slots(unassigned_matches, matches, slot_matrix, teams):
 
         if not possible_slots:
             logger.error(f"[RESCUE] ❌ Match {match_id} ({team1} vs {team2}): No common availability at all")
-            logger.error(f"[RESCUE]    💡 Suggestion: Check if teams have overlapping availability windows")
+            logger.error(f"[RESCUE]    💡 Root cause: Teams have no overlapping time windows")
+
+            # Provide detailed diagnostics
+            team1_data = teams.get(team1, {})
+            team2_data = teams.get(team2, {})
+            team1_avail = team1_data.get("availability", {})
+            team2_avail = team2_data.get("availability", {})
+
+            team1_days = AvailabilityChecker.get_available_days(team1_avail)
+            team2_days = AvailabilityChecker.get_available_days(team2_avail)
+
+            logger.error(f"[RESCUE]    Team '{team1}' available on: {', '.join(team1_days) if team1_days else 'NO DAYS'}")
+            logger.error(f"[RESCUE]    Team '{team2}' available on: {', '.join(team2_days) if team2_days else 'NO DAYS'}")
+
+            common_days = set(team1_days) & set(team2_days)
+            if common_days:
+                logger.error(f"[RESCUE]    Common days: {', '.join(common_days)} - but no overlapping time ranges")
+                for day in common_days:
+                    logger.error(f"[RESCUE]      {day.capitalize()}: {team1} ({team1_avail.get(day)}) vs {team2} ({team2_avail.get(day)})")
+            else:
+                logger.error(f"[RESCUE]    No common days between teams - scheduling impossible")
+
             continue
 
         logger.debug(f"[RESCUE] 🔍 Match {match_id} ({team1} vs {team2}): {len(possible_slots)} potential slots available")
 
+        # Count how many are already used
+        available_count = sum(1 for slot in possible_slots if slot.isoformat() not in used_slots)
+        logger.debug(f"[RESCUE]    Of which {available_count} are still free, {len(possible_slots) - available_count} already occupied")
+
+        assigned = False
         for slot in possible_slots:
             slot_str = slot.isoformat()
             if slot_str in used_slots:
@@ -807,6 +929,7 @@ def assign_rescue_slots(unassigned_matches, matches, slot_matrix, teams):
             match["rescue_assigned"] = True
             used_slots.add(slot_str)
             rescue_assigned += 1
+            assigned = True
 
             logger.info(
                 f"[RESCUE] ✅ Match {match_id} ({team1} vs {team2}) scheduled at {slot_str} "
@@ -814,11 +937,24 @@ def assign_rescue_slots(unassigned_matches, matches, slot_matrix, teams):
             )
             break
 
-        if not match.get("scheduled_time"):
-            logger.error(
-                f"[RESCUE] ❌ Match {match_id} ({team1} vs {team2}): Even rescue mode failed"
-            )
-            logger.error(f"[RESCUE]    All {len(possible_slots)} available slots were already occupied")
+        if not assigned:
+            logger.error(f"[RESCUE] ❌ Match {match_id} ({team1} vs {team2}): Even rescue mode failed")
+            logger.error(f"[RESCUE]    All {len(possible_slots)} potentially available slots were already occupied by other matches")
+
+            # Show time distribution of occupied slots
+            slot_dates = defaultdict(int)
+            for slot in possible_slots:
+                if slot.isoformat() in used_slots:
+                    slot_dates[slot.date()] += 1
+
+            if slot_dates:
+                logger.error(f"[RESCUE]    Occupied slot distribution by date:")
+                for date, count in sorted(slot_dates.items())[:5]:  # Show first 5 dates
+                    logger.error(f"[RESCUE]      {date}: {count} slots occupied")
+                if len(slot_dates) > 5:
+                    logger.error(f"[RESCUE]      ... and {len(slot_dates) - 5} more dates")
+
+            logger.error(f"[RESCUE]    💡 Solution: Extend tournament duration or reduce team count")
 
     logger.info(f"[RESCUE] 📊 Rescue mode summary: {rescue_assigned}/{len(unassigned_matches)} matches rescued")
 
@@ -873,37 +1009,60 @@ async def generate_and_assign_slots():
     if failed_matches:
         logger.info(f"[SLOT-PLANNING] Step 4/4: Checking if tournament extension can help...")
 
-        # Check which failed matches have availability overlap (capacity problem vs. no overlap)
-        extendable_matches = []
-        for match in failed_matches:
-            team1 = match["team1"]
-            team2 = match["team2"]
-            potential_slots = get_valid_slots_for_match(team1, team2, slot_matrix)
+        # Retry extension up to 3 times
+        max_extension_attempts = 3
+        extension_weeks_per_attempt = 2
+        total_newly_scheduled = 0
 
-            if potential_slots:
-                # Teams have overlapping availability, but all slots are occupied
-                extendable_matches.append(match)
-                logger.info(f"[EXTEND] ✅ Match {match['match_id']} ({team1} vs {team2}) has {len(potential_slots)} potential slots (capacity issue)")
-            else:
-                logger.error(f"[EXTEND] ❌ Match {match['match_id']} ({team1} vs {team2}) has NO overlapping availability (unfixable)")
+        for attempt in range(1, max_extension_attempts + 1):
+            # Get current failed matches
+            current_failed = [m for m in updated_matches if not m.get("scheduled_time")]
 
-        if extendable_matches:
-            logger.info(f"[EXTEND] 🔧 {len(extendable_matches)} matches can be fixed by extending tournament duration")
+            if not current_failed:
+                logger.info(f"[EXTEND] ✅ All matches scheduled after {attempt - 1} extension(s)!")
+                break
 
-            # Extend tournament by 2 weeks
+            logger.info(f"[EXTEND] 🔄 Extension attempt {attempt}/{max_extension_attempts} for {len(current_failed)} unscheduled matches")
+
+            # Check which failed matches have availability overlap (capacity problem vs. no overlap)
+            extendable_matches = []
+            unfixable_matches = []
+
+            for match in current_failed:
+                team1 = match["team1"]
+                team2 = match["team2"]
+                potential_slots = get_valid_slots_for_match(team1, team2, slot_matrix)
+
+                if potential_slots:
+                    # Teams have overlapping availability, but all slots are occupied
+                    extendable_matches.append(match)
+                    logger.debug(f"[EXTEND] ✅ Match {match['match_id']} ({team1} vs {team2}) has {len(potential_slots)} potential slots (capacity issue)")
+                else:
+                    unfixable_matches.append(match)
+                    if attempt == 1:  # Only log on first attempt to avoid spam
+                        logger.error(f"[EXTEND] ❌ Match {match['match_id']} ({team1} vs {team2}) has NO overlapping availability (unfixable by extension)")
+
+            if not extendable_matches:
+                logger.warning(f"[EXTEND] ⚠️  No matches can be fixed by extension (all have no team overlap)")
+                logger.warning(f"[EXTEND]    {len(unfixable_matches)} matches remain unfixable due to no overlapping availability")
+                break
+
+            logger.info(f"[EXTEND] 🔧 {len(extendable_matches)} matches might be fixable by extending tournament duration")
+
+            # Extend tournament by configured weeks
             tz = ZoneInfo(CONFIG.bot.timezone)
             tournament_end = datetime.fromisoformat(tournament["tournament_end"])
             if tournament_end.tzinfo is None:
                 tournament_end = tournament_end.replace(tzinfo=tz)
 
             original_end = tournament_end.strftime("%Y-%m-%d")
-            tournament_end += timedelta(weeks=2)
+            tournament_end += timedelta(weeks=extension_weeks_per_attempt)
             new_end = tournament_end.strftime("%Y-%m-%d")
 
             tournament["tournament_end"] = tournament_end.isoformat()
             save_tournament_data(tournament)
 
-            logger.warning(f"[EXTEND] ⏰ Tournament automatically extended: {original_end} → {new_end} (+2 weeks)")
+            logger.warning(f"[EXTEND] ⏰ Tournament automatically extended: {original_end} → {new_end} (+{extension_weeks_per_attempt} weeks)")
             logger.info(f"[EXTEND] 🔄 Regenerating slot matrix with new end date...")
 
             # Reload tournament and regenerate slot matrix
@@ -916,15 +1075,28 @@ async def generate_and_assign_slots():
             # Use rescue mode directly on extendable matches (already relaxed rules)
             updated_matches = assign_rescue_slots(extendable_matches, updated_matches, slot_matrix, teams)
 
-            # Save updated matches
+            # Count newly scheduled matches in this attempt
+            newly_scheduled_this_attempt = sum(1 for m in extendable_matches if m.get("scheduled_time"))
+            total_newly_scheduled += newly_scheduled_this_attempt
+
+            logger.info(f"[EXTEND] 📊 Attempt {attempt} result: {newly_scheduled_this_attempt}/{len(extendable_matches)} matches scheduled")
+
+            # Check if we made progress
+            if newly_scheduled_this_attempt == 0:
+                logger.warning(f"[EXTEND] ⚠️  No progress made in attempt {attempt} - stopping extension attempts")
+                logger.warning(f"[EXTEND]    Remaining {len(extendable_matches)} matches may require manual intervention")
+                break
+
+            # Save progress after each attempt
             tournament["matches"] = updated_matches
             save_tournament_data(tournament)
 
-            # Report results
-            newly_scheduled = sum(1 for m in extendable_matches if m.get("scheduled_time"))
-            logger.info(f"[EXTEND] 📊 Extension result: {newly_scheduled}/{len(extendable_matches)} matches scheduled after extension")
-        else:
-            logger.error("[EXTEND] ❌ No matches can be fixed by extending tournament (all have no team overlap)")
+        # Final extension summary
+        still_failed = [m for m in updated_matches if not m.get("scheduled_time")]
+        if total_newly_scheduled > 0:
+            logger.info(f"[EXTEND] 🎉 Extension complete: {total_newly_scheduled} additional matches scheduled")
+        if still_failed:
+            logger.error(f"[EXTEND] ⚠️  {len(still_failed)} matches could not be scheduled even after extension")
     else:
         logger.info(f"[SLOT-PLANNING] Step 4/4: Extension not needed - all matches scheduled!")
 
