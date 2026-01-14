@@ -1,0 +1,7 @@
+{
+  "WRONG_CHANNEL": {
+    "title": "🚫 Wrong Channel",
+    "description": "This command can only be used in a specific channel!",
+    "color": "0xE74C3C"
+  }
+}

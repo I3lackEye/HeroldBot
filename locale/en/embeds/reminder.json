@@ -1,0 +1,9 @@
+{
+  "REMINDER": {
+    "title": "🕒 Match Reminder!",
+    "description": "**Your match starts in 1 hour:**\n\n🏆 **PLACEHOLDER_TEAM1** vs **PLACEHOLDER_TEAM2**\n🕒 **Start Time:** PLACEHOLDER_TIME\n\nPlease be ready on time and good luck!\n\n📣 Participants: PLACEHOLDER_MENTIONS",
+    "color": "0xF1C40F",
+    "footer": "We wish you exciting matches!",
+    "icon": "🎯"
+  }
+}

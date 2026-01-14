@@ -1,0 +1,28 @@
+{
+  "data_paths": {
+    "data": "data/data.json",
+    "tournament": "data/tournament.json"
+  },
+  "channels": {
+    "limits": "1453847184171597927",
+    "reminder": "1453847114013741218",
+    "reschedule": "1453848141274152971"
+  },
+  "roles": {
+    "moderator": [
+      "Moderator"
+    ],
+    "admin": [
+      "157268596190478336"
+    ],
+    "dev": [
+      "157268596190478336"
+    ],
+    "winner": [
+      "1454781541917134858"
+    ]
+  },
+  "language": "de",
+  "timezone": "Europe/Berlin",
+  "max_string_length": 50
+}

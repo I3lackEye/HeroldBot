@@ -1,0 +1,82 @@
+{
+  "HELP": {
+    "title": "📖 HeroldBot - Help & Guide",
+    "description": "Welcome to the automated tournament system! Here you'll find all important information.",
+    "color": "0x5865F2",
+    "fields": [
+      {
+        "name": "🎮 Tournament Flow",
+        "value": "1️⃣ **Game Poll** - Vote for your favorite game\n2️⃣ **Registration** - Register solo or as a team\n3️⃣ **Matchmaking** - Automatic scheduling\n4️⃣ **Play Matches** - Play according to schedule\n5️⃣ **Awards** - Best teams win!"
+      },
+      {
+        "name": "📝 Important Commands",
+        "value": "`/player join` - Register for tournament\n`/player leave` - Unregister from tournament\n`/player request_reschedule` - Reschedule match\n`/info participants` - Participant list\n`/info tournament` - Tournament status\n`/info stats` - Your statistics"
+      },
+      {
+        "name": "⏰ Scheduling",
+        "value": "During registration you provide your availability (Saturday/Sunday + times). The bot automatically schedules matches during your available times."
+      },
+      {
+        "name": "🔄 Rescheduling",
+        "value": "You can request a reschedule up to 24h before the match. Both teams must agree. If a team declines = Forfeit!"
+      },
+      {
+        "name": "🏆 Points & Victory",
+        "value": "Each won match counts as a victory. The team with most victories wins!"
+      }
+    ],
+    "footer": "Good luck in the tournament! 🎉"
+  },
+  "PLAYER_STATS": {
+    "title": "📊 Statistics for PLACEHOLDER_PLAYER_NAME",
+    "color": "0x3498DB",
+    "fields": [
+      {
+        "name": "🏆 Wins",
+        "value": "PLACEHOLDER_WINS"
+      },
+      {
+        "name": "🧩 Participations",
+        "value": "PLACEHOLDER_PARTICIPATIONS"
+      },
+      {
+        "name": "📈 Win Rate",
+        "value": "PLACEHOLDER_WINRATE"
+      },
+      {
+        "name": "🎮 Favorite Game",
+        "value": "PLACEHOLDER_FAVORITE_GAME"
+      }
+    ],
+    "footer": "Tournament Evaluation"
+  },
+  "TEAM_STATS": {
+    "title": "📊 Team Statistics: PLACEHOLDER_TEAM_NAME",
+    "color": "0x1ABC9C",
+    "fields": [
+      {
+        "name": "🏆 Wins",
+        "value": "PLACEHOLDER_WINS"
+      },
+      {
+        "name": "🎯 Matches Played",
+        "value": "PLACEHOLDER_MATCHES_PLAYED"
+      }
+    ],
+    "footer": "Tournament Evaluation"
+  },
+  "LEADERBOARD": {
+    "title": "🏆 Leaderboard",
+    "description": "PLACEHOLDER_LEADERBOARD",
+    "color": "0xF1C40F"
+  },
+  "MATCH_HISTORY": {
+    "title": "🏛️ Tournament Match History",
+    "description": "Here are the past matches:",
+    "color": "0x7289DA"
+  },
+  "PARTICIPANTS": {
+    "title": "👥 Tournament Participants",
+    "color": "0x3498DB"
+  }
+}

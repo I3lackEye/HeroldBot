@@ -1,0 +1,7 @@
+{   
+    "REGISTRATION_CLOSED_ANNOUNCEMENT": {
+        "title": "🚫 Anmeldung geschlossen!",
+        "description": "Die Anmeldephase ist beendet.\n\nDie Teams werden jetzt gebildet und die Matches vorbereitet.",
+        "footer": "Danke für eure Teilnahme!"
+    }
+}

@@ -1,0 +1,41 @@
+{
+  "PERMISSION": {
+    "no_permission": "🚫 Du hast keine Berechtigung für diesen Befehl.",
+    "no_permission_short": "🚫 Keine Berechtigung.",
+    "not_allowed": "🚫 Du darfst diesen Befehl nicht verwenden."
+  },
+  "ERRORS": {
+    "no_tournament": "🚫 Kein Turnier aktiv.",
+    "tournament_running": "🚫 Ein Turnier läuft bereits! Bitte beende es zuerst mit `/admin end_tournament`.",
+    "registration_closed": "❌ Die Anmeldung ist geschlossen. Du kannst dich nicht mehr für das Turnier anmelden.",
+    "not_registered": "🚫 Du bist in keinem Team registriert.",
+    "match_not_found": "🚫 Match nicht gefunden.",
+    "invalid_match": "🚫 Ungültige Match-ID oder nicht dein Match!",
+    "player_not_found": "❌ Kein Spieler oder Team gefunden.",
+    "no_games_available": "⚠️ Keine Spiele für die Abstimmung verfügbar.",
+    "no_active_poll": "❌ Keine aktive Abstimmung gefunden.",
+    "poll_fetch_error": "❌ Fehler beim Abrufen der Abstimmungsnachricht.",
+    "matches_incomplete": "⚠️ Nicht alle Matches sind abgeschlossen. Turnier bleibt offen.",
+    "no_tournament_running": "⚠️ Kein Turnier läuft – Anmeldung kann nicht geschlossen werden.",
+    "match_planning_error": "⚠️ Ein Fehler ist während der Match-Planung aufgetreten: {error}",
+    "template_missing": "🚫 Template fehlt.",
+    "embed_error": "❌ Fehler beim Erstellen des Embeds.",
+    "validation_error": "❌ Validierungsfehler: {error}",
+    "save_failed": "❌ Speichern fehlgeschlagen: {error}",
+    "no_matches_scheduled": "⚠️ Keine Matches geplant.",
+    "no_stats": "⚠️ Du hast noch keine Statistiken.",
+    "no_matches_found": "⚠️ Keine Matches gefunden."
+  },
+  "SUCCESS": {
+    "archived": "✅ Turnier archiviert: `{file_path}`",
+    "accepted": "✅ Akzeptiert!",
+    "poll_ended": "✅ Abstimmung wurde beendet!",
+    "reschedule_reset": "✅ Verschiebungsanfrage für Match {match_id} wurde zurückgesetzt.",
+    "dm_sent": "✅ ZIP-Datei wurde dir per DM gesendet.",
+    "saved": "✅ Erfolgreich gespeichert!"
+  },
+  "WARNINGS": {
+    "no_pending_request": "⚠️ Keine ausstehende Anfrage für Match {match_id} gefunden.",
+    "dm_failed": "⚠️ Konnte dir keine DM senden. Stelle sicher, dass DMs vom Server erlaubt sind."
+  }
+}

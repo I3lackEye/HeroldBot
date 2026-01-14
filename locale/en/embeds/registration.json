@@ -1,0 +1,9 @@
+{
+  "REGISTRATION_CONFIRMATION": {
+    "title": "✅ Registration Successful!",
+    "description": "You have been successfully registered PLACEHOLDER_TYPE.\n\nPLACEHOLDER_DETAILS",
+    "color": "0x2ECC71",
+    "footer": "We wish you lots of fun in the tournament! 🎮",
+    "thumbnail": "https://cdn-icons-png.flaticon.com/512/190/190411.png"
+  }
+}

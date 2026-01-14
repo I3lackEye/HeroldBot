@@ -1,0 +1,9 @@
+{
+  "TOURNAMENT_END": {
+    "title": "🏁 Turnier abgeschlossen!",
+    "description": "Das Turnier ist offiziell beendet!\n\nPLACEHOLDER_MVP_MESSAGE\n\n🥇 Gewinner: PLACEHOLDER_WINNERS\n🎮 Gespieltes Spiel: PLACEHOLDER_CHOSEN_GAME\n\n👑 Neuer Champion: PLACEHOLDER_NEW_CHAMPION\n\nWir danken allen Teilnehmern für spannende Matches! 🚀",
+    "color": "0x2ECC71",
+    "footer": "Danke, dass ihr Teil unserer Community seid! ❤️",
+    "thumbnail": "https://cdn-icons-png.flaticon.com/512/3135/3135715.png"
+  }
+}

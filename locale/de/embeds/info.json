@@ -1,0 +1,82 @@
+{
+  "HELP": {
+    "title": "📖 HeroldBot - Hilfe & Anleitung",
+    "description": "Willkommen zum automatisierten Turniersystem! Hier findest du alle wichtigen Informationen.",
+    "color": "0x5865F2",
+    "fields": [
+      {
+        "name": "🎮 Turnier-Ablauf",
+        "value": "1️⃣ **Spiele-Abstimmung** - Wähle dein Lieblingsspiel\n2️⃣ **Anmeldung** - Registriere dich solo oder als Team\n3️⃣ **Matchmaking** - Automatische Terminplanung\n4️⃣ **Matches spielen** - Spiele nach Zeitplan\n5️⃣ **Siegerehrung** - Die besten Teams gewinnen!"
+      },
+      {
+        "name": "📝 Wichtige Befehle",
+        "value": "`/player join` - Für Turnier anmelden\n`/player leave` - Vom Turnier abmelden\n`/player request_reschedule` - Match verschieben\n`/info participants` - Teilnehmerliste\n`/info tournament` - Turnierstatus\n`/info stats` - Deine Statistiken"
+      },
+      {
+        "name": "⏰ Zeitplanung",
+        "value": "Bei der Anmeldung gibst du deine Verfügbarkeit an (Samstag/Sonntag + Zeiten). Der Bot plant Matches automatisch in deinen verfügbaren Zeiten."
+      },
+      {
+        "name": "🔄 Match verschieben",
+        "value": "Du kannst bis zu 24h vor dem Match eine Verschiebung anfragen. Beide Teams müssen zustimmen. Lehnt ein Team ab = Forfeit!"
+      },
+      {
+        "name": "🏆 Punkte & Sieg",
+        "value": "Jedes gewonnene Match zählt als Sieg. Am Ende gewinnt das Team mit den meisten Siegen!"
+      }
+    ],
+    "footer": "Viel Erfolg im Turnier! 🎉"
+  },
+  "PLAYER_STATS": {
+    "title": "📊 Statistiken für PLACEHOLDER_PLAYER_NAME",
+    "color": "0x3498DB",
+    "fields": [
+      {
+        "name": "🏆 Siege",
+        "value": "PLACEHOLDER_WINS"
+      },
+      {
+        "name": "🧩 Teilnahmen",
+        "value": "PLACEHOLDER_PARTICIPATIONS"
+      },
+      {
+        "name": "📈 Siegesquote",
+        "value": "PLACEHOLDER_WINRATE"
+      },
+      {
+        "name": "🎮 Lieblingsspiel",
+        "value": "PLACEHOLDER_FAVORITE_GAME"
+      }
+    ],
+    "footer": "Turnierauswertung"
+  },
+  "TEAM_STATS": {
+    "title": "📊 Team-Statistiken: PLACEHOLDER_TEAM_NAME",
+    "color": "0x1ABC9C",
+    "fields": [
+      {
+        "name": "🏆 Siege",
+        "value": "PLACEHOLDER_WINS"
+      },
+      {
+        "name": "🎯 Gespielte Matches",
+        "value": "PLACEHOLDER_MATCHES_PLAYED"
+      }
+    ],
+    "footer": "Turnierauswertung"
+  },
+  "LEADERBOARD": {
+    "title": "🏆 Bestenliste",
+    "description": "PLACEHOLDER_LEADERBOARD",
+    "color": "0xF1C40F"
+  },
+  "MATCH_HISTORY": {
+    "title": "🏛️ Turnier Match-Historie",
+    "description": "Hier sind die vergangenen Matches:",
+    "color": "0x7289DA"
+  },
+  "PARTICIPANTS": {
+    "title": "👥 Turnier Teilnehmer",
+    "color": "0x3498DB"
+  }
+}
