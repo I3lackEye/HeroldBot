@@ -1,5 +1,5 @@
 {
   "reminder_enabled": true,
-  "game_key_handler": false,
+  "game_key_handler": true,
   "debug_save_slot_matrix": true
 }
