@@ -1,0 +1,32 @@
+{
+  "KEY_DONATION_SUCCESS": {
+    "title": "✅ Key succesvol gedoneerd",
+    "description": "Bedankt voor je donatie!\n\n**Beschrijving:** PLACEHOLDER_DESCRIPTION",
+    "color": "0x57F287",
+    "footer": "Je key is versleuteld en veilig opgeslagen."
+  },
+  "KEY_WINNER_NOTIFICATION": {
+    "title": "🎉 Gefeliciteerd met de toernooiwinst!",
+    "description": "**Team PLACEHOLDER_TEAM_NAME** heeft het toernooi gewonnen!\n\n🎁 **Goed nieuws!** Er zijn **PLACEHOLDER_KEY_COUNT** game keys beschikbaar om te claimen.\n\nGebruik `/key claim` om je key op te halen!",
+    "color": "0xFFD700",
+    "fields": [
+      {
+        "name": "Beschikbare Keys",
+        "value": "PLACEHOLDER_KEY_LIST"
+      }
+    ],
+    "footer": "Elk teamlid kan één key claimen. Keys worden via DM verzonden."
+  },
+  "KEY_CLAIM_SELECT": {
+    "title": "🎁 Claim een Game Key",
+    "description": "Klik op een knop hieronder om een key te claimen. De key wordt naar je gestuurd via DM.",
+    "color": "0xFFD700",
+    "footer": "Je kunt slechts één key per toernooi claimen."
+  },
+  "KEY_CLAIMED_SUCCESS": {
+    "title": "🎁 Jouw Game Key",
+    "description": "**Beschrijving:** PLACEHOLDER_DESCRIPTION\n**Key:** `PLACEHOLDER_KEY`",
+    "color": "0xFFD700",
+    "footer": "Gefeliciteerd met je overwinning! 🎉"
+  }
+}

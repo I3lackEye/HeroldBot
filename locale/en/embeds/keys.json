@@ -1,0 +1,32 @@
+{
+  "KEY_DONATION_SUCCESS": {
+    "title": "✅ Key Donated Successfully",
+    "description": "Thank you for your donation!\n\n**Description:** PLACEHOLDER_DESCRIPTION",
+    "color": "0x57F287",
+    "footer": "Your key has been encrypted and stored securely."
+  },
+  "KEY_WINNER_NOTIFICATION": {
+    "title": "🎉 Congratulations on Winning the Tournament!",
+    "description": "**Team PLACEHOLDER_TEAM_NAME** has won the tournament!\n\n🎁 **Good news!** There are **PLACEHOLDER_KEY_COUNT** game keys available for you to claim.\n\nUse `/key claim` to claim your key!",
+    "color": "0xFFD700",
+    "fields": [
+      {
+        "name": "Available Keys",
+        "value": "PLACEHOLDER_KEY_LIST"
+      }
+    ],
+    "footer": "Each team member can claim one key. Keys will be sent via DM."
+  },
+  "KEY_CLAIM_SELECT": {
+    "title": "🎁 Claim a Game Key",
+    "description": "Click a button below to claim a key. The key will be sent to you via DM.",
+    "color": "0xFFD700",
+    "footer": "You can only claim one key per tournament."
+  },
+  "KEY_CLAIMED_SUCCESS": {
+    "title": "🎁 Your Game Key",
+    "description": "**Description:** PLACEHOLDER_DESCRIPTION\n**Key:** `PLACEHOLDER_KEY`",
+    "color": "0xFFD700",
+    "footer": "Congratulations on your win! 🎉"
+  }
+}
