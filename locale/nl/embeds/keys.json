@@ -28,5 +28,28 @@
     "description": "**Beschrijving:** PLACEHOLDER_DESCRIPTION\n**Key:** `PLACEHOLDER_KEY`",
     "color": "0xFFD700",
     "footer": "Gefeliciteerd met je overwinning! 🎉"
+  },
+  "KEY_LIST": {
+    "title": "🎁 Beschikbare Game Keys",
+    "description": "Er zijn momenteel **PLACEHOLDER_KEY_COUNT** keys beschikbaar om te claimen.",
+    "color": "0x3498DB",
+    "footer": "PLACEHOLDER_FOOTER"
+  },
+  "KEY_ADMIN_LIST": {
+    "title": "🔑 Alle Game Keys (Admin-weergave)",
+    "description": "**Totaal:** PLACEHOLDER_TOTAL | **Beschikbaar:** PLACEHOLDER_AVAILABLE | **Geclaimed:** PLACEHOLDER_CLAIMED",
+    "color": "0x9B59B6",
+    "footer": "PLACEHOLDER_FOOTER"
+  },
+  "KEY_REMOVED": {
+    "title": "🗑️ Key verwijderd",
+    "description": "Key succesvol verwijderd: **PLACEHOLDER_DESCRIPTION**",
+    "color": "0xE74C3C"
+  },
+  "KEY_DECRYPTED": {
+    "title": "🔓 Gedecodeerde Key (Admin)",
+    "description": "**Beschrijving:** PLACEHOLDER_DESCRIPTION\n**Key:** `PLACEHOLDER_KEY`",
+    "color": "0xE67E22",
+    "footer": "ID: PLACEHOLDER_ID"
   }
 }

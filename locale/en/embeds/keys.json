@@ -28,5 +28,28 @@
     "description": "**Description:** PLACEHOLDER_DESCRIPTION\n**Key:** `PLACEHOLDER_KEY`",
     "color": "0xFFD700",
     "footer": "Congratulations on your win! 🎉"
+  },
+  "KEY_LIST": {
+    "title": "🎁 Available Game Keys",
+    "description": "There are currently **PLACEHOLDER_KEY_COUNT** keys available for claiming.",
+    "color": "0x3498DB",
+    "footer": "PLACEHOLDER_FOOTER"
+  },
+  "KEY_ADMIN_LIST": {
+    "title": "🔑 All Game Keys (Admin View)",
+    "description": "**Total:** PLACEHOLDER_TOTAL | **Available:** PLACEHOLDER_AVAILABLE | **Claimed:** PLACEHOLDER_CLAIMED",
+    "color": "0x9B59B6",
+    "footer": "PLACEHOLDER_FOOTER"
+  },
+  "KEY_REMOVED": {
+    "title": "🗑️ Key Removed",
+    "description": "Successfully removed key: **PLACEHOLDER_DESCRIPTION**",
+    "color": "0xE74C3C"
+  },
+  "KEY_DECRYPTED": {
+    "title": "🔓 Decrypted Key (Admin)",
+    "description": "**Description:** PLACEHOLDER_DESCRIPTION\n**Key:** `PLACEHOLDER_KEY`",
+    "color": "0xE67E22",
+    "footer": "ID: PLACEHOLDER_ID"
   }
 }

@@ -381,12 +381,23 @@ class KeyGroup(app_commands.Group):
             )
             return
 
-        embed = discord.Embed(
-            title="🎁 Available Game Keys",
-            description=f"There are currently **{len(available_keys)}** keys available for claiming.",
-            color=discord.Color.blue()
-        )
+        # Prepare placeholders
+        footer_text = ""
+        if len(available_keys) > 25:
+            footer_text = f"Showing first 25 of {len(available_keys)} keys"
+        else:
+            footer_text = f"Total: {len(available_keys)} keys"
 
+        placeholders = {
+            "key_count": str(len(available_keys)),
+            "footer": footer_text
+        }
+
+        # Load and build embed from template
+        template = load_embed_template("keys").get("KEY_LIST")
+        embed = build_embed_from_template(template, placeholders)
+
+        # Add fields for each key
         for i, key in enumerate(available_keys[:25], 1):  # Limit to 25 for embed field limit
             donated_at = datetime.fromisoformat(key["donated_at"]).strftime("%Y-%m-%d")
             embed.add_field(
@@ -394,9 +405,6 @@ class KeyGroup(app_commands.Group):
                 value=f"Donated by {key['donated_by_name']} on {donated_at}",
                 inline=False
             )
-
-        if len(available_keys) > 25:
-            embed.set_footer(text=f"Showing first 25 of {len(available_keys)} keys")
 
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
@@ -537,11 +545,23 @@ class KeyGroup(app_commands.Group):
         available = len([k for k in all_keys if k["status"] == "available"])
         claimed = len([k for k in all_keys if k["status"] == "claimed"])
 
-        embed = discord.Embed(
-            title="🔑 All Game Keys (Admin View)",
-            description=f"**Total:** {len(all_keys)} | **Available:** {available} | **Claimed:** {claimed}",
-            color=discord.Color.purple()
-        )
+        # Prepare placeholders
+        footer_text = ""
+        if len(all_keys) > 25:
+            footer_text = f"Showing first 25 of {len(all_keys)} keys"
+        else:
+            footer_text = f"All {len(all_keys)} keys displayed"
+
+        placeholders = {
+            "total": str(len(all_keys)),
+            "available": str(available),
+            "claimed": str(claimed),
+            "footer": footer_text
+        }
+
+        # Load and build embed from template
+        template = load_embed_template("keys").get("KEY_ADMIN_LIST")
+        embed = build_embed_from_template(template, placeholders)
 
         for i, key in enumerate(all_keys[:25], 1):
             status_emoji = "✅" if key["status"] == "available" else "❌"
@@ -562,9 +582,6 @@ class KeyGroup(app_commands.Group):
                 value=value,
                 inline=False
             )
-
-        if len(all_keys) > 25:
-            embed.set_footer(text=f"Showing first 25 of {len(all_keys)} keys")
 
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
@@ -602,11 +619,12 @@ class KeyGroup(app_commands.Group):
 
         logger.info(f"Key removed by {interaction.user.display_name}: {key_found['description']} ({key_id})")
 
-        embed = discord.Embed(
-            title="🗑️ Key Removed",
-            description=f"Successfully removed key: **{key_found['description']}**",
-            color=discord.Color.red()
-        )
+        # Load and build embed from template
+        placeholders = {
+            "description": key_found['description']
+        }
+        template = load_embed_template("keys").get("KEY_REMOVED")
+        embed = build_embed_from_template(template, placeholders)
 
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
@@ -648,12 +666,14 @@ class KeyGroup(app_commands.Group):
             )
             return
 
-        embed = discord.Embed(
-            title="🔓 Decrypted Key (Admin)",
-            description=f"**Description:** {key_found['description']}\n**Key:** `{decrypted_key}`",
-            color=discord.Color.orange()
-        )
-        embed.set_footer(text=f"ID: {key_id}")
+        # Load and build embed from template
+        placeholders = {
+            "description": key_found['description'],
+            "key": decrypted_key,
+            "id": key_id
+        }
+        template = load_embed_template("keys").get("KEY_DECRYPTED")
+        embed = build_embed_from_template(template, placeholders)
 
         logger.warning(f"Key decrypted by admin {interaction.user.display_name}: {key_found['description']}")
 
