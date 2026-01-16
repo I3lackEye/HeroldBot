@@ -17,6 +17,7 @@ from cryptography.fernet import Fernet, InvalidToken
 
 from modules.config import Config
 from modules.dataStorage import load_tournament_data
+from modules.embeds import load_embed_template, build_embed_from_template
 from modules.logger import logger
 from modules.utils import has_permission
 
@@ -158,12 +159,10 @@ class DonateKeyModal(Modal, title="Donate a Game Key"):
 
         logger.info(f"Key donated by {interaction.user.display_name} ({interaction.user.id}): {description}")
 
-        embed = discord.Embed(
-            title="✅ Key Donated Successfully",
-            description=f"Thank you for donating a key!\n\n**Description:** {description}",
-            color=discord.Color.green()
-        )
-        embed.set_footer(text="Your key has been encrypted and stored securely.")
+        # Load embed from locale
+        template = load_embed_template("keys").get("KEY_DONATION_SUCCESS")
+        placeholders = {"PLACEHOLDER_DESCRIPTION": description}
+        embed = build_embed_from_template(template, placeholders)
 
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
@@ -236,12 +235,13 @@ class ClaimKeyView(View):
 
         # Send the key to the user via DM
         try:
-            embed = discord.Embed(
-                title="🎁 Your Game Key",
-                description=f"**Description:** {key_entry['description']}\n**Key:** `{decrypted_key}`",
-                color=discord.Color.gold()
-            )
-            embed.set_footer(text="Congratulations on your win! 🎉")
+            # Load embed from locale
+            template = load_embed_template("keys").get("KEY_CLAIMED_SUCCESS")
+            placeholders = {
+                "PLACEHOLDER_DESCRIPTION": key_entry['description'],
+                "PLACEHOLDER_KEY": decrypted_key
+            }
+            embed = build_embed_from_template(template, placeholders)
 
             await interaction.user.send(embed=embed)
 
@@ -383,8 +383,17 @@ class KeyGroup(app_commands.Group):
             )
             return
 
-        # Check if user is part of the winning team
+        # Check if tournament has ended
         tournament = load_tournament_data()
+
+        if tournament.get("running", False):
+            await interaction.response.send_message(
+                "❌ The tournament is still running! Keys are only available after the tournament ends.",
+                ephemeral=True
+            )
+            return
+
+        # Check if user is part of the winning team
         user_mention = interaction.user.mention
 
         # Find user's team
@@ -404,17 +413,37 @@ class KeyGroup(app_commands.Group):
             )
             return
 
-        # Check if team has won the tournament
-        # Winner is determined by the "winner" role or checking match results
-        # For simplicity, we check if the team has the most wins
-        team_wins = 0
-        for match in tournament.get("matches", []):
-            if match.get("winner") == user_team:
-                team_wins += 1
-
-        if team_wins == 0:
+        # Check if user's team is the overall tournament winner
+        # Find team with most wins
+        teams = tournament.get("teams", {})
+        if not teams:
             await interaction.response.send_message(
-                "❌ Your team hasn't won any matches yet. Keys are only available to winners!",
+                "❌ No teams found in the tournament!",
+                ephemeral=True
+            )
+            return
+
+        # Get the winning team (team with most wins)
+        winning_team_data = max(teams.values(), key=lambda t: t.get("wins", 0))
+        winning_team_name = None
+        for team_name, team_data in teams.items():
+            if team_data == winning_team_data:
+                winning_team_name = team_name
+                break
+
+        # Check if team must have at least one win
+        if winning_team_data.get("wins", 0) == 0:
+            await interaction.response.send_message(
+                "❌ No team has won the tournament yet! Keys are only available after the tournament is completed.",
+                ephemeral=True
+            )
+            return
+
+        # Check if user is in the winning team
+        if user_team != winning_team_name:
+            await interaction.response.send_message(
+                f"❌ Keys are only available to the tournament winner team!\n"
+                f"**Current leader:** {winning_team_name} with {winning_team_data.get('wins', 0)} wins.",
                 ephemeral=True
             )
             return
@@ -450,12 +479,9 @@ class KeyGroup(app_commands.Group):
         )
         await view.create_buttons()
 
-        embed = discord.Embed(
-            title="🎁 Claim a Game Key",
-            description="Click a button below to claim a key. The key will be sent to you via DM.",
-            color=discord.Color.gold()
-        )
-        embed.set_footer(text="You can only claim one key per tournament.")
+        # Load embed from locale
+        template = load_embed_template("keys").get("KEY_CLAIM_SELECT")
+        embed = build_embed_from_template(template)
 
         await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
@@ -606,6 +632,73 @@ class KeyGroup(app_commands.Group):
         logger.warning(f"Key decrypted by admin {interaction.user.display_name}: {key_found['description']}")
 
         await interaction.response.send_message(embed=embed, ephemeral=True)
+
+
+# ----------------------------------------
+# Helper Function for Tournament End
+# ----------------------------------------
+async def notify_winners_about_keys(bot, winner_ids: list, winning_team_name: str):
+    """
+    Notifies tournament winners about available game keys.
+    Called from end_tournament_procedure.
+
+    Args:
+        bot: Discord bot instance
+        winner_ids: List of winner user IDs (as strings)
+        winning_team_name: Name of the winning team
+    """
+    from modules.config import Config
+
+    config = Config()
+
+    # Check if feature is enabled
+    if not config.features.game_key_handler:
+        logger.info("[KEY_NOTIFICATION] Game key feature is disabled, skipping notification")
+        return
+
+    # Check if there are any available keys
+    keys_data = load_keys_data()
+    available_keys = [k for k in keys_data["keys"] if k["status"] == "available"]
+
+    if not available_keys:
+        logger.info("[KEY_NOTIFICATION] No keys available, skipping notification")
+        return
+
+    logger.info(f"[KEY_NOTIFICATION] Notifying {len(winner_ids)} winners about {len(available_keys)} available keys")
+
+    # Create key list preview
+    key_list = "\n".join([f"• {key['description']}" for key in available_keys[:5]])
+    if len(available_keys) > 5:
+        key_list += f"\n• ... and {len(available_keys) - 5} more"
+
+    # Load embed from locale
+    template = load_embed_template("keys").get("KEY_WINNER_NOTIFICATION")
+    placeholders = {
+        "PLACEHOLDER_TEAM_NAME": winning_team_name,
+        "PLACEHOLDER_KEY_COUNT": str(len(available_keys)),
+        "PLACEHOLDER_KEY_LIST": key_list
+    }
+    embed = build_embed_from_template(template, placeholders)
+
+    # Send DM to each winner
+    success_count = 0
+    for user_id in winner_ids:
+        try:
+            user_id_int = int(user_id.strip("<@>"))
+            user = await bot.fetch_user(user_id_int)
+
+            await user.send(embed=embed)
+            success_count += 1
+            logger.info(f"[KEY_NOTIFICATION] Sent notification to {user.display_name} ({user_id_int})")
+
+        except discord.Forbidden:
+            logger.warning(f"[KEY_NOTIFICATION] Could not send DM to user {user_id} (DMs disabled)")
+        except discord.NotFound:
+            logger.warning(f"[KEY_NOTIFICATION] User {user_id} not found")
+        except Exception as e:
+            logger.error(f"[KEY_NOTIFICATION] Error sending notification to {user_id}: {e}")
+
+    logger.info(f"[KEY_NOTIFICATION] Successfully notified {success_count}/{len(winner_ids)} winners")
 
 
 # ----------------------------------------

@@ -237,7 +237,7 @@ class AdminGroup(app_commands.Group):
             ephemeral=True,
         )
 
-        await end_tournament_procedure(interaction.channel, manual_trigger=True)
+        await end_tournament_procedure(interaction.channel, manual_trigger=True, bot=interaction.client)
 
 
     @app_commands.command(name="manage_game", description="Add or remove a game.")

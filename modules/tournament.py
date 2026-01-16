@@ -72,6 +72,7 @@ async def end_tournament_procedure(
     channel: discord.TextChannel,
     manual_trigger: bool = False,
     interaction: Optional[Interaction] = None,
+    bot: Optional[discord.Client] = None,
 ):
     """
     Handles the tournament end procedure:
@@ -197,6 +198,16 @@ async def end_tournament_procedure(
     # Send final embed (before reset, so chosen_game is available)
     mvp_message = f"🏆 Tournament MVP: **{mvp}**!" if mvp else "🏆 No MVP determined."
     await send_tournament_end_announcement(channel, mvp_message, winner_ids, chosen_game, new_champion_id)
+
+    # Notify winners about available game keys
+    if bot and winner_ids:
+        try:
+            winning_team_name = get_winner_team(winner_ids)
+            if winning_team_name:
+                from modules.key_manager import notify_winners_about_keys
+                await notify_winners_about_keys(bot, winner_ids, winning_team_name)
+        except Exception as e:
+            logger.error(f"[TOURNAMENT] Error notifying winners about keys: {e}")
 
     if mvp:  # If MVP exists
         try:
