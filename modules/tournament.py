@@ -54,6 +54,7 @@ from modules.utils import (
     all_matches_completed,
     autocomplete_teams,
     calculate_optimal_tournament_duration,
+    extract_user_id,
     get_current_chosen_game,
     get_player_team,
     has_permission,
@@ -100,14 +101,10 @@ async def end_tournament_procedure(
     chosen_game = get_current_chosen_game()
     mvp = get_mvp()  # mvp as str e.g. <@1234567890>
 
-    # Default value
-    new_champion_id = None
-
     # Extract MVP ID if present
+    new_champion_id = None
     if mvp:
-        match = re.search(r"\d+", mvp)  # MVP could be a mention like <@1234567890>
-        if match:
-            new_champion_id = int(match.group(0))
+        new_champion_id = extract_user_id(mvp)
 
     # Process all completed matches for detailed stats
     try:
@@ -133,18 +130,18 @@ async def end_tournament_procedure(
             winner_members = winner_team_data.get("members", [])
             loser_members = loser_team_data.get("members", [])
 
-            # Extract user IDs (safe regex execution)
+            # Extract user IDs using extract_user_id helper
             winner_ids_match = []
             for m in winner_members:
-                match = re.search(r"\d+", m)
-                if match:
-                    winner_ids_match.append(match.group(0))
+                user_id = extract_user_id(m)
+                if user_id:
+                    winner_ids_match.append(str(user_id))
 
             loser_ids_match = []
             for m in loser_members:
-                match = re.search(r"\d+", m)
-                if match:
-                    loser_ids_match.append(match.group(0))
+                user_id = extract_user_id(m)
+                if user_id:
+                    loser_ids_match.append(str(user_id))
 
             if winner_ids_match and loser_ids_match and chosen_game != "Unknown":
                 record_match_result(
@@ -165,9 +162,9 @@ async def end_tournament_procedure(
         for team_data in tournament.get("teams", {}).values():
             members = team_data.get("members", [])
             for member in members:
-                match = re.search(r"\d+", member)
-                if match:
-                    all_participant_ids.append(match.group(0))
+                user_id = extract_user_id(member)
+                if user_id:
+                    all_participant_ids.append(str(user_id))
 
         if all_participant_ids and chosen_game != "Unknown":
             update_tournament_participation(all_participant_ids, chosen_game)
@@ -186,6 +183,25 @@ async def end_tournament_procedure(
         chosen_game=chosen_game or "Unknown",
         mvp_name=mvp or "No MVP",
     )
+
+    # Save last tournament winner for key claiming system
+    if winner_ids:
+        from modules.dataStorage import load_global_data, save_global_data
+        from datetime import datetime
+        from zoneinfo import ZoneInfo
+        from modules.config import CONFIG
+
+        global_data = load_global_data()
+        winning_team_name = get_winner_team(winner_ids) or "Unknown Team"
+
+        global_data["last_tournament_winner"] = {
+            "winning_team": winning_team_name,
+            "game": chosen_game or "Unknown",
+            "ended_at": datetime.now(tz=ZoneInfo(CONFIG.bot.timezone)).isoformat(),
+            "winner_ids": [str(uid) for uid in winner_ids],  # Store as strings for key claiming
+        }
+        save_global_data(global_data)
+        logger.info(f"[TOURNAMENT] Last winner saved: {winning_team_name} with {len(winner_ids)} members")
 
     reset_tournament()
 
@@ -209,15 +225,10 @@ async def end_tournament_procedure(
         except Exception as e:
             logger.error(f"[TOURNAMENT] Error notifying winners about keys: {e}")
 
-    if mvp:  # If MVP exists
+    if mvp and new_champion_id:  # If MVP exists and ID was successfully extracted
         try:
-            from modules.utils import extract_user_id
             guild = channel.guild  # Get guild from channel
-            mvp_id = extract_user_id(mvp)  # Extract MVP from mention safely
-            if mvp_id:
-                await update_champion_role(guild, mvp_id)
-            else:
-                logger.error(f"[CHAMPION] Could not extract valid user ID from MVP mention: {mvp}")
+            await update_champion_role(guild, new_champion_id)
         except Exception as e:
             logger.error(f"[CHAMPION] Error updating champion role: {e}")
 

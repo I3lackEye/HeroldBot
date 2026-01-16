@@ -355,50 +355,6 @@ def get_mvp() -> str:
     return mvp_name
 
 
-def update_player_stats(winner_ids: list, chosen_game: str):
-    """
-    Updates player statistics and tournament history.
-
-    :param winner_ids: List of winner user IDs (as strings).
-    :param chosen_game: The game that was played.
-    """
-    global_data = load_global_data()
-
-    # Ensure these sections exist
-    if "player_stats" not in global_data:
-        global_data["player_stats"] = {}
-    if "tournament_history" not in global_data:
-        global_data["tournament_history"] = []
-
-    # Update winners
-    for user_id in winner_ids:
-        player = global_data["player_stats"].setdefault(
-            str(user_id),
-            {
-                "wins": 0,
-                "participations": 0,
-                "mention": f"<@{user_id}>",
-                "display_name": f"User {user_id}",
-                "game_stats": {},
-            },
-        )
-
-        player["wins"] += 1
-        player["participations"] += 1
-        player["game_stats"][chosen_game] = player["game_stats"].get(chosen_game, 0) + 1
-
-    # Add to tournament history
-    global_data["tournament_history"].append(
-        {
-            "game": chosen_game,
-            "ended_at": datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
-        }
-    )
-
-    save_global_data(global_data)
-    logger.info(f"[END] Statistics updated for winners {winner_ids} in game '{chosen_game}'.")
-
-
 def get_winner_ids() -> list:
     """
     Determines the user IDs of the winners based on current tournament standings.
