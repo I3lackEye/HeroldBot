@@ -413,4 +413,4 @@ async def setup(bot):
     but does not register any cogs or commands. Tournament-related commands
     are registered in other modules (admin_tools, players, etc.).
     """
-    logger.info("[TOURNAMENT] Tournament module loaded (utility functions only)")
+    logger.info("[SYSTEM] ✅ Tournament module loaded (utility functions only)")

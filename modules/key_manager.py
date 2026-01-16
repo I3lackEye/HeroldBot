@@ -525,7 +525,7 @@ class KeyGroup(app_commands.Group):
     )
     async def admin_list(self, interaction: Interaction):
         """Admin command to list all keys."""
-        if not has_permission(interaction.user, ["admin", "dev"]):
+        if not has_permission(interaction.user, "admin", "dev"):
             await interaction.response.send_message(
                 "❌ You don't have permission to use this command.",
                 ephemeral=True
@@ -592,7 +592,7 @@ class KeyGroup(app_commands.Group):
     @app_commands.describe(key_id="The UUID of the key to remove")
     async def admin_remove(self, interaction: Interaction, key_id: str):
         """Admin command to remove a key."""
-        if not has_permission(interaction.user, ["admin", "dev"]):
+        if not has_permission(interaction.user, "admin", "dev"):
             await interaction.response.send_message(
                 "❌ You don't have permission to use this command.",
                 ephemeral=True
@@ -635,7 +635,7 @@ class KeyGroup(app_commands.Group):
     @app_commands.describe(key_id="The UUID of the key to decrypt")
     async def admin_decrypt(self, interaction: Interaction, key_id: str):
         """Admin command to decrypt and view a key."""
-        if not has_permission(interaction.user, ["admin", "dev"]):
+        if not has_permission(interaction.user, "admin", "dev"):
             await interaction.response.send_message(
                 "❌ You don't have permission to use this command.",
                 ephemeral=True
@@ -753,12 +753,10 @@ class KeyManagerCog(commands.Cog):
         self.bot = bot
         self.key_group = KeyGroup()
         bot.tree.add_command(self.key_group)
-        logger.info("KeyManagerCog loaded")
 
     async def cog_unload(self):
         """Cleanup when cog is unloaded."""
         self.bot.tree.remove_command(self.key_group.name)
-        logger.info("KeyManagerCog unloaded")
 
 
 async def setup(bot):
