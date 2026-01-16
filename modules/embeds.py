@@ -149,7 +149,11 @@ def build_embed_from_template(template: dict, placeholders: dict = None) -> Embe
         for field in template.get("fields", []):
             embed.add_field(name=field.get("name", ""), value=field.get("value", ""), inline=False)
 
+    # Set footer with placeholder replacement
     if footer := template.get("footer"):
+        if placeholders:
+            for key, value in placeholders.items():
+                footer = footer.replace(f"PLACEHOLDER_{key.upper()}", str(value))
         embed.set_footer(text=footer)
 
     return embed

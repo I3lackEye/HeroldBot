@@ -86,15 +86,16 @@ def has_permission(member: discord.Member, *required_permissions: str) -> bool:
     allowed_roles = []
     allowed_ids = set()
 
-    # Map permission names to role lists from CONFIG
+    # Map permission names to role lists from CONFIG (case-insensitive)
     role_map = {
-        "Moderator": CONFIG.bot.roles.moderator,
-        "Admin": CONFIG.bot.roles.admin,
-        "Dev": CONFIG.bot.roles.dev,
+        "moderator": CONFIG.bot.roles.moderator,
+        "admin": CONFIG.bot.roles.admin,
+        "dev": CONFIG.bot.roles.dev,
     }
 
     for permission in required_permissions:
-        role_list = role_map.get(permission, [])
+        # Convert to lowercase for case-insensitive matching
+        role_list = role_map.get(permission.lower(), [])
         for entry in role_list:
             if entry.isdigit() and len(entry) > 10:
                 allowed_ids.add(int(entry))
