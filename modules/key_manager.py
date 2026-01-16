@@ -79,14 +79,18 @@ KEYS_FILE = "data/game_keys.json"
 def load_keys_data():
     """Load keys data from JSON file."""
     if not os.path.exists(KEYS_FILE):
-        return {"keys": []}
+        return {"keys": [], "claims_per_tournament": {}}
 
     try:
         with open(KEYS_FILE, 'r', encoding='utf-8') as f:
-            return json.load(f)
+            data = json.load(f)
+            # Ensure claims_per_tournament exists for backwards compatibility
+            if "claims_per_tournament" not in data:
+                data["claims_per_tournament"] = {}
+            return data
     except Exception as e:
         logger.error(f"Failed to load keys data: {e}")
-        return {"keys": []}
+        return {"keys": [], "claims_per_tournament": {}}
 
 
 def save_keys_data(data):
@@ -173,36 +177,46 @@ class DonateKeyModal(Modal, title="Donate a Game Key"):
 class ClaimKeyView(View):
     """View for claiming available keys."""
 
-    def __init__(self, available_keys: list, user_id: int, team_name: str, team_members: list, encryption: KeyEncryption):
+    def __init__(self, available_keys: list, user_id: int, team_name: str, winner_ids: list, tournament_id: str, encryption: KeyEncryption):
         super().__init__(timeout=300)  # 5 minutes timeout
         self.available_keys = available_keys
         self.user_id = user_id
         self.team_name = team_name
-        self.team_members = team_members
+        self.winner_ids = winner_ids
+        self.tournament_id = tournament_id
         self.encryption = encryption
         self.claimed_keys = []
 
     async def claim_key(self, interaction: Interaction, key_entry: dict):
         """Claim a specific key."""
+        user_id_str = str(interaction.user.id)
+
         # Verify user is in the winning team
-        if str(interaction.user.id) not in [m.strip("<@>") for m in self.team_members]:
+        is_winner = False
+        for winner_id in self.winner_ids:
+            clean_id = winner_id.strip("<@>")
+            if clean_id == user_id_str:
+                is_winner = True
+                break
+
+        if not is_winner:
             await interaction.response.send_message(
                 "❌ You are not part of the winning team!",
                 ephemeral=True
             )
             return False
 
-        # Check if user already claimed a key
+        # Check if user already claimed a key for THIS tournament
         keys_data = load_keys_data()
-        user_id_str = str(interaction.user.id)
+        claims_per_tournament = keys_data.get("claims_per_tournament", {})
+        tournament_claims = claims_per_tournament.get(self.tournament_id, {})
 
-        for key in keys_data["keys"]:
-            if key.get("claimed_by") and user_id_str in key["claimed_by"]:
-                await interaction.response.send_message(
-                    "❌ You have already claimed a key!",
-                    ephemeral=True
-                )
-                return False
+        if user_id_str in tournament_claims:
+            await interaction.response.send_message(
+                "❌ You have already claimed a key for this tournament!",
+                ephemeral=True
+            )
+            return False
 
         # Decrypt the key
         decrypted_key = self.encryption.decrypt(key_entry["encrypted_key"])
@@ -225,11 +239,20 @@ class ClaimKeyView(View):
                     return False
 
                 key["status"] = "claimed"
-                key["claimed_by"] = key.get("claimed_by", [])
-                key["claimed_by"].append(user_id_str)
+                key["claimed_by"] = user_id_str
                 key["claimed_at"] = datetime.now().isoformat()
                 key["claimed_team"] = self.team_name
+                key["tournament_id"] = self.tournament_id
                 break
+
+        # Track claim in claims_per_tournament for robust duplicate prevention
+        if self.tournament_id not in claims_per_tournament:
+            claims_per_tournament[self.tournament_id] = {}
+        claims_per_tournament[self.tournament_id][user_id_str] = {
+            "claimed_at": datetime.now().isoformat(),
+            "key_id": key_entry["id"]
+        }
+        keys_data["claims_per_tournament"] = claims_per_tournament
 
         save_keys_data(keys_data)
 
@@ -264,9 +287,18 @@ class ClaimKeyView(View):
             for key in keys_data["keys"]:
                 if key["id"] == key_entry["id"]:
                     key["status"] = "available"
-                    if user_id_str in key.get("claimed_by", []):
-                        key["claimed_by"].remove(user_id_str)
+                    key["claimed_by"] = None
+                    key["claimed_at"] = None
+                    key["claimed_team"] = None
+                    key["tournament_id"] = None
                     break
+
+            # Remove from claims_per_tournament
+            claims_per_tournament = keys_data.get("claims_per_tournament", {})
+            if self.tournament_id in claims_per_tournament:
+                claims_per_tournament[self.tournament_id].pop(user_id_str, None)
+            keys_data["claims_per_tournament"] = claims_per_tournament
+
             save_keys_data(keys_data)
 
             return False
@@ -383,67 +415,59 @@ class KeyGroup(app_commands.Group):
             )
             return
 
-        # Check if tournament has ended
-        tournament = load_tournament_data()
+        # Load last tournament winner from global data
+        from modules.dataStorage import load_global_data
+        global_data = load_global_data()
+        last_winner = global_data.get("last_tournament_winner", {})
 
-        if tournament.get("running", False):
+        if not last_winner or not last_winner.get("ended_at"):
             await interaction.response.send_message(
-                "❌ The tournament is still running! Keys are only available after the tournament ends.",
+                "❌ No completed tournament found! Keys are only available to tournament winners.",
                 ephemeral=True
             )
             return
 
-        # Check if user is part of the winning team
-        user_mention = interaction.user.mention
+        # Use ended_at as unique tournament ID
+        tournament_id = last_winner.get("ended_at")
+        winning_team_name = last_winner.get("winning_team")
 
-        # Find user's team
-        user_team = None
-        user_team_data = None
-
-        for team_name, team_data in tournament.get("teams", {}).items():
-            if user_mention in team_data.get("members", []):
-                user_team = team_name
-                user_team_data = team_data
-                break
-
-        if not user_team:
+        if not winning_team_name:
             await interaction.response.send_message(
-                "❌ You are not part of any team!",
+                "❌ No tournament winner found!",
                 ephemeral=True
             )
             return
 
-        # Check if user's team is the overall tournament winner
-        # Find team with most wins
-        teams = tournament.get("teams", {})
-        if not teams:
-            await interaction.response.send_message(
-                "❌ No teams found in the tournament!",
-                ephemeral=True
-            )
-            return
+        # Get winner IDs from last tournament
+        from modules.info import get_winner_ids
+        winner_ids = last_winner.get("winner_ids", [])
 
-        # Get the winning team (team with most wins)
-        winning_team_data = max(teams.values(), key=lambda t: t.get("wins", 0))
-        winning_team_name = None
-        for team_name, team_data in teams.items():
-            if team_data == winning_team_data:
-                winning_team_name = team_name
-                break
-
-        # Check if team must have at least one win
-        if winning_team_data.get("wins", 0) == 0:
+        # If not stored in last_winner, try to get from current calculation
+        if not winner_ids:
+            logger.warning("[KEY_CLAIM] winner_ids not found in last_tournament_winner, unable to verify eligibility")
             await interaction.response.send_message(
-                "❌ No team has won the tournament yet! Keys are only available after the tournament is completed.",
+                "❌ Unable to verify tournament winners. Please contact an administrator.",
                 ephemeral=True
             )
             return
 
         # Check if user is in the winning team
-        if user_team != winning_team_name:
+        user_id_str = str(interaction.user.id)
+        user_mention = interaction.user.mention
+
+        # Check if user is in winner_ids
+        is_winner = False
+        for winner_id in winner_ids:
+            # winner_id might be a string like "123456" or "<@123456>"
+            clean_id = winner_id.strip("<@>")
+            if clean_id == user_id_str:
+                is_winner = True
+                break
+
+        if not is_winner:
             await interaction.response.send_message(
                 f"❌ Keys are only available to the tournament winner team!\n"
-                f"**Current leader:** {winning_team_name} with {winning_team_data.get('wins', 0)} wins.",
+                f"**Last winner:** {winning_team_name}",
                 ephemeral=True
             )
             return
@@ -459,22 +483,24 @@ class KeyGroup(app_commands.Group):
             )
             return
 
-        # Check if user already claimed a key
-        user_id_str = str(interaction.user.id)
-        for key in keys_data["keys"]:
-            if key.get("claimed_by") and user_id_str in key["claimed_by"]:
-                await interaction.response.send_message(
-                    "❌ You have already claimed a key!",
-                    ephemeral=True
-                )
-                return
+        # Check if user already claimed a key for THIS tournament
+        claims_per_tournament = keys_data.get("claims_per_tournament", {})
+        tournament_claims = claims_per_tournament.get(tournament_id, {})
+
+        if user_id_str in tournament_claims:
+            await interaction.response.send_message(
+                "❌ You have already claimed a key for this tournament!",
+                ephemeral=True
+            )
+            return
 
         # Create view with buttons for each key
         view = ClaimKeyView(
             available_keys=available_keys,
             user_id=interaction.user.id,
-            team_name=user_team,
-            team_members=user_team_data.get("members", []),
+            team_name=winning_team_name,
+            winner_ids=winner_ids,
+            tournament_id=tournament_id,
             encryption=self.encryption
         )
         await view.create_buttons()

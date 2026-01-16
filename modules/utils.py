@@ -367,6 +367,7 @@ def finalize_tournament(winning_team: str, winners: list[int], game: str, points
         "points": points,
         "game": game,
         "ended_at": datetime.now(tz=ZoneInfo(CONFIG.bot.timezone)).isoformat(),
+        "winner_ids": [str(uid) for uid in winners],  # Store winner IDs for key claiming
     }
 
     # Increase stats
