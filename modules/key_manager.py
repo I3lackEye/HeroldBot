@@ -165,7 +165,7 @@ class DonateKeyModal(Modal, title="Donate a Game Key"):
 
         # Load embed from locale
         template = load_embed_template("keys").get("KEY_DONATION_SUCCESS")
-        placeholders = {"PLACEHOLDER_DESCRIPTION": description}
+        placeholders = {"description": description}
         embed = build_embed_from_template(template, placeholders)
 
         await interaction.response.send_message(embed=embed, ephemeral=True)
@@ -261,8 +261,8 @@ class ClaimKeyView(View):
             # Load embed from locale
             template = load_embed_template("keys").get("KEY_CLAIMED_SUCCESS")
             placeholders = {
-                "PLACEHOLDER_DESCRIPTION": key_entry['description'],
-                "PLACEHOLDER_KEY": decrypted_key
+                "description": key_entry['description'],
+                "key": decrypted_key
             }
             embed = build_embed_from_template(template, placeholders)
 
@@ -696,9 +696,9 @@ async def notify_winners_about_keys(bot, winner_ids: list, winning_team_name: st
     # Load embed from locale
     template = load_embed_template("keys").get("KEY_WINNER_NOTIFICATION")
     placeholders = {
-        "PLACEHOLDER_TEAM_NAME": winning_team_name,
-        "PLACEHOLDER_KEY_COUNT": str(len(available_keys)),
-        "PLACEHOLDER_KEY_LIST": key_list
+        "team_name": winning_team_name,
+        "key_count": str(len(available_keys)),
+        "key_list": key_list
     }
     embed = build_embed_from_template(template, placeholders)
 
