@@ -15,7 +15,7 @@ from discord.ext import commands
 from discord.ui import Modal, TextInput, View, Button
 from cryptography.fernet import Fernet, InvalidToken
 
-from modules.config import Config
+from modules.config import CONFIG
 from modules.dataStorage import load_tournament_data
 from modules.embeds import load_embed_template, build_embed_from_template
 from modules.logger import logger
