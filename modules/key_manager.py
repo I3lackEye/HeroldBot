@@ -344,7 +344,7 @@ class KeyGroup(app_commands.Group):
     )
     async def donate(self, interaction: Interaction):
         """Open a modal to donate a game key."""
-        config = Config()
+        config = CONFIG
 
         if not config.features.game_key_handler:
             await interaction.response.send_message(
@@ -362,7 +362,7 @@ class KeyGroup(app_commands.Group):
     )
     async def list_keys(self, interaction: Interaction):
         """List all available keys."""
-        config = Config()
+        config = CONFIG
 
         if not config.features.game_key_handler:
             await interaction.response.send_message(
@@ -406,7 +406,7 @@ class KeyGroup(app_commands.Group):
     )
     async def claim(self, interaction: Interaction):
         """Allow winners to claim keys."""
-        config = Config()
+        config = CONFIG
 
         if not config.features.game_key_handler:
             await interaction.response.send_message(
@@ -673,10 +673,6 @@ async def notify_winners_about_keys(bot, winner_ids: list, winning_team_name: st
         winner_ids: List of winner user IDs (as strings)
         winning_team_name: Name of the winning team
     """
-    from modules.config import Config
-
-    config = Config()
-
     # Check if feature is enabled
     if not config.features.game_key_handler:
         logger.info("[KEY_NOTIFICATION] Game key feature is disabled, skipping notification")
