@@ -200,10 +200,90 @@ async def handle_request_reschedule(interaction: Interaction, match_id: int):
         await interaction.response.send_message(get_message("ERRORS", "match_not_found"), ephemeral=True)
         return
 
+    # ✅ VALIDATE MATCH STATUS (before showing slots to avoid wasted voting time)
+    match_status = match.get("status")
+    if match_status in ["completed", "forfeit"]:
+        await interaction.response.send_message(
+            f"🚫 **Cannot reschedule this match!**\n\n"
+            f"Match {match_id} is already **{match_status}** and cannot be rescheduled.",
+            ephemeral=True
+        )
+        return
+
+    # ✅ VALIDATE TEAMS STILL EXIST (before showing slots)
+    team1 = match.get("team1")
+    team2 = match.get("team2")
+    teams = tournament.get("teams", {})
+
+    if team1 not in teams or team2 not in teams:
+        missing_teams = []
+        if team1 not in teams:
+            missing_teams.append(team1)
+        if team2 not in teams:
+            missing_teams.append(team2)
+
+        await interaction.response.send_message(
+            f"🚫 **Cannot reschedule this match!**\n\n"
+            f"The following team(s) no longer exist in the tournament:\n"
+            f"• {', '.join(missing_teams)}\n\n"
+            f"Please contact a tournament admin.",
+            ephemeral=True
+        )
+        return
+
+    # ✅ VALIDATE TEAM MEMBERS (before showing slots)
+    team1_members = set(teams[team1].get("members", []))
+    team2_members = set(teams[team2].get("members", []))
+
+    if not team1_members or not team2_members:
+        await interaction.response.send_message(
+            f"🚫 **Cannot reschedule this match!**\n\n"
+            f"One or both teams have no members.\n"
+            f"Please contact a tournament admin.",
+            ephemeral=True
+        )
+        return
+
+    # ✅ VALIDATE MATCH HAS NOT BEEN RESCHEDULED BEFORE (single reschedule per match rule)
+    if match.get("rescheduled_once"):
+        await interaction.response.send_message(
+            f"🚫 **Cannot reschedule this match!**\n\n"
+            f"Match {match_id} has already been rescheduled once.\n"
+            f"Each match can only be rescheduled one time.",
+            ephemeral=True
+        )
+        return
+
     # Check if reschedule is already pending (persisted state)
     if match.get("reschedule_pending"):
+        # Get details about the pending request
+        reschedule_requested_by = match.get("reschedule_requested_by", [])
+        pending_since_str = match.get("reschedule_pending_since")
+
+        requesting_team = reschedule_requested_by[0] if reschedule_requested_by else "Unknown team"
+
+        # Calculate time remaining
+        remaining_info = ""
+        if pending_since_str:
+            try:
+                pending_since = parse_iso_datetime(pending_since_str)
+                timeout_at = pending_since + timedelta(hours=RESCHEDULE_TIMEOUT_HOURS)
+                remaining = timeout_at - now_in_bot_timezone()
+                remaining_hours = remaining.total_seconds() / 3600
+
+                if remaining_hours > 0:
+                    remaining_info = f"\n⏰ Time remaining for voting: {remaining_hours:.1f} hours"
+            except Exception as e:
+                logger.debug(f"[RESCHEDULE] Error calculating remaining time: {e}")
+
         await interaction.response.send_message(
-            "🚫 A reschedule request is already pending for this match!", ephemeral=True
+            f"🚫 **A reschedule request is already pending for this match!**\n\n"
+            f"📋 **Details:**\n"
+            f"• Requested by: **{requesting_team}**\n"
+            f"• Status: Players are currently voting on the new time\n"
+            f"{remaining_info}\n\n"
+            f"ℹ️ Please wait for the current vote to complete before requesting another reschedule.",
+            ephemeral=True
         )
         return
 
@@ -211,8 +291,9 @@ async def handle_request_reschedule(interaction: Interaction, match_id: int):
     reschedule_requested_by = match.get("reschedule_requested_by", [])
     if team_name in reschedule_requested_by:
         await interaction.response.send_message(
-            "🚫 Your team has already requested a reschedule for this match.\n"
-            "Each team can only request one reschedule per match.",
+            "🚫 **Your team has already requested a reschedule for this match.**\n\n"
+            "Each team can only request one reschedule per match.\n"
+            "The previous request has expired or was declined.",
             ephemeral=True
         )
         return
