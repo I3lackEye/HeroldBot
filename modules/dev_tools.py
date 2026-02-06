@@ -1000,8 +1000,16 @@ class DevGroup(app_commands.Group):
                 for m in pending:
                     mid = m.get("match_id")
                     team = m.get("reschedule_requested_by", ["Unknown"])[0]
-                    since = m.get("reschedule_pending_since", "Unknown")
-                    msg += f"• Match {mid}: Requested by {team}\n  Since: {since}\n\n"
+                    since_str = m.get("reschedule_pending_since", "Unknown")
+
+                    # Format the timestamp nicely
+                    try:
+                        since_dt = parse_iso_datetime(since_str)
+                        since_formatted = since_dt.strftime("%d.%m.%Y %H:%M")
+                    except:
+                        since_formatted = since_str
+
+                    msg += f"• Match {mid}: Requested by {team}\n  Since: {since_formatted}\n\n"
 
                 await interaction.followup.send(msg, ephemeral=True)
             else:
@@ -1016,13 +1024,23 @@ class DevGroup(app_commands.Group):
 
                 is_pending = match.get("reschedule_pending", False)
                 requested_by = match.get("reschedule_requested_by", [])
-                pending_since = match.get("reschedule_pending_since", "N/A")
+                pending_since_str = match.get("reschedule_pending_since", "N/A")
+
+                # Format the timestamp nicely
+                if pending_since_str != "N/A":
+                    try:
+                        pending_since_dt = parse_iso_datetime(pending_since_str)
+                        pending_since_formatted = pending_since_dt.strftime("%d.%m.%Y %H:%M")
+                    except:
+                        pending_since_formatted = pending_since_str
+                else:
+                    pending_since_formatted = "N/A"
 
                 await interaction.followup.send(
                     f"**Match {match_id} Reschedule Status:**\n\n"
                     f"• Pending: {is_pending}\n"
                     f"• Requested by: {', '.join(requested_by) if requested_by else 'None'}\n"
-                    f"• Since: {pending_since}",
+                    f"• Since: {pending_since_formatted}",
                     ephemeral=True
                 )
 
