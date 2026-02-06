@@ -42,7 +42,7 @@ from modules.modals import (
 )
 
 from modules.poll import end_poll
-from modules.reschedule import pending_reschedules, _reschedule_lock
+from modules.reschedule import _reschedule_lock, get_reschedule_pending_matches
 from modules.stats_tracker import record_match_result
 from modules.tournament import end_tournament_procedure, auto_end_poll, execute_registration_close_procedure
 from modules.utils import (
@@ -62,15 +62,19 @@ from modules.utils import (
 async def pending_match_autocomplete(interaction: Interaction, current: str):
     """
     Autocomplete for pending reschedule matches (IDs only).
+    Uses persisted JSON state.
     """
     choices = []
 
-    # If no pending reschedules exist ➝ suggest nothing
-    if not pending_reschedules:
+    # Get pending reschedule matches from JSON
+    pending_matches = get_reschedule_pending_matches()
+
+    if not pending_matches:
         return []
 
-    for match_id in pending_reschedules:
-        if current in str(match_id):  # Filters by entered number
+    for match in pending_matches:
+        match_id = match.get("match_id")
+        if match_id and current in str(match_id):  # Filters by entered number
             choices.append(app_commands.Choice(name=f"Match {match_id}", value=match_id))
 
     return choices[:25]  # Return maximum 25 entries
@@ -450,21 +454,48 @@ class AdminGroup(app_commands.Group):
     @app_commands.describe(match_id="Select match ID")
     @app_commands.autocomplete(match_id=pending_match_autocomplete)
     async def reset_reschedule(self, interaction: Interaction, match_id: int):
-        global pending_reschedules
         if not has_permission(interaction.user, "Moderator", "Admin"):
             await interaction.response.send_message(get_message("PERMISSION", "no_permission"), ephemeral=True)
             return
 
         async with _reschedule_lock:
-            if match_id in pending_reschedules:
-                pending_reschedules.discard(match_id)
+            tournament = load_tournament_data()
+            match = next((m for m in tournament.get("matches", []) if m.get("match_id") == match_id), None)
+
+            if match and match.get("reschedule_pending"):
+                # Clear all reschedule flags from JSON
+                fields_cleared = []
+                if "reschedule_pending" in match:
+                    del match["reschedule_pending"]
+                    fields_cleared.append("reschedule_pending")
+                if "reschedule_requested_by" in match:
+                    del match["reschedule_requested_by"]
+                    fields_cleared.append("reschedule_requested_by")
+                if "reschedule_pending_since" in match:
+                    del match["reschedule_pending_since"]
+                    fields_cleared.append("reschedule_pending_since")
+
+                save_tournament_data(tournament)
+
+                # Cancel the timer task if it exists
+                from modules.task_manager import get_all_tasks
+                task_name = f"reschedule_timer_match_{match_id}"
+                all_tasks = get_all_tasks()
+                if task_name in all_tasks:
+                    timer_task = all_tasks[task_name]["task"]
+                    if not timer_task.done():
+                        timer_task.cancel()
+                        logger.info(f"[ADMIN] Cancelled timer task for match {match_id}")
+
                 await interaction.response.send_message(
-                    get_message("SUCCESS", "reschedule_reset", match_id=match_id),
+                    f"✅ Reschedule request for match {match_id} has been reset.\n"
+                    f"Cleared: {', '.join(fields_cleared)}",
                     ephemeral=True,
                 )
+                logger.info(f"[ADMIN] Reset reschedule for match {match_id} - cleared {fields_cleared}")
             else:
                 await interaction.response.send_message(
-                    get_message("WARNINGS", "no_pending_request", match_id=match_id), ephemeral=True
+                    f"⚠️  No pending reschedule request found for match {match_id}.", ephemeral=True
                 )
 
     @app_commands.command(

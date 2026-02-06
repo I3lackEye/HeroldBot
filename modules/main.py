@@ -255,6 +255,65 @@ async def on_ready():
     except Exception as e:
         logger.error(f"[STARTUP] ❌ Failed to start reminder system: {e}")
 
+    # Recover reschedule timers after bot restart
+    try:
+        from modules.reschedule import start_reschedule_timer, RESCHEDULE_TIMEOUT_HOURS
+        from modules.utils import parse_iso_datetime, now_in_bot_timezone
+        from datetime import timedelta
+
+        tournament_data = load_tournament_data()
+        recovered_timers = 0
+        expired_cleanups = 0
+
+        for match in tournament_data.get("matches", []):
+            if match.get("reschedule_pending"):
+                match_id = match.get("match_id")
+                pending_since_str = match.get("reschedule_pending_since")
+
+                if not pending_since_str:
+                    logger.warning(f"[STARTUP] ⚠️  Match {match_id} has reschedule_pending but no pending_since timestamp")
+                    continue
+
+                try:
+                    pending_since = parse_iso_datetime(pending_since_str)
+                    now = now_in_bot_timezone()
+                    timeout_at = pending_since + timedelta(hours=RESCHEDULE_TIMEOUT_HOURS)
+                    remaining_seconds = (timeout_at - now).total_seconds()
+
+                    if remaining_seconds <= 0:
+                        # Already expired - clean up immediately
+                        logger.info(f"[STARTUP] 🧹 Cleaning up expired reschedule for match {match_id}")
+                        if "reschedule_pending" in match:
+                            del match["reschedule_pending"]
+                        if "reschedule_requested_by" in match:
+                            del match["reschedule_requested_by"]
+                        if "reschedule_pending_since" in match:
+                            del match["reschedule_pending_since"]
+                        expired_cleanups += 1
+                    else:
+                        # Recreate timer for remaining duration
+                        timer_task = bot.loop.create_task(
+                            start_reschedule_timer(bot, match_id, delay_seconds=remaining_seconds)
+                        )
+                        add_task(f"reschedule_timer_match_{match_id}", timer_task)
+                        recovered_timers += 1
+                        logger.debug(f"[STARTUP] ⏱️  Recovered timer for match {match_id} ({remaining_seconds/3600:.1f}h remaining)")
+
+                except Exception as e:
+                    logger.error(f"[STARTUP] ❌ Error recovering timer for match {match_id}: {e}")
+
+        # Save if we cleaned up any expired reschedules
+        if expired_cleanups > 0:
+            save_tournament_data(tournament_data)
+
+        if recovered_timers > 0 or expired_cleanups > 0:
+            logger.info(f"[STARTUP] ✅ Reschedule recovery: {recovered_timers} timer(s) recovered, {expired_cleanups} expired cleaned up")
+        elif DEBUG_MODE:
+            logger.debug("[STARTUP] ℹ️  No pending reschedule requests to recover")
+
+    except Exception as e:
+        logger.error(f"[STARTUP] ❌ Failed to recover reschedule timers: {e}")
+
     # Resync slash commands
     try:
         synced = await bot.tree.sync()

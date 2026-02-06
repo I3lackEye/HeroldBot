@@ -35,11 +35,41 @@ from modules.utils import (
 )
 from modules.reschedule_view import RescheduleView, SlotSelectView
 
-# Global state for pending reschedule requests
-pending_reschedules = set()
+# Global lock for reschedule operations
 _reschedule_lock = asyncio.Lock()  # Prevent race conditions
 
 RESCHEDULE_TIMEOUT_HOURS = CONFIG.tournament.reschedule_timeout_hours
+
+
+# =======================================
+# HELPER FUNCTIONS
+# =======================================
+
+def is_reschedule_pending_for_match(match_id: int) -> bool:
+    """
+    Checks if a reschedule is currently pending for the given match.
+    Uses persisted JSON as single source of truth (no in-memory state).
+
+    :param match_id: Match ID to check
+    :return: True if reschedule is pending, False otherwise
+    """
+    tournament = load_tournament_data()
+    match = next((m for m in tournament.get("matches", []) if m.get("match_id") == match_id), None)
+    if not match:
+        return False
+    return match.get("reschedule_pending", False)
+
+
+def get_reschedule_pending_matches() -> list:
+    """
+    Returns list of all matches with pending reschedule requests.
+    Uses persisted JSON as single source of truth.
+
+    :return: List of match dicts with reschedule_pending=True
+    """
+    tournament = load_tournament_data()
+    return [m for m in tournament.get("matches", []) if m.get("reschedule_pending")]
+
 
 # ---------------------------------------
 # Helper: Extract IDs
@@ -145,7 +175,6 @@ async def handle_request_reschedule(interaction: Interaction, match_id: int):
     Handles a reschedule request from a player.
     Shows available slots for the player to choose from.
     """
-    global pending_reschedules
     tournament = load_tournament_data()
     user_id = str(interaction.user.id)
     logger.info(f"[RESCHEDULE] Request received from {interaction.user.display_name} for match ID {match_id}")
@@ -332,9 +361,6 @@ async def handle_request_reschedule(interaction: Interaction, match_id: int):
             return
 
         # Start timer and register in task manager
-        async with _reschedule_lock:
-            pending_reschedules.add(match_id)
-
         timer_task = interaction.client.loop.create_task(start_reschedule_timer(interaction.client, match_id))
         add_task(f"reschedule_timer_match_{match_id}", timer_task)
         logger.debug(f"[RESCHEDULE] Timer task created and registered for match {match_id}")
@@ -378,29 +404,47 @@ async def match_id_autocomplete(interaction: Interaction, current: str):
     return choices[:25]  # Discord allows max 25 suggestions
 
 
-async def start_reschedule_timer(bot, match_id: int):
+async def start_reschedule_timer(bot, match_id: int, delay_seconds: int = None):
     """
     Waits a certain time and then automatically removes the reschedule request.
     Optionally notifies the reschedule channel.
     Can be cancelled early if reschedule is resolved before timeout.
+
+    :param bot: Bot instance
+    :param match_id: Match ID for reschedule
+    :param delay_seconds: Optional custom delay (for timer recovery). Defaults to RESCHEDULE_TIMEOUT_HOURS
     """
     try:
-        await asyncio.sleep(RESCHEDULE_TIMEOUT_HOURS * 3600)  # Wait for timeout
+        if delay_seconds is None:
+            delay_seconds = RESCHEDULE_TIMEOUT_HOURS * 3600
 
+        await asyncio.sleep(delay_seconds)
+
+        # Clean up reschedule state in JSON
         async with _reschedule_lock:
-            if match_id in pending_reschedules:
-                pending_reschedules.discard(match_id)
+            tournament = load_tournament_data()
+            match = next((m for m in tournament.get("matches", []) if m.get("match_id") == match_id), None)
 
-            logger.info(
-                f"[RESCHEDULE] Automatic cleanup: Match {match_id} was reset (timeout after {RESCHEDULE_TIMEOUT_HOURS} hours)."
-            )
+            if match and match.get("reschedule_pending"):
+                # Clear reschedule flags
+                if "reschedule_pending" in match:
+                    del match["reschedule_pending"]
+                if "reschedule_requested_by" in match:
+                    del match["reschedule_requested_by"]
+                if "reschedule_pending_since" in match:
+                    del match["reschedule_pending_since"]
 
-        # ➔ Send message in reschedule channel
-        reschedule_channel = bot.get_channel(RESCHEDULE_CHANNEL_ID)
-        if reschedule_channel:
-            await reschedule_channel.send(
-                f"❗ The reschedule request for match `{match_id}` was automatically ended as no agreement was reached within {RESCHEDULE_TIMEOUT_HOURS} hours."
-            )
+                save_tournament_data(tournament)
+                logger.info(
+                    f"[RESCHEDULE] Automatic cleanup: Match {match_id} was reset (timeout after {delay_seconds/3600:.1f} hours)."
+                )
+
+                # Send message in reschedule channel
+                reschedule_channel = bot.get_channel(RESCHEDULE_CHANNEL_ID)
+                if reschedule_channel:
+                    await reschedule_channel.send(
+                        f"❗ The reschedule request for match `{match_id}` was automatically ended as no agreement was reached within {RESCHEDULE_TIMEOUT_HOURS} hours."
+                    )
     except asyncio.CancelledError:
         logger.debug(f"[RESCHEDULE] Timer for match {match_id} was cancelled (reschedule resolved early)")
         # Don't propagate the exception, just exit cleanly
