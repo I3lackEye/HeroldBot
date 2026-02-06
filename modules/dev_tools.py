@@ -21,7 +21,7 @@ from modules.dataStorage import (
 )
 from modules.embeds import build_embed_from_template, load_embed_template
 from modules.logger import logger
-from modules.task_manager import get_all_tasks
+from modules.task_manager import add_task, get_all_tasks
 from modules.tournament import auto_end_poll, close_registration_after_delay, end_tournament_procedure
 from modules.utils import (
     generate_random_availability,
