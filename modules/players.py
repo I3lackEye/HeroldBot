@@ -17,7 +17,6 @@ from modules.modals import TeamFullJoinModal
 from modules.reschedule import (
     handle_request_reschedule,
     match_id_autocomplete,
-    neuer_zeitpunkt_autocomplete,
 )
 from modules.utils import (
     generate_team_name,
