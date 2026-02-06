@@ -336,6 +336,16 @@ async def execute_registration_close_procedure(channel: discord.TextChannel):
                 save_tournament_data(tournament)
                 logger.info(f"[TOURNAMENT] Duration auto-set to {optimal_end.strftime('%Y-%m-%d')}")
 
+                # Schedule automatic tournament end
+                now = datetime.now(tz=tz)
+                delay_seconds = max(0, int((optimal_end - now).total_seconds()))
+                if delay_seconds > 0:
+                    add_task(
+                        "tournament_end_timer",
+                        asyncio.create_task(close_tournament_after_delay(delay_seconds, channel))
+                    )
+                    logger.info(f"[TOURNAMENT] Auto-end scheduled in {delay_seconds // 86400} days")
+
         # Step 5: Clear solo list (already processed by auto_match_solo)
         tournament["solo"] = []
         save_tournament_data(tournament)

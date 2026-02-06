@@ -153,13 +153,17 @@ class RescheduleView(ui.View):
             logger.info(f"[RESCHEDULE] Match {self.match_id} forfeited by {decliner_team}. Winner: {opponent}")
 
         # Import at runtime to avoid circular dependency
-        from modules.reschedule import pending_reschedules, pending_timer_tasks, _reschedule_lock
+        from modules.reschedule import pending_reschedules, _reschedule_lock
+        from modules.task_manager import get_all_tasks
+
         async with _reschedule_lock:
             pending_reschedules.discard(self.match_id)
 
-            # Cancel the timer task if it exists
-            if self.match_id in pending_timer_tasks:
-                timer_task = pending_timer_tasks.pop(self.match_id)
+            # Cancel the timer task if it exists in task manager
+            task_name = f"reschedule_timer_match_{self.match_id}"
+            all_tasks = get_all_tasks()
+            if task_name in all_tasks:
+                timer_task = all_tasks[task_name]["task"]
                 if not timer_task.done():
                     timer_task.cancel()
                     logger.debug(f"[RESCHEDULE] Cancelled timer task for match {self.match_id} after decline")
@@ -286,13 +290,17 @@ class RescheduleView(ui.View):
         logger.info(f"[RESCHEDULE] ✅ Match {self.match_id} successfully rescheduled to {self.new_datetime}.")
 
         # Import at runtime to avoid circular dependency
-        from modules.reschedule import pending_reschedules, pending_timer_tasks, _reschedule_lock
+        from modules.reschedule import pending_reschedules, _reschedule_lock
+        from modules.task_manager import get_all_tasks
+
         async with _reschedule_lock:
             pending_reschedules.discard(self.match_id)
 
-            # Cancel the timer task if it exists
-            if self.match_id in pending_timer_tasks:
-                timer_task = pending_timer_tasks.pop(self.match_id)
+            # Cancel the timer task if it exists in task manager
+            task_name = f"reschedule_timer_match_{self.match_id}"
+            all_tasks = get_all_tasks()
+            if task_name in all_tasks:
+                timer_task = all_tasks[task_name]["task"]
                 if not timer_task.done():
                     timer_task.cancel()
                     logger.debug(f"[RESCHEDULE] Cancelled timer task for match {self.match_id} after success")
@@ -338,10 +346,8 @@ class RescheduleView(ui.View):
                 logger.error(f"[RESCHEDULE] Error editing message on timeout: {e}")
 
         # Import at runtime to avoid circular dependency
-        from modules.reschedule import pending_reschedules, pending_timer_tasks, _reschedule_lock
+        from modules.reschedule import pending_reschedules, _reschedule_lock
+
         async with _reschedule_lock:
             pending_reschedules.discard(self.match_id)
-
-            # Timer task already completed (that's why we're here), just clean up
-            pending_timer_tasks.pop(self.match_id, None)
-            logger.debug(f"[RESCHEDULE] Cleaned up timer task reference for match {self.match_id} after on_timeout")
+            logger.debug(f"[RESCHEDULE] Cleaned up pending reschedule for match {self.match_id} after on_timeout")

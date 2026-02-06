@@ -808,15 +808,76 @@ class DevGroup(app_commands.Group):
             await interaction.response.send_message("🚦 Currently **no** background tasks running.", ephemeral=True)
             return
 
-        embed = discord.Embed(title="Active Background Tasks", color=0x42F587)
-        for name, entry in list(tasks.items())[:5]:
+        embed = discord.Embed(
+            title="🔧 Active Background Tasks",
+            description=f"Total: {len(tasks)} task(s)",
+            color=0x42F587
+        )
+
+        # Categorize tasks
+        tournament_tasks = []
+        reschedule_tasks = []
+        other_tasks = []
+
+        for name, entry in tasks.items():
             task = entry["task"]
             coro = entry["coro"]
-            status = "✅ completed" if task.done() else "🟢 running"
-            embed.add_field(name=name, value=f"Status: {status}\nCoroutine: `{coro}`", inline=False)
 
-        if len(tasks) > 5:
-            embed.set_footer(text=f"... and {len(tasks)-5} more task(s)")
+            # Determine task category
+            if name.startswith("reschedule_timer"):
+                reschedule_tasks.append((name, task, coro))
+            elif any(name.startswith(prefix) for prefix in ["tournament_", "close_registration", "auto_end_poll"]):
+                tournament_tasks.append((name, task, coro))
+            else:
+                other_tasks.append((name, task, coro))
+
+        # Display tournament tasks first
+        if tournament_tasks:
+            tournament_field = ""
+            for name, task, coro in tournament_tasks[:5]:
+                status_icon = "✅" if task.done() else "🟢"
+                status_text = "completed" if task.done() else "running"
+                tournament_field += f"{status_icon} **{name}**\n└ `{coro}` ({status_text})\n\n"
+
+            embed.add_field(
+                name="🏆 Tournament Tasks",
+                value=tournament_field or "None",
+                inline=False
+            )
+
+        # Display reschedule tasks
+        if reschedule_tasks:
+            reschedule_field = ""
+            for name, task, coro in reschedule_tasks[:5]:
+                # Extract match ID from task name
+                match_id = name.replace("reschedule_timer_match_", "")
+                status_icon = "✅" if task.done() else "⏳"
+                status_text = "completed" if task.done() else "waiting"
+                reschedule_field += f"{status_icon} **Match {match_id}**\n└ `{coro}` ({status_text})\n\n"
+
+            embed.add_field(
+                name="🔄 Reschedule Timers",
+                value=reschedule_field or "None",
+                inline=False
+            )
+
+        # Display other tasks
+        if other_tasks:
+            other_field = ""
+            for name, task, coro in other_tasks[:5]:
+                status_icon = "✅" if task.done() else "🟢"
+                status_text = "completed" if task.done() else "running"
+                other_field += f"{status_icon} **{name}**\n└ `{coro}` ({status_text})\n\n"
+
+            embed.add_field(
+                name="🔧 Other Tasks",
+                value=other_field or "None",
+                inline=False
+            )
+
+        total_shown = min(len(tournament_tasks) + len(reschedule_tasks) + len(other_tasks), 15)
+        if len(tasks) > total_shown:
+            embed.set_footer(text=f"... and {len(tasks) - total_shown} more task(s)")
 
         await interaction.response.send_message(embed=embed, ephemeral=True)
 

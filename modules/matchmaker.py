@@ -17,12 +17,43 @@ from modules.config import CONFIG
 from modules.dataStorage import DEBUG_MODE, load_tournament_data, save_tournament_data
 # Removed: send_cleanup_summary import - function deleted to reduce spam
 from modules.logger import logger
+from modules.task_manager import add_task, get_all_tasks
 from modules.utils import AvailabilityChecker, generate_team_name, get_active_days_config, get_default_availability
 
 # Tournament configuration (from centralized config)
 MATCH_DURATION = CONFIG.tournament.match_duration
 PAUSE_DURATION = CONFIG.tournament.pause_duration
 MAX_TIME_BUDGET = CONFIG.tournament.max_time_budget
+
+
+def _update_tournament_end_timer(new_end: datetime, tz: ZoneInfo):
+    """
+    Updates the tournament end timer when the tournament is extended.
+    Cancels old timer and logs the extension.
+
+    Note: We can't reschedule the timer here because we don't have a channel reference.
+    The timer will be recreated on bot restart if needed.
+
+    :param new_end: New tournament end datetime
+    :param tz: Timezone object
+    """
+    # Cancel existing tournament_end_timer if it exists
+    all_tasks = get_all_tasks()
+    if "tournament_end_timer" in all_tasks:
+        old_task = all_tasks["tournament_end_timer"]["task"]
+        if not old_task.done():
+            old_task.cancel()
+            logger.info("[EXTEND] ⏰ Cancelled old tournament end timer")
+
+    # Calculate new delay for logging
+    now = datetime.now(tz=tz)
+    delay_seconds = max(0, int((new_end - now).total_seconds()))
+
+    if delay_seconds > 0:
+        logger.info(f"[EXTEND] ⏰ New tournament end: {new_end.strftime('%Y-%m-%d')} ({delay_seconds // 86400} days)")
+        logger.info("[EXTEND] 💡 Timer will be recreated on bot restart")
+    else:
+        logger.warning("[EXTEND] ⚠️  New tournament end is in the past - no timer will be set")
 
 
 # =======================================
@@ -829,6 +860,10 @@ async def generate_and_assign_slots():
             save_tournament_data(tournament)
 
             logger.warning(f"[EXTEND] ⏰ Tournament automatically extended: {original_end} → {new_end} (+{extension_weeks_per_attempt} weeks)")
+
+            # Update tournament end timer task
+            _update_tournament_end_timer(tournament_end, tz)
+
             logger.info(f"[EXTEND] 🔄 Regenerating slot matrix with new end date...")
 
             # Reload tournament and regenerate slot matrix

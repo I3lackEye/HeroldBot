@@ -23,12 +23,12 @@ from modules.embeds import (
 )
 from modules.logger import logger
 from modules.matchmaker import generate_slot_matrix, get_valid_slots_for_match, assign_slots_with_matrix
+from modules.task_manager import add_task, get_all_tasks
 from modules.utils import get_player_team, get_team_open_matches, smart_send
 from modules.reschedule_view import RescheduleView, SlotSelectView
 
 # Global state for pending reschedule requests
 pending_reschedules = set()
-pending_timer_tasks = {}  # match_id -> asyncio.Task for cancellable timers
 _reschedule_lock = asyncio.Lock()  # Prevent race conditions
 
 RESCHEDULE_TIMEOUT_HOURS = CONFIG.tournament.reschedule_timeout_hours
@@ -326,13 +326,13 @@ async def handle_request_reschedule(interaction: Interaction, match_id: int):
             logger.error(f"[RESCHEDULE] ❌ Error posting request: {e}")
             return
 
-        # Start timer and store task for potential cancellation
+        # Start timer and register in task manager
         async with _reschedule_lock:
             pending_reschedules.add(match_id)
 
         timer_task = interaction.client.loop.create_task(start_reschedule_timer(interaction.client, match_id))
-        pending_timer_tasks[match_id] = timer_task
-        logger.debug(f"[RESCHEDULE] Timer task created for match {match_id}")
+        add_task(f"reschedule_timer_match_{match_id}", timer_task)
+        logger.debug(f"[RESCHEDULE] Timer task created and registered for match {match_id}")
 
     # Show slot selection view
     view = SlotSelectView(match_id, interaction.user, future_slots, post_reschedule_request)
@@ -425,9 +425,6 @@ async def start_reschedule_timer(bot, match_id: int):
         async with _reschedule_lock:
             if match_id in pending_reschedules:
                 pending_reschedules.discard(match_id)
-
-            # Clean up timer task reference
-            pending_timer_tasks.pop(match_id, None)
 
             logger.info(
                 f"[RESCHEDULE] Automatic cleanup: Match {match_id} was reset (timeout after {RESCHEDULE_TIMEOUT_HOURS} hours)."

@@ -44,3 +44,38 @@ def log_active_tasks():
         task = entry["task"]
         coro = entry["coro"]
         logger.info(f"[TASK-MANAGER] Task: {name}, done={task.done()}, cancelled={task.cancelled()}, coroutine={coro}")
+
+
+def cancel_tournament_tasks():
+    """
+    Cancels all tournament-related tasks.
+    Used when tournament is manually ended or aborted.
+    """
+    tournament_task_prefixes = [
+        "tournament_end",
+        "close_registration",
+        "auto_end_poll",
+        "reschedule_timer"
+    ]
+
+    cancelled_tasks = []
+    for name, entry in list(all_tasks.items()):
+        task = entry["task"]
+
+        # Check if task name starts with any tournament-related prefix
+        if any(name.startswith(prefix) for prefix in tournament_task_prefixes):
+            if not task.done():
+                try:
+                    task.cancel()
+                    cancelled_tasks.append(name)
+                    logger.info(f"[TASK-MANAGER] Cancelled tournament task: {name}")
+                except Exception as e:
+                    logger.error(f"[TASK-MANAGER] Error cancelling task {name}: {e}")
+            all_tasks.pop(name, None)
+
+    if cancelled_tasks:
+        logger.info(f"[TASK-MANAGER] Cancelled {len(cancelled_tasks)} tournament tasks: {cancelled_tasks}")
+    else:
+        logger.info("[TASK-MANAGER] No active tournament tasks to cancel")
+
+    return cancelled_tasks

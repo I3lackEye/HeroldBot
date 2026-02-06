@@ -27,7 +27,7 @@ from modules.dataStorage import (
 )
 from modules.embeds import send_match_schedule, load_embed_template, build_embed_from_template, get_message
 from modules.logger import logger
-from modules.task_manager import add_task
+from modules.task_manager import add_task, cancel_tournament_tasks
 from modules.matchmaker import (
     auto_match_solo,
     cleanup_orphan_teams,
@@ -231,6 +231,11 @@ class AdminGroup(app_commands.Group):
             return
 
         await interaction.response.defer(ephemeral=True)
+
+        # Cancel all tournament-related tasks first
+        cancelled_tasks = cancel_tournament_tasks()
+        if cancelled_tasks:
+            logger.info(f"[ADMIN] Cancelled {len(cancelled_tasks)} tournament tasks before manual end")
 
         await interaction.followup.send(
             "🏁 Tournament end is being prepared... this may take a few seconds!",
