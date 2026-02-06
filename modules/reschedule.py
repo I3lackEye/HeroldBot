@@ -24,7 +24,15 @@ from modules.embeds import (
 from modules.logger import logger
 from modules.matchmaker import generate_slot_matrix, get_valid_slots_for_match, assign_slots_with_matrix
 from modules.task_manager import add_task, get_all_tasks
-from modules.utils import get_player_team, get_team_open_matches, smart_send
+from modules.utils import (
+    get_player_team,
+    get_team_open_matches,
+    smart_send,
+    now_in_bot_timezone,
+    ensure_timezone_aware,
+    parse_iso_datetime,
+    get_bot_timezone
+)
 from modules.reschedule_view import RescheduleView, SlotSelectView
 
 # Global state for pending reschedule requests
@@ -83,7 +91,7 @@ def extend_tournament_and_reschedule_match(match: dict, days: int = 2, max_attem
     end_str = tournament.get("tournament_end")
 
     try:
-        current_end = datetime.fromisoformat(end_str).astimezone(ZoneInfo("UTC"))
+        current_end = parse_iso_datetime(end_str)
     except Exception as e:
         logger.error(f"[RESCHEDULE] ❌ Error reading tournament end time: {e}")
         return False
@@ -158,7 +166,7 @@ async def handle_request_reschedule(interaction: Interaction, match_id: int):
         await interaction.response.send_message("🚫 Invalid match ID or not your match!", ephemeral=True)
         return
 
-    match = next((m for m in tournament.get("matches", []) if m.get("match_id") == match_id), None,)
+    match = next((m for m in tournament.get("matches", []) if m.get("match_id") == match_id), None)
     if not match:
         await interaction.response.send_message(get_message("ERRORS", "match_not_found"), ephemeral=True)
         return
@@ -209,8 +217,7 @@ async def handle_request_reschedule(interaction: Interaction, match_id: int):
             return
 
     # Filter to only future slots
-    tz = ZoneInfo(CONFIG.bot.timezone)
-    now = datetime.now(tz=tz)
+    now = now_in_bot_timezone()
     future_slots = [slot for slot in allowed_slots if slot > now]
 
     if not future_slots:
@@ -228,11 +235,9 @@ async def handle_request_reschedule(interaction: Interaction, match_id: int):
     scheduled_time_str = match.get("scheduled_time")
     if scheduled_time_str:
         try:
-            scheduled_dt = datetime.fromisoformat(scheduled_time_str)
-            if scheduled_dt.tzinfo is None:
-                scheduled_dt = scheduled_dt.replace(tzinfo=tz)
+            scheduled_dt = parse_iso_datetime(scheduled_time_str)
             logger.debug(f"[RESCHEDULE] Scheduled time from match: {scheduled_dt.isoformat()}")
-            if scheduled_dt - datetime.now(tz=tz) <= timedelta(hours=24):
+            if scheduled_dt - now_in_bot_timezone() <= timedelta(hours=24):
                 await interaction.response.send_message(
                     "🚫 You can only reschedule matches up to 24 hours before the scheduled start.",
                     ephemeral=True
@@ -274,7 +279,7 @@ async def handle_request_reschedule(interaction: Interaction, match_id: int):
             return
 
         # Build embed
-        deadline = (datetime.now(tz=tz) + timedelta(hours=RESCHEDULE_TIMEOUT_HOURS)).strftime("%d.%m.%Y %H:%M")
+        deadline = (now_in_bot_timezone() + timedelta(hours=RESCHEDULE_TIMEOUT_HOURS)).strftime("%d.%m.%Y %H:%M")
         short_players = "\n".join([m.mention for m in valid_members][:10])  # Max 10 for readability
         short_match = f"{team1[:50]} vs {team2[:50]}"
 
@@ -305,7 +310,7 @@ async def handle_request_reschedule(interaction: Interaction, match_id: int):
 
             # Mark reschedule as pending (persisted state for bot restart resilience)
             match_updated["reschedule_pending"] = True
-            match_updated["reschedule_pending_since"] = datetime.now(tz=tz).isoformat()
+            match_updated["reschedule_pending_since"] = now_in_bot_timezone().isoformat()
 
             save_tournament_data(tournament_updated)
             logger.info(f"[RESCHEDULE] Marked {team_name} as having requested reschedule for match {match_id}")
@@ -371,46 +376,6 @@ async def match_id_autocomplete(interaction: Interaction, current: str):
                 )
             )
     return choices[:25]  # Discord allows max 25 suggestions
-
-
-# ---------------------------------------
-# Helper: Autocomplete for new time selection
-# ---------------------------------------
-async def neuer_zeitpunkt_autocomplete(interaction: Interaction, current: str):
-    """Provides autocomplete suggestions for available time slots."""
-    tournament = load_tournament_data()
-
-    try:
-        allowed_slots = get_free_slots_for_match(tournament, match_id)
-        allowed_iso = {slot.isoformat() for slot in allowed_slots}
-
-    except ValueError:
-        return []
-
-    # Find already booked slots
-    booked_slots = set()
-    for match in tournament.get("matches", []):
-        if match.get("scheduled_time"):
-            booked_slots.add(match["scheduled_time"])
-
-    # Only allowed & free slots
-    free_slots = [slot for slot in allowed_iso if slot not in booked_slots]
-
-    # Only future slots
-    tz = ZoneInfo(CONFIG.bot.timezone)
-    free_slots = [slot for slot in free_slots if datetime.fromisoformat(slot) > datetime.now(tz=tz)]
-
-    if current:
-        free_slots = [slot for slot in free_slots if current in slot]
-
-    choices = []
-    for slot in free_slots[:25]:
-        dt = datetime.fromisoformat(slot)
-        label = f"{dt.strftime('%A')} {dt.strftime('%d.%m.%Y %H:%M')}"
-        value = dt.strftime("%d.%m.%Y %H:%M")
-        choices.append(app_commands.Choice(name=label, value=value))
-
-    return choices
 
 
 async def start_reschedule_timer(bot, match_id: int):

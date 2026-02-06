@@ -18,7 +18,16 @@ from modules.dataStorage import DEBUG_MODE, load_tournament_data, save_tournamen
 # Removed: send_cleanup_summary import - function deleted to reduce spam
 from modules.logger import logger
 from modules.task_manager import add_task, get_all_tasks
-from modules.utils import AvailabilityChecker, generate_team_name, get_active_days_config, get_default_availability
+from modules.utils import (
+    AvailabilityChecker,
+    generate_team_name,
+    get_active_days_config,
+    get_default_availability,
+    now_in_bot_timezone,
+    ensure_timezone_aware,
+    parse_iso_datetime,
+    get_bot_timezone
+)
 
 # Tournament configuration (from centralized config)
 MATCH_DURATION = CONFIG.tournament.match_duration
@@ -26,7 +35,7 @@ PAUSE_DURATION = CONFIG.tournament.pause_duration
 MAX_TIME_BUDGET = CONFIG.tournament.max_time_budget
 
 
-def _update_tournament_end_timer(new_end: datetime, tz: ZoneInfo):
+def _update_tournament_end_timer(new_end: datetime):
     """
     Updates the tournament end timer when the tournament is extended.
     Cancels old timer and logs the extension.
@@ -34,9 +43,11 @@ def _update_tournament_end_timer(new_end: datetime, tz: ZoneInfo):
     Note: We can't reschedule the timer here because we don't have a channel reference.
     The timer will be recreated on bot restart if needed.
 
-    :param new_end: New tournament end datetime
-    :param tz: Timezone object
+    :param new_end: New tournament end datetime (will be ensured timezone-aware)
     """
+    # Ensure timezone-aware
+    new_end = ensure_timezone_aware(new_end)
+
     # Cancel existing tournament_end_timer if it exists
     all_tasks = get_all_tasks()
     if "tournament_end_timer" in all_tasks:
@@ -46,7 +57,7 @@ def _update_tournament_end_timer(new_end: datetime, tz: ZoneInfo):
             logger.info("[EXTEND] ⏰ Cancelled old tournament end timer")
 
     # Calculate new delay for logging
-    now = datetime.now(tz=tz)
+    now = now_in_bot_timezone()
     delay_seconds = max(0, int((new_end - now).total_seconds()))
 
     if delay_seconds > 0:
@@ -245,19 +256,15 @@ def generate_schedule_overview(matches: list) -> str:
     if not matches:
         return "No matches scheduled."
 
-    # Get timezone from config
-    tz = ZoneInfo(CONFIG.bot.timezone)
-    today = datetime.now(tz=tz).date()  # Today's date in configured timezone
+    # Get today's date in bot timezone
+    today = now_in_bot_timezone().date()
 
     # Group by date
     schedule_by_day = defaultdict(list)
     for match in matches:
         scheduled_time = match.get("scheduled_time")
         if scheduled_time:
-            dt = datetime.fromisoformat(scheduled_time)
-            # Ensure timezone awareness
-            if dt.tzinfo is None:
-                dt = dt.replace(tzinfo=tz)
+            dt = parse_iso_datetime(scheduled_time)
             day = dt.strftime("%d.%m.%Y %A")
             schedule_by_day[day].append((dt, match))  # Store datetime + match
 
@@ -306,8 +313,6 @@ def get_team_time_budget(team_name: str, date: datetime.date, matches: list) -> 
     """
     Calculates the total time a team is blocked on a specific day through matches + pauses.
     """
-    # Get timezone from config
-    tz = ZoneInfo(CONFIG.bot.timezone)
     total_time = timedelta()
 
     for match in matches:
@@ -316,10 +321,7 @@ def get_team_time_budget(team_name: str, date: datetime.date, matches: list) -> 
             continue
 
         try:
-            match_time = datetime.fromisoformat(scheduled)
-            # Ensure timezone awareness
-            if match_time.tzinfo is None:
-                match_time = match_time.replace(tzinfo=tz)
+            match_time = parse_iso_datetime(scheduled)
         except ValueError:
             continue
 
@@ -353,17 +355,9 @@ def generate_slot_matrix(tournament: dict, slot_interval_minutes: int = 60, log_
     from datetime import datetime, timedelta
     from collections import defaultdict
 
-    # Get timezone from config
-    tz = ZoneInfo(CONFIG.bot.timezone)
-
     # Parse dates and ensure they're timezone-aware
-    from_date = datetime.fromisoformat(tournament["registration_end"])
-    if from_date.tzinfo is None:
-        from_date = from_date.replace(tzinfo=tz)
-
-    to_date = datetime.fromisoformat(tournament["tournament_end"])
-    if to_date.tzinfo is None:
-        to_date = to_date.replace(tzinfo=tz)
+    from_date = parse_iso_datetime(tournament["registration_end"])
+    to_date = parse_iso_datetime(tournament["tournament_end"])
 
     # Validate tournament dates
     if from_date >= to_date:
@@ -847,10 +841,7 @@ async def generate_and_assign_slots():
             logger.info(f"[EXTEND] 🔧 {len(extendable_matches)} matches might be fixable by extending tournament duration")
 
             # Extend tournament by configured weeks
-            tz = ZoneInfo(CONFIG.bot.timezone)
-            tournament_end = datetime.fromisoformat(tournament["tournament_end"])
-            if tournament_end.tzinfo is None:
-                tournament_end = tournament_end.replace(tzinfo=tz)
+            tournament_end = parse_iso_datetime(tournament["tournament_end"])
 
             original_end = tournament_end.strftime("%Y-%m-%d")
             tournament_end += timedelta(weeks=extension_weeks_per_attempt)
@@ -862,7 +853,7 @@ async def generate_and_assign_slots():
             logger.warning(f"[EXTEND] ⏰ Tournament automatically extended: {original_end} → {new_end} (+{extension_weeks_per_attempt} weeks)")
 
             # Update tournament end timer task
-            _update_tournament_end_timer(tournament_end, tz)
+            _update_tournament_end_timer(tournament_end)
 
             logger.info(f"[EXTEND] 🔄 Regenerating slot matrix with new end date...")
 

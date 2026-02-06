@@ -9,6 +9,7 @@ from zoneinfo import ZoneInfo
 # Lokale Module
 from modules.dataStorage import load_tournament_data, save_tournament_data
 from modules.logger import logger
+from modules.utils import ensure_timezone_aware, to_utc
 
 
 # ---------------------------------------
@@ -251,7 +252,7 @@ class RescheduleView(ui.View):
             return
 
         # Critical: Check if slot is still free (prevent double booking)
-        new_slot_iso = self.new_datetime.astimezone(ZoneInfo("UTC")).isoformat()
+        new_slot_iso = to_utc(ensure_timezone_aware(self.new_datetime)).isoformat()
         booked_slots = {
             m["scheduled_time"]
             for m in tournament.get("matches", [])

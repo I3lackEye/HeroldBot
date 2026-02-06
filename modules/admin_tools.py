@@ -50,6 +50,9 @@ from modules.utils import (
     games_autocomplete,
     has_permission,
     smart_send,
+    now_in_bot_timezone,
+    ensure_timezone_aware,
+    get_bot_timezone
 )
 
 
@@ -100,7 +103,7 @@ async def handle_start_tournament_modal(
             )
             return
 
-        now = datetime.now(ZoneInfo(CONFIG.bot.timezone))
+        now = now_in_bot_timezone()
         registration_end = now + timedelta(hours=registration_duration)
         # Set generous default duration (12 weeks) - will be automatically recalculated
         # after registration closes based on actual number of teams
@@ -322,7 +325,7 @@ class AdminGroup(app_commands.Group):
         match["status"] = "completed"
         match["winner"] = winner
         match["reported_by"] = interaction.user.mention
-        match["reported_at"] = datetime.now(tz=ZoneInfo(CONFIG.bot.timezone)).isoformat()
+        match["reported_at"] = now_in_bot_timezone().isoformat()
 
         save_tournament_data(tournament)
 

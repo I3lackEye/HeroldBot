@@ -59,6 +59,10 @@ from modules.utils import (
     get_player_team,
     has_permission,
     smart_send,
+    now_in_bot_timezone,
+    ensure_timezone_aware,
+    parse_iso_datetime,
+    get_bot_timezone
 )
 
 # Global variables for double-call prevention
@@ -187,9 +191,6 @@ async def end_tournament_procedure(
     # Save last tournament winner for key claiming system
     if winner_ids:
         from modules.dataStorage import load_global_data, save_global_data
-        from datetime import datetime
-        from zoneinfo import ZoneInfo
-        from modules.config import CONFIG
 
         global_data = load_global_data()
         winning_team_name = get_winner_team(winner_ids) or "Unknown Team"
@@ -197,7 +198,7 @@ async def end_tournament_procedure(
         global_data["last_tournament_winner"] = {
             "winning_team": winning_team_name,
             "game": chosen_game or "Unknown",
-            "ended_at": datetime.now(tz=ZoneInfo(CONFIG.bot.timezone)).isoformat(),
+            "ended_at": now_in_bot_timezone().isoformat(),
             "winner_ids": [str(uid) for uid in winner_ids],  # Store as strings for key claiming
         }
         save_global_data(global_data)
@@ -324,11 +325,7 @@ async def execute_registration_close_procedure(channel: discord.TextChannel):
         if num_teams > 0:
             registration_end_str = tournament.get("registration_end")
             if registration_end_str:
-                registration_end = datetime.fromisoformat(registration_end_str)
-                # Ensure timezone awareness
-                tz = ZoneInfo(CONFIG.bot.timezone)
-                if registration_end.tzinfo is None:
-                    registration_end = registration_end.replace(tzinfo=tz)
+                registration_end = parse_iso_datetime(registration_end_str)
 
                 # Calculate and update tournament end
                 optimal_end = calculate_optimal_tournament_duration(num_teams, registration_end)
@@ -337,7 +334,7 @@ async def execute_registration_close_procedure(channel: discord.TextChannel):
                 logger.info(f"[TOURNAMENT] Duration auto-set to {optimal_end.strftime('%Y-%m-%d')}")
 
                 # Schedule automatic tournament end
-                now = datetime.now(tz=tz)
+                now = now_in_bot_timezone()
                 delay_seconds = max(0, int((optimal_end - now).total_seconds()))
                 if delay_seconds > 0:
                     add_task(

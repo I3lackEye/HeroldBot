@@ -786,6 +786,79 @@ def get_default_availability() -> dict:
     }
 
 
+# =======================================
+# TIMEZONE HELPER FUNCTIONS
+# =======================================
+
+def get_bot_timezone() -> ZoneInfo:
+    """
+    Returns the configured bot timezone as a ZoneInfo object.
+
+    :return: ZoneInfo object for the bot's timezone
+    """
+    return ZoneInfo(CONFIG.bot.timezone)
+
+
+def now_in_bot_timezone() -> datetime:
+    """
+    Returns the current datetime in the bot's configured timezone.
+
+    :return: Timezone-aware datetime object
+    """
+    return datetime.now(tz=get_bot_timezone())
+
+
+def ensure_timezone_aware(dt: datetime, default_tz: Optional[ZoneInfo] = None) -> datetime:
+    """
+    Ensures a datetime object is timezone-aware.
+    If it's naive, applies the default timezone (bot timezone if not specified).
+
+    :param dt: Datetime object to check
+    :param default_tz: Timezone to apply if dt is naive (defaults to bot timezone)
+    :return: Timezone-aware datetime object
+    """
+    if dt.tzinfo is None:
+        tz = default_tz or get_bot_timezone()
+        return dt.replace(tzinfo=tz)
+    return dt
+
+
+def parse_iso_datetime(iso_string: str) -> datetime:
+    """
+    Parses an ISO format datetime string and ensures it's timezone-aware.
+    If the string doesn't contain timezone info, applies bot timezone.
+
+    :param iso_string: ISO format datetime string
+    :return: Timezone-aware datetime object
+    """
+    dt = datetime.fromisoformat(iso_string)
+    return ensure_timezone_aware(dt)
+
+
+def to_utc(dt: datetime) -> datetime:
+    """
+    Converts a datetime to UTC timezone.
+    Ensures the datetime is timezone-aware first.
+
+    :param dt: Datetime to convert
+    :return: Datetime in UTC timezone
+    """
+    dt = ensure_timezone_aware(dt)
+    return dt.astimezone(ZoneInfo("UTC"))
+
+
+def to_bot_timezone(dt: datetime) -> datetime:
+    """
+    Converts a datetime to the bot's configured timezone.
+    Ensures the datetime is timezone-aware first.
+
+    :param dt: Datetime to convert
+    :return: Datetime in bot's timezone
+    """
+    dt = ensure_timezone_aware(dt)
+    return dt.astimezone(get_bot_timezone())
+
+
 def calculate_optimal_tournament_duration(num_teams: int, registration_end: datetime) -> datetime:
     """
     Calculates optimal tournament end date based on number of teams and tournament configuration.
@@ -798,9 +871,12 @@ def calculate_optimal_tournament_duration(num_teams: int, registration_end: date
 
     :param num_teams: Number of teams in the tournament
     :param registration_end: When registration ends (tournament start)
-    :return: Recommended tournament end datetime
+    :return: Recommended tournament end datetime (timezone-aware)
     """
     from math import ceil
+
+    # Ensure registration_end is timezone-aware
+    registration_end = ensure_timezone_aware(registration_end)
 
     if num_teams < 2:
         # Fallback: If less than 2 teams, just use 1 week

@@ -28,6 +28,10 @@ from modules.utils import (
     generate_team_name,
     has_permission,
     smart_send,
+    now_in_bot_timezone,
+    ensure_timezone_aware,
+    parse_iso_datetime,
+    get_bot_timezone
 )
 
 
@@ -356,8 +360,7 @@ class DevGroup(app_commands.Group):
             return
 
         # Prepare tournament data with timezone awareness
-        tz = ZoneInfo(CONFIG.bot.timezone)
-        now = datetime.now(tz=tz)
+        now = now_in_bot_timezone()
 
         # Registration ends in 20 seconds (for quick testing)
         registration_end = now + timedelta(seconds=20)
@@ -560,18 +563,12 @@ class DevGroup(app_commands.Group):
                 teams = tournament.get("teams", {})
 
             # Get tournament end date
-            from datetime import datetime, timedelta
-            tz = ZoneInfo(CONFIG.bot.timezone)
-
             tournament_end = tournament.get("tournament_end")
             if tournament_end:
-                end_date = datetime.fromisoformat(tournament_end)
-                # Ensure timezone awareness
-                if end_date.tzinfo is None:
-                    end_date = end_date.replace(tzinfo=tz)
+                end_date = parse_iso_datetime(tournament_end)
             else:
                 # Default: 2 weeks from now
-                end_date = datetime.now(tz=tz) + timedelta(weeks=2)
+                end_date = now_in_bot_timezone() + timedelta(weeks=2)
 
             # Try to create schedule
             matchups = create_round_robin_schedule(tournament)
@@ -730,12 +727,8 @@ class DevGroup(app_commands.Group):
         reg_end = tournament.get("registration_end")
         if reg_open and reg_end:
             try:
-                tz = ZoneInfo(CONFIG.bot.timezone)
-                dt = datetime.fromisoformat(reg_end)
-                # Ensure timezone awareness
-                if dt.tzinfo is None:
-                    dt = dt.replace(tzinfo=tz)
-                remaining = dt - datetime.now(tz=tz)
+                dt = parse_iso_datetime(reg_end)
+                remaining = dt - now_in_bot_timezone()
                 report.append(f"📝 Registration: ✅ Open ({remaining.days}d {remaining.seconds//3600}h remaining)")
             except Exception:
                 report.append("📝 Registration: ⚠️ Invalid date format")
