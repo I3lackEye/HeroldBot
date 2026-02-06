@@ -874,6 +874,201 @@ class DevGroup(app_commands.Group):
 
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
+    @app_commands.command(
+        name="test_reschedule",
+        description="🧪 Test reschedule system with mock data"
+    )
+    @app_commands.describe(
+        action="Action to perform",
+        match_id="Match ID (for check_pending action)"
+    )
+    @app_commands.choices(action=[
+        app_commands.Choice(name="Create mock match", value="create"),
+        app_commands.Choice(name="Set reschedule pending", value="set_pending"),
+        app_commands.Choice(name="Check pending status", value="check_pending"),
+        app_commands.Choice(name="Clear reschedule state", value="clear"),
+    ])
+    async def test_reschedule(
+        self,
+        interaction: Interaction,
+        action: app_commands.Choice[str],
+        match_id: int = None
+    ):
+        """Test the reschedule system with various scenarios."""
+        if not has_permission(interaction.user, "Dev"):
+            await interaction.response.send_message(
+                get_message("PERMISSION", "not_allowed"),
+                ephemeral=True
+            )
+            return
+
+        await interaction.response.defer(ephemeral=True)
+
+        tournament = load_tournament_data()
+
+        if action.value == "create":
+            # Create a mock match for testing
+            teams = tournament.get("teams", {})
+            if len(teams) < 2:
+                await interaction.followup.send(
+                    "❌ Need at least 2 teams in tournament to create a test match.\n"
+                    "Use `/dev quick_tournament` first.",
+                    ephemeral=True
+                )
+                return
+
+            team_names = list(teams.keys())[:2]
+
+            # Find next available match ID
+            existing_matches = tournament.get("matches", [])
+            next_id = max([m.get("match_id", 0) for m in existing_matches], default=0) + 1
+
+            # Create mock match
+            mock_match = {
+                "match_id": next_id,
+                "team1": team_names[0],
+                "team2": team_names[1],
+                "status": "scheduled",
+                "scheduled_time": (now_in_bot_timezone() + timedelta(days=3)).isoformat(),
+            }
+
+            tournament["matches"].append(mock_match)
+            save_tournament_data(tournament)
+
+            await interaction.followup.send(
+                f"✅ **Created test match:**\n"
+                f"• Match ID: {next_id}\n"
+                f"• Teams: {team_names[0]} vs {team_names[1]}\n"
+                f"• Status: scheduled\n\n"
+                f"You can now test reschedule with `/player request_reschedule` using match ID `{next_id}`",
+                ephemeral=True
+            )
+
+        elif action.value == "set_pending":
+            if match_id is None:
+                await interaction.followup.send(
+                    "❌ Please provide a match_id parameter",
+                    ephemeral=True
+                )
+                return
+
+            match = next((m for m in tournament.get("matches", []) if m.get("match_id") == match_id), None)
+            if not match:
+                await interaction.followup.send(
+                    f"❌ Match {match_id} not found",
+                    ephemeral=True
+                )
+                return
+
+            # Set reschedule as pending
+            match["reschedule_pending"] = True
+            match["reschedule_pending_since"] = now_in_bot_timezone().isoformat()
+            match["reschedule_requested_by"] = [match["team1"]]
+
+            save_tournament_data(tournament)
+
+            # Start a test timer (shortened to 1 minute for testing)
+            from modules.reschedule import start_reschedule_timer
+            timer_task = self.bot.loop.create_task(
+                start_reschedule_timer(self.bot, match_id, delay_seconds=60)
+            )
+            add_task(f"reschedule_timer_match_{match_id}", timer_task)
+
+            await interaction.followup.send(
+                f"✅ **Set reschedule pending for match {match_id}:**\n"
+                f"• reschedule_pending: True\n"
+                f"• reschedule_requested_by: {match['team1']}\n"
+                f"• Timer: 1 minute (test duration)\n\n"
+                f"Try requesting reschedule now to see the 'already pending' error!",
+                ephemeral=True
+            )
+
+        elif action.value == "check_pending":
+            if match_id is None:
+                # Show all pending reschedules
+                from modules.reschedule import get_reschedule_pending_matches
+                pending = get_reschedule_pending_matches()
+
+                if not pending:
+                    await interaction.followup.send(
+                        "✅ No pending reschedule requests",
+                        ephemeral=True
+                    )
+                    return
+
+                msg = "**Pending Reschedule Requests:**\n\n"
+                for m in pending:
+                    mid = m.get("match_id")
+                    team = m.get("reschedule_requested_by", ["Unknown"])[0]
+                    since = m.get("reschedule_pending_since", "Unknown")
+                    msg += f"• Match {mid}: Requested by {team}\n  Since: {since}\n\n"
+
+                await interaction.followup.send(msg, ephemeral=True)
+            else:
+                # Check specific match
+                match = next((m for m in tournament.get("matches", []) if m.get("match_id") == match_id), None)
+                if not match:
+                    await interaction.followup.send(
+                        f"❌ Match {match_id} not found",
+                        ephemeral=True
+                    )
+                    return
+
+                is_pending = match.get("reschedule_pending", False)
+                requested_by = match.get("reschedule_requested_by", [])
+                pending_since = match.get("reschedule_pending_since", "N/A")
+
+                await interaction.followup.send(
+                    f"**Match {match_id} Reschedule Status:**\n\n"
+                    f"• Pending: {is_pending}\n"
+                    f"• Requested by: {', '.join(requested_by) if requested_by else 'None'}\n"
+                    f"• Since: {pending_since}",
+                    ephemeral=True
+                )
+
+        elif action.value == "clear":
+            if match_id is None:
+                await interaction.followup.send(
+                    "❌ Please provide a match_id parameter",
+                    ephemeral=True
+                )
+                return
+
+            match = next((m for m in tournament.get("matches", []) if m.get("match_id") == match_id), None)
+            if not match:
+                await interaction.followup.send(
+                    f"❌ Match {match_id} not found",
+                    ephemeral=True
+                )
+                return
+
+            # Clear reschedule state
+            fields_cleared = []
+            if "reschedule_pending" in match:
+                del match["reschedule_pending"]
+                fields_cleared.append("reschedule_pending")
+            if "reschedule_requested_by" in match:
+                del match["reschedule_requested_by"]
+                fields_cleared.append("reschedule_requested_by")
+            if "reschedule_pending_since" in match:
+                del match["reschedule_pending_since"]
+                fields_cleared.append("reschedule_pending_since")
+
+            save_tournament_data(tournament)
+
+            # Cancel timer if exists
+            task_name = f"reschedule_timer_match_{match_id}"
+            all_tasks = get_all_tasks()
+            if task_name in all_tasks:
+                timer_task = all_tasks[task_name]["task"]
+                if not timer_task.done():
+                    timer_task.cancel()
+
+            await interaction.followup.send(
+                f"✅ Cleared reschedule state for match {match_id}\n"
+                f"Removed: {', '.join(fields_cleared) if fields_cleared else 'nothing (was already clear)'}",
+                ephemeral=True
+            )
 
     @app_commands.command(name="stop", description="🛑 Stops the bot (developers only)")
     async def stop_command(self, interaction: Interaction):
