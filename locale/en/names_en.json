@@ -1,23 +1,23 @@
 {
-    "adjektive": [
-      "Mutige", "Wilde", "Eiserne", "Schnelle", "Stille", "Kühne", "Tapfere", "Listige",
-      "Freche", "Donnernde", "Flinke", "Mächtige", "Verwegene", "Legendäre", "Lustige",
-      "Athletische", "Beglückende", "Elegante", "Fabelhafte", "Feurige", "Grandiose",
-      "Mysteriöse", "Garstige", "Hinterhältige", "Gebrechliche", "Unwürdige", "Verdächtige",
-      "Läppische", "Königliche", "Luftige", "Wässrige", "Erdige", "Göttliche", "Zauberhafte",
-      "Famose", "Grazile", "Anmutige", "Chaotische", "Liebreizende", "Hastige", "Hurtige",
-      "Aufmüpfige", "Unerschütterliche", "Bedürftige", "Schaurige", "Zahnlose", "Närrische",
-      "Solide", "Adelige", "Vorsichtige","Knochige", "Aufgedrehte", "Schelmische", "Miefende",
-      "Sonnige", "Frostige", "Windige", "Gelangweilte", "Unvergängliche", "Unnachgiebige",
-      "Saubere", "Einarmige", "Einbeinige", "Imperiale", "Kaiserliche", "Melancholische", "Verwirrtew"
-    ],
-    "substantive": [
-      "Wölfe", "Drachen", "Falken", "Titanen", "Krieger", "Panther", "Schlangen", "Ninjas",
-      "Löwen", "Bären", "Adler", "Haie", "Berserker", "Wächter", "Hobbits", "Goblins", "Ratten",
-      "Hühner", "Flöten", "Feen", "Orks", "Elfen", "Vampire", "Lappen", "Seepferdchen", "Einhörner",
-      "Abenteurer", "Schurken", "Vipern", "Marder", "Basilisken", "Skelette", "Untote", "Schakale",
-      "Goten", "Wikinger", "Römer", "Gallier", "Phönixe", "Beeren", "Gartenzwerge", "Gartengnome",
-      "Pioniere", "Kobolde", "Pilger", "Barden", "Ritter", "Besserwisser", "Glücksritter","Paladine",
-      "Templer", "Ganoven", "Wegelagerer", "Freibeuter", "Halunken"
-    ]
-  }
+  "adjectives": [
+    "Brave", "Wild", "Iron", "Swift", "Silent", "Bold", "Valiant", "Cunning",
+    "Cheeky", "Thundering", "Nimble", "Mighty", "Daring", "Legendary", "Jolly",
+    "Athletic", "Blessed", "Elegant", "Fabulous", "Fiery", "Grand",
+    "Mysterious", "Nasty", "Sneaky", "Frail", "Unworthy", "Suspicious",
+    "Silly", "Royal", "Airy", "Watery", "Earthy", "Divine", "Magical",
+    "Splendid", "Graceful", "Gracious", "Chaotic", "Charming", "Hasty", "Rapid",
+    "Rebellious", "Unshakable", "Needy", "Creepy", "Toothless", "Foolish",
+    "Solid", "Noble", "Cautious", "Bony", "Hyper", "Mischievous", "Smelly",
+    "Sunny", "Frosty", "Windy", "Bored", "Immortal", "Relentless",
+    "Clean", "One-Armed", "One-Legged", "Imperial", "Majestic", "Melancholic", "Confused"
+  ],
+  "nouns": [
+    "Wolves", "Dragons", "Falcons", "Titans", "Warriors", "Panthers", "Serpents", "Ninjas",
+    "Lions", "Bears", "Eagles", "Sharks", "Berserkers", "Guardians", "Hobbits", "Goblins", "Rats",
+    "Chickens", "Flutes", "Fairies", "Orcs", "Elves", "Vampires", "Rags", "Seahorses", "Unicorns",
+    "Adventurers", "Rogues", "Vipers", "Martens", "Basilisks", "Skeletons", "Undead", "Jackals",
+    "Goths", "Vikings", "Romans", "Gauls", "Phoenixes", "Berries", "Garden Dwarves", "Garden Gnomes",
+    "Pioneers", "Kobolds", "Pilgrims", "Bards", "Knights", "Know-It-Alls", "Fortune Seekers", "Paladins",
+    "Templars", "Scoundrels", "Highwaymen", "Freebooters", "Rascals"
+  ]
+}
