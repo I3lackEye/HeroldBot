@@ -106,59 +106,39 @@ class RescheduleView(ui.View):
         if self.approved == set(self.players):
             await self.success()
 
-    @ui.button(label="❌ Decline (Forfeit)", style=ButtonStyle.danger)
+    @ui.button(label="❌ Decline", style=ButtonStyle.danger)
     async def decline(self, interaction: Interaction, button: ui.Button):
         """
-        When a player declines the reschedule, the match is forfeited.
-        The declining player's team loses automatically.
+        When a player declines the reschedule, the reschedule request is cancelled.
+        The match continues at its originally scheduled time.
         """
         await interaction.response.defer()
 
-        logger.warning(f"[RESCHEDULE] {interaction.user.display_name} DECLINED reschedule for match {self.match_id}!")
-        logger.warning(f"[RESCHEDULE] Match {self.match_id} will be forfeited - decliner's team loses.")
-
-        # Determine which team the declining player belongs to
-        tournament = load_tournament_data()
-        teams = tournament.get("teams", {})
-
-        decliner_team = None
-        for team_name, team_data in teams.items():
-            if interaction.user.mention in team_data.get("members", []):
-                decliner_team = team_name
-                break
-
-        if not decliner_team:
-            logger.error(f"[RESCHEDULE] Could not find team for declining player {interaction.user.mention}")
-            await interaction.followup.send("❌ Error: Could not determine your team.", ephemeral=True)
-            return
-
-        # Set match to forfeit
-        match = next((m for m in tournament.get("matches", []) if m.get("match_id") == self.match_id), None)
-        if match:
-            match["status"] = "forfeit"
-            match["forfeit_by"] = decliner_team
-
-            # Opponent wins
-            opponent = self.team2 if self.team1 == decliner_team else self.team1
-            match["winner"] = opponent
-
-            # Clear reschedule state fields
-            if "reschedule_requested_by" in match:
-                del match["reschedule_requested_by"]
-            if "reschedule_pending" in match:
-                del match["reschedule_pending"]
-            if "reschedule_pending_since" in match:
-                del match["reschedule_pending_since"]
-
-            save_tournament_data(tournament)
-            logger.info(f"[RESCHEDULE] Match {self.match_id} forfeited by {decliner_team}. Winner: {opponent}")
+        logger.info(f"[RESCHEDULE] {interaction.user.display_name} DECLINED reschedule for match {self.match_id}")
+        logger.info(f"[RESCHEDULE] Reschedule cancelled - match {self.match_id} will remain at original time")
 
         # Import at runtime to avoid circular dependency
         from modules.reschedule import _reschedule_lock
         from modules.task_manager import get_all_tasks
 
         async with _reschedule_lock:
-            # Cancel the timer task if it exists in task manager
+            # Load tournament and clear reschedule state
+            tournament = load_tournament_data()
+            match = next((m for m in tournament.get("matches", []) if m.get("match_id") == self.match_id), None)
+
+            if match:
+                # Clear reschedule state fields - match keeps original time and status
+                if "reschedule_requested_by" in match:
+                    del match["reschedule_requested_by"]
+                if "reschedule_pending" in match:
+                    del match["reschedule_pending"]
+                if "reschedule_pending_since" in match:
+                    del match["reschedule_pending_since"]
+
+                save_tournament_data(tournament)
+                logger.info(f"[RESCHEDULE] Cleared reschedule state for match {self.match_id}")
+
+            # Cancel the timer task if it exists
             task_name = f"reschedule_timer_match_{self.match_id}"
             all_tasks = get_all_tasks()
             if task_name in all_tasks:
@@ -167,12 +147,22 @@ class RescheduleView(ui.View):
                     timer_task.cancel()
                     logger.debug(f"[RESCHEDULE] Cancelled timer task for match {self.match_id} after decline")
 
+        # Get original scheduled time for the message
+        original_time_str = "its original time"
+        if match and match.get("scheduled_time"):
+            try:
+                from modules.utils import parse_iso_datetime
+                original_dt = parse_iso_datetime(match["scheduled_time"])
+                original_time_str = original_dt.strftime("%d.%m.%Y %H:%M")
+            except:
+                pass
+
         if self.message:
             await self.message.edit(
                 content=(
-                    f"❌ **{interaction.user.mention}** declined the reschedule request.\n"
-                    f"⚠️ Match {self.match_id} has been **forfeited**.\n"
-                    f"🏆 **{opponent}** wins by forfeit."
+                    f"❌ **{interaction.user.mention}** declined the reschedule request.\n\n"
+                    f"The match will remain scheduled at **{original_time_str}**.\n"
+                    f"Both teams can request a new reschedule if needed."
                 ),
                 embed=None,
                 view=None
