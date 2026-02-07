@@ -732,43 +732,43 @@ class InfoGroup(app_commands.Group):
         await interaction.response.send_message(embed=embed, ephemeral=False)
 
 
+async def stats_autocomplete(interaction: Interaction, current: str):
+    """Combined autocomplete for player names and team names."""
+    from modules.stats_tracker import list_all_players, load_player_stats
+
+    choices = []
+
+    # Add players
+    player_ids = list_all_players()
+    for user_id in player_ids[:15]:  # Limit to avoid hitting Discord's 25 choice limit
+        stats = load_player_stats(user_id)
+        if not stats:
+            continue
+
+        display_name = stats.get("display_name", "Unknown")
+        if current.lower() in display_name.lower():
+            # Use display_name as value so the command can search by name
+            choices.append(app_commands.Choice(name=f"👤 {display_name}", value=display_name))
+
+    # Add teams
+    tournament = load_tournament_data()
+    teams = tournament.get("teams", {})
+    for team_name in list(teams.keys())[:10]:  # Limit teams too
+        if current.lower() in team_name.lower():
+            choices.append(app_commands.Choice(name=f"🏆 {team_name}", value=team_name))
+
+    return choices[:25]  # Discord limit
+
+
 class InfoCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         info_group = InfoGroup()
 
         # Register autocomplete for stats command
-        info_group.stats_smart.autocomplete("target")(self.stats_autocomplete)
+        info_group.stats_smart.autocomplete("target")(stats_autocomplete)
 
         self.bot.tree.add_command(info_group)
-
-    @staticmethod
-    async def stats_autocomplete(interaction: Interaction, current: str):
-        """Combined autocomplete for player names and team names."""
-        from modules.stats_tracker import list_all_players, load_player_stats
-
-        choices = []
-
-        # Add players
-        player_ids = list_all_players()
-        for user_id in player_ids[:15]:  # Limit to avoid hitting Discord's 25 choice limit
-            stats = load_player_stats(user_id)
-            if not stats:
-                continue
-
-            display_name = stats.get("display_name", "Unknown")
-            if current.lower() in display_name.lower():
-                # Use display_name as value so the command can search by name
-                choices.append(app_commands.Choice(name=f"👤 {display_name}", value=display_name))
-
-        # Add teams
-        tournament = load_tournament_data()
-        teams = tournament.get("teams", {})
-        for team_name in list(teams.keys())[:10]:  # Limit teams too
-            if current.lower() in team_name.lower():
-                choices.append(app_commands.Choice(name=f"🏆 {team_name}", value=team_name))
-
-        return choices[:25]  # Discord limit
 
 
 async def setup(bot):
