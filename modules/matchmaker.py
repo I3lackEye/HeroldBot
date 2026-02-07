@@ -407,11 +407,18 @@ def generate_slot_matrix(tournament: dict, slot_interval_minutes: int = 60, log_
             continue
 
         # Generate slots throughout the day at specified intervals
-        # Start from midnight and go until end of day
         day_start = current.replace(hour=0, minute=0, second=0, microsecond=0)
         day_end = day_start + timedelta(days=1)
 
-        slot = day_start
+        # CRITICAL FIX: On the first day, if tournament started mid-day, start from 'current' not midnight
+        # On subsequent days, start from midnight as normal
+        # This prevents generating slots in the past when tournament starts late
+        if current == from_date and from_date.hour != 0:
+            # First day and started mid-day - use actual start time
+            slot = current
+        else:
+            # Subsequent days or started at midnight - use day_start
+            slot = day_start
         while slot < day_end:
             total_slots_generated += 1
 
