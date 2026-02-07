@@ -359,10 +359,17 @@ def generate_slot_matrix(tournament: dict, slot_interval_minutes: int = 60, log_
     from_date = parse_iso_datetime(tournament["registration_end"])
     to_date = parse_iso_datetime(tournament["tournament_end"])
 
+    # CRITICAL FIX: Never generate slots in the past
+    # Use the later of registration_end or current time as start point
+    now = now_in_bot_timezone()
+    if from_date < now:
+        logger.info(f"[{log_prefix}] ⚠️  Registration ended in the past ({from_date}), using current time ({now}) as start point")
+        from_date = now
+
     # Validate tournament dates
     if from_date >= to_date:
-        logger.error(f"[{log_prefix}] ❌ Invalid tournament dates: registration_end ({from_date}) must be before tournament_end ({to_date})")
-        logger.error(f"[{log_prefix}]    💡 Please check your tournament configuration in tournament.json")
+        logger.error(f"[{log_prefix}] ❌ Invalid tournament dates: start ({from_date}) must be before tournament_end ({to_date})")
+        logger.error(f"[{log_prefix}]    💡 Tournament may have ended or needs date extension")
         return {}
 
     teams = tournament.get("teams", {})
