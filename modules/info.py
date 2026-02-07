@@ -774,12 +774,14 @@ async def stats_autocomplete(interaction: Interaction, current: str):
         if not stats:
             continue
 
-        # Try to get fresh display name from guild first
+        # Try to get fresh info from guild first
         display_name = None
+        username = None
         try:
             member = interaction.guild.get_member(int(user_id))
             if member:
                 display_name = member.display_name
+                username = member.name  # This is the username like "darkesteye"
         except:
             pass
 
@@ -791,9 +793,15 @@ async def stats_autocomplete(interaction: Interaction, current: str):
             else:
                 continue  # Skip players with placeholder names
 
-        if current.lower() in display_name.lower():
+        # Match against display name or username
+        if current.lower() in display_name.lower() or (username and current.lower() in username.lower()):
+            # Show both display name and username in the choice
+            if username and username.lower() != display_name.lower():
+                choice_name = f"👤 {display_name} (@{username})"
+            else:
+                choice_name = f"👤 {display_name}"
             # Use display_name as value so the command can search by name
-            choices.append(app_commands.Choice(name=f"👤 {display_name}", value=display_name))
+            choices.append(app_commands.Choice(name=choice_name, value=display_name))
 
     # Add teams
     tournament = load_tournament_data()
