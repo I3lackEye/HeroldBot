@@ -67,7 +67,7 @@ def get_leaderboard() -> str:
     return leaderboard
 
 
-def build_stats_embed(user, stats: dict) -> Embed:
+def build_stats_embed(user, stats: dict, guild: discord.Guild = None) -> Embed:
     """Builds an embed with comprehensive player statistics using locale templates."""
     language = CONFIG.bot.language
 
@@ -137,9 +137,22 @@ def build_stats_embed(user, stats: dict) -> Embed:
     nemesis = get_nemesis(str(user.id))
     if nemesis:
         nemesis_id, nemesis_stats = nemesis
-        # Load nemesis player data from file
-        nemesis_data = load_player_stats(nemesis_id)
-        nemesis_name = nemesis_data.get("display_name", f"<@{nemesis_id}>") if nemesis_data else f"<@{nemesis_id}>"
+        # Try to get fresh display name from guild first, fallback to stored name
+        nemesis_name = f"<@{nemesis_id}>"  # Fallback to mention
+        if guild:
+            try:
+                nemesis_member = guild.get_member(int(nemesis_id))
+                if nemesis_member:
+                    nemesis_name = nemesis_member.display_name
+            except:
+                pass
+        # If guild lookup failed, try stored name
+        if nemesis_name.startswith("<@"):
+            nemesis_data = load_player_stats(nemesis_id)
+            stored_name = nemesis_data.get("display_name") if nemesis_data else None
+            if stored_name and not stored_name.startswith("Player "):
+                nemesis_name = stored_name
+
         nemesis_record = f"{nemesis_stats['wins']}W-{nemesis_stats['losses']}L"
         nemesis_text = f"👿 {nemesis_name} ({nemesis_record})"
     else:
@@ -148,9 +161,22 @@ def build_stats_embed(user, stats: dict) -> Embed:
     rival = get_favorite_rival(str(user.id))
     if rival:
         rival_id, rival_stats = rival
-        # Load rival player data from file
-        rival_data = load_player_stats(rival_id)
-        rival_name = rival_data.get("display_name", f"<@{rival_id}>") if rival_data else f"<@{rival_id}>"
+        # Try to get fresh display name from guild first, fallback to stored name
+        rival_name = f"<@{rival_id}>"  # Fallback to mention
+        if guild:
+            try:
+                rival_member = guild.get_member(int(rival_id))
+                if rival_member:
+                    rival_name = rival_member.display_name
+            except:
+                pass
+        # If guild lookup failed, try stored name
+        if rival_name.startswith("<@"):
+            rival_data = load_player_stats(rival_id)
+            stored_name = rival_data.get("display_name") if rival_data else None
+            if stored_name and not stored_name.startswith("Player "):
+                rival_name = stored_name
+
         rival_record = f"{rival_stats['wins']}W-{rival_stats['losses']}L"
         rival_text = f"🤝 {rival_name} ({rival_record})"
     else:
@@ -544,7 +570,7 @@ class InfoGroup(app_commands.Group):
                 await interaction.response.send_message(get_message("ERRORS", "no_stats"), ephemeral=True)
                 return
 
-            embed = build_stats_embed(interaction.user, stats)
+            embed = build_stats_embed(interaction.user, stats, interaction.guild)
             await interaction.response.send_message(embed=embed, ephemeral=True)
             return
 
@@ -566,7 +592,10 @@ class InfoGroup(app_commands.Group):
                 # Try to find real member
                 member = interaction.guild.get_member(int(user_id))
                 fake_user = discord.Object(id=int(user_id)) if not member else member
-                embed = build_stats_embed(fake_user, stats)
+                # Set display_name for fake_user if member not found
+                if not member and hasattr(stats, 'get'):
+                    fake_user.display_name = stats.get("display_name", f"Player {user_id}")
+                embed = build_stats_embed(fake_user, stats, interaction.guild)
                 await interaction.response.send_message(embed=embed, ephemeral=True)
                 return
 
@@ -745,7 +774,23 @@ async def stats_autocomplete(interaction: Interaction, current: str):
         if not stats:
             continue
 
-        display_name = stats.get("display_name", "Unknown")
+        # Try to get fresh display name from guild first
+        display_name = None
+        try:
+            member = interaction.guild.get_member(int(user_id))
+            if member:
+                display_name = member.display_name
+        except:
+            pass
+
+        # Fallback to stored name (skip if it's the placeholder)
+        if not display_name:
+            stored_name = stats.get("display_name", "Unknown")
+            if not stored_name.startswith("Player "):
+                display_name = stored_name
+            else:
+                continue  # Skip players with placeholder names
+
         if current.lower() in display_name.lower():
             # Use display_name as value so the command can search by name
             choices.append(app_commands.Choice(name=f"👤 {display_name}", value=display_name))
