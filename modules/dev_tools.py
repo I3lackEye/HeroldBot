@@ -1088,6 +1088,106 @@ class DevGroup(app_commands.Group):
                 ephemeral=True
             )
 
+    @app_commands.command(
+        name="fix_past_matches",
+        description="🔧 Reschedules all matches that are in the past"
+    )
+    async def fix_past_matches(self, interaction: Interaction):
+        """Finds all matches scheduled in the past and reschedules them."""
+        if not has_permission(interaction.user, "Dev"):
+            await interaction.response.send_message(
+                get_message("PERMISSION", "not_allowed"),
+                ephemeral=True
+            )
+            return
+
+        await interaction.response.defer(ephemeral=True)
+
+        tournament = load_tournament_data()
+        matches = tournament.get("matches", [])
+        now = now_in_bot_timezone()
+
+        # Find matches in the past
+        past_matches = []
+        for match in matches:
+            scheduled_time_str = match.get("scheduled_time")
+            if scheduled_time_str and match.get("status") not in ["completed", "forfeit"]:
+                try:
+                    scheduled_time = parse_iso_datetime(scheduled_time_str)
+                    if scheduled_time < now:
+                        past_matches.append((match, scheduled_time))
+                except Exception as e:
+                    logger.error(f"[FIX-PAST] Error parsing time for match {match.get('match_id')}: {e}")
+
+        if not past_matches:
+            await interaction.followup.send(
+                "✅ No matches scheduled in the past. All good!",
+                ephemeral=True
+            )
+            return
+
+        # Show what will be fixed
+        msg = f"**Found {len(past_matches)} match(es) in the past:**\n\n"
+        for match, old_time in past_matches[:10]:
+            match_id = match.get("match_id")
+            team1 = match.get("team1", "Unknown")
+            team2 = match.get("team2", "Unknown")
+            msg += f"• Match {match_id}: {team1} vs {team2}\n"
+            msg += f"  Was: {old_time.strftime('%d.%m.%Y %H:%M')}\n\n"
+
+        if len(past_matches) > 10:
+            msg += f"... and {len(past_matches) - 10} more\n\n"
+
+        msg += "**Attempting to reschedule...**\n"
+
+        await interaction.followup.send(msg, ephemeral=True)
+
+        # Reschedule each match
+        from modules.matchmaker import generate_slot_matrix, assign_slots_with_matrix
+
+        # Reset scheduled_time for past matches
+        for match, _ in past_matches:
+            match["scheduled_time"] = None
+
+        # Generate new slot matrix (will use current time as start)
+        slot_matrix = generate_slot_matrix(tournament)
+
+        if not slot_matrix:
+            await interaction.followup.send(
+                "❌ Could not generate slot matrix. Check logs for errors.",
+                ephemeral=True
+            )
+            return
+
+        # Try to assign slots
+        matches_to_reschedule = [m for m, _ in past_matches]
+        updated_matches, unassigned = assign_slots_with_matrix(matches_to_reschedule, slot_matrix)
+
+        # Save results
+        save_tournament_data(tournament)
+
+        # Report results
+        result_msg = f"\n**Results:**\n"
+        result_msg += f"✅ Successfully rescheduled: {len(updated_matches)}\n"
+        result_msg += f"❌ Could not reschedule: {len(unassigned)}\n\n"
+
+        if updated_matches:
+            result_msg += "**New times:**\n"
+            for match in updated_matches[:10]:
+                match_id = match.get("match_id")
+                new_time_str = match.get("scheduled_time")
+                try:
+                    new_time = parse_iso_datetime(new_time_str)
+                    result_msg += f"• Match {match_id}: {new_time.strftime('%d.%m.%Y %H:%M')}\n"
+                except:
+                    result_msg += f"• Match {match_id}: {new_time_str}\n"
+
+        if unassigned:
+            result_msg += f"\n⚠️  **{len(unassigned)} match(es) could not be rescheduled**\n"
+            result_msg += "Consider extending the tournament or adjusting team availability."
+
+        await interaction.followup.send(result_msg, ephemeral=True)
+
     @app_commands.command(name="stop", description="🛑 Stops the bot (developers only)")
     async def stop_command(self, interaction: Interaction):
         """Stops the bot gracefully."""
