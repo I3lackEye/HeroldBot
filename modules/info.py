@@ -15,7 +15,7 @@ from discord.ext import commands
 # Local modules
 from modules.config import CONFIG
 from modules.dataStorage import load_global_data, load_tournament_data, save_global_data
-from modules.embeds import send_status, send_tournament_stats, load_embed_template, build_embed_from_template
+from modules.embeds import send_status, send_tournament_stats, load_embed_template, build_embed_from_template, send_match_schedule
 from modules.logger import logger
 from modules.stats_tracker import (
     calculate_match_winrate,
@@ -644,6 +644,35 @@ class InfoGroup(app_commands.Group):
         }
 
         await send_status(interaction, placeholders)
+
+    @app_commands.command(name="matches", description="Show the current match schedule.")
+    async def matches(self, interaction: Interaction):
+        """Displays the current tournament match schedule."""
+        from modules.matchmaker import generate_schedule_overview
+
+        tournament = load_tournament_data()
+
+        if not tournament.get("running", False):
+            await interaction.response.send_message(
+                "⚠️ No tournament is currently running.",
+                ephemeral=True
+            )
+            return
+
+        matches = tournament.get("matches", [])
+
+        if not matches:
+            await interaction.response.send_message(
+                "⚠️ No matches scheduled yet.",
+                ephemeral=True
+            )
+            return
+
+        # Generate schedule overview using the same function as the matchmaker
+        description_text = generate_schedule_overview(matches)
+
+        # Send using the existing embed function
+        await send_match_schedule(interaction, description_text)
 
     @app_commands.command(name="participants", description="Show list of all participants.")
     async def participants(self, interaction: Interaction):
