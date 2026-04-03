@@ -25,7 +25,7 @@ from modules.stats_tracker import (
     get_top_games,
     format_time_since
 )
-from modules.utils import autocomplete_players, autocomplete_teams, has_permission
+from modules.utils import autocomplete_players, autocomplete_teams
 
 # ----------------------------------------
 # Helper Functions
@@ -470,10 +470,6 @@ class InfoGroup(app_commands.Group):
     ])
     async def stats_overview(self, interaction: Interaction, view: Choice[str]):
         """Displays tournament overview, leaderboard, or match history."""
-        if not has_permission(interaction.user, "Moderator", "Admin"):
-            await interaction.response.send_message(get_message("PERMISSION", "no_permission_short"), ephemeral=True)
-            return
-
         if view.value == "leaderboard":
             # Show leaderboard
             board = get_leaderboard()

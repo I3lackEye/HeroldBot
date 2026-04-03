@@ -229,7 +229,7 @@ class TeamFullJoinModal(Modal):
             max_length=32,
         )
         self.saturday_time = TextInput(
-            label="Saturday Availability (e.g. 12:00-18:00)",
+            label="Fri & Sat Availability (e.g. 12:00-18:00)",
             required=True,
             placeholder="12:00-18:00",
             max_length=20,
@@ -322,7 +322,7 @@ class TeamFullJoinModal(Modal):
             teams = tournament.setdefault("teams", {})
             teams[team_name] = {
                 "members": [interaction.user.mention, teammate.mention],
-                "availability": {"saturday": saturday, "sunday": sunday},
+                "availability": {"friday": saturday, "saturday": saturday, "sunday": sunday},
                 "unavailable_dates": unavailable_list,
             }
             save_tournament_data(tournament)
@@ -341,7 +341,7 @@ class TeamFullJoinModal(Modal):
             solo_list = tournament.setdefault("solo", [])
             solo_entry = {
                 "player": interaction.user.mention,
-                "availability": {"saturday": saturday, "sunday": sunday},
+                "availability": {"friday": saturday, "saturday": saturday, "sunday": sunday},
                 "unavailable_dates": unavailable_list,
             }
             solo_list.append(solo_entry)

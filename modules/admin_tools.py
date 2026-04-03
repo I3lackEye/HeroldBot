@@ -347,15 +347,15 @@ class AdminGroup(app_commands.Group):
             import re
             winner_ids = []
             for m in winner_members:
-                match = re.search(r"\d+", m)
-                if match:
-                    winner_ids.append(match.group(0))
+                id_match = re.search(r"\d+", m)
+                if id_match:
+                    winner_ids.append(id_match.group(0))
 
             loser_ids = []
             for m in loser_members:
-                match = re.search(r"\d+", m)
-                if match:
-                    loser_ids.append(match.group(0))
+                id_match = re.search(r"\d+", m)
+                if id_match:
+                    loser_ids.append(id_match.group(0))
 
             # Get game name
             game = tournament.get("poll_results", {}).get("chosen_game", "Unknown")
